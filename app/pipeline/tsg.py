@@ -115,7 +115,11 @@ def write_dataset(pair: dict, hd: Path, meta: dict | None = None) -> dict:
         if t is not None and len(t.spectra) == n:
             np.save(hd / "spectra" / f"tir_{d8}.npy", np.asarray(t.spectra, "f4")); np.save(hd / "spectra" / f"tir_{d8}_wavelengths.npy", np.asarray(t.wavelength, "f4"))
             spectral.append({"name": "Base Refl", "n": n, "wl": [float(t.wavelength[0]), float(t.wavelength[-1]), len(t.wavelength)]})
-            if "Final Mask" in t.scalars:
+            mf = pair["swir"][0].with_name(f"{pair['name']}_tir_mask.npy")     # the data service's own TIR mask, when sources.py found one
+            override = np.load(mf) if mf.exists() else None
+            if override is not None and len(override) == n:
+                cols["mask_tir"] = override.astype("uint8")
+            elif "Final Mask" in t.scalars:
                 cols["mask_tir"] = (_numeric(t.scalars["Final Mask"]) == 1).astype("uint8")
             for name in sorted(LABEL_LOGS):
                 if name in t.scalars and name.endswith("jCLST"):

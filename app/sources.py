@@ -10,7 +10,8 @@ from functools import lru_cache
 from pathlib import Path
 
 from .pipeline import config as C
-from .pipeline.tsg import META_TAGS
+from .pipeline.nvcl import NVCLError, get, parse_logs
+from .pipeline.tsg import META_TAGS, find_pairs, header
 
 WANTED = re.compile(r"_tsg(_tir)?\.(tsg|bip)$", re.I)
 MAX_UNPACKED = 12 * 1024**3
@@ -70,6 +71,43 @@ def holes_in_catalogue() -> list[dict]:
     return sorted(by.values(), key=lambda e: e["name"])
 
 
+def service_tir_mask(folder: Path) -> int:
+    """Put the NVCL data service's own TIR validity mask beside each dataset of a mirrored hole
+    (<name>_tir_mask.npy). Returns how many datasets got one.
+
+    A TSG package carries one Final Mask for TIR, synchronised to the SWIR mask when the package
+    was written. The data service keeps the TIR mask as the scan was logged, and that is the one the
+    models were trained with, so for NVCL holes it is the one used. A dataset the service does not
+    know, or one without a TIR mask there, keeps the package's."""
+    n = 0
+    for pair in find_pairs(folder):
+        if not pair["tir"]:
+            continue
+        dsid = header(pair["swir"][0])["dsid"]
+        try:
+            logs = parse_logs(get(C.NVCL + f"getLogCollection.html?datasetid={dsid}", timeout=60).decode(errors="ignore"))
+        except NVCLError as e:
+            raise RuntimeError(f"NVCL data service not reachable for {pair['name']}: {e}") from e   # retried later
+        users: dict[str, list[str]] = {}
+        for lg in logs:
+            if lg["mask"]:
+                users.setdefault(lg["mask"], []).append(lg["name"] or "")
+        tir = next((lg for lg in logs if lg["type"] == "6" and any(u.endswith("jCLST") for u in users.get(lg["logid"], []))), None)
+        if tir is None:
+            continue
+        try:
+            raw = get(C.NVCL + f"downloadscalars.html?logid={tir['logid']}", timeout=600)
+        except NVCLError as e:
+            raise RuntimeError(f"NVCL TIR mask of {pair['name']} could not be downloaded: {e}") from e
+        import io
+        import numpy as np
+        import pandas as pd
+        v = pd.read_csv(io.BytesIO(raw), na_values=["null"], keep_default_na=False).iloc[:, 2]
+        np.save(pair["swir"][0].with_name(f"{pair['name']}_tir_mask.npy"), (pd.to_numeric(v, errors="coerce").fillna(0).to_numpy() == 1).astype("uint8"))
+        n += 1
+    return n
+
+
 def fetch(job: dict, platform, tmp: Path) -> tuple[list[Path], dict[str, dict], list[Path]]:
     """Folders of TSG files for a job, the header fields known for its datasets, and the zips they came from
     (the tray photographs are read from those afterwards)."""
@@ -83,6 +121,7 @@ def fetch(job: dict, platform, tmp: Path) -> tuple[list[Path], dict[str, dict], 
                 raise NotHere(f"{p['ref']}.zip is not in this worker's NVCL mirror.")
             d = tmp / f"ds{p['number']:03d}"
             if unpack_spectral(z, d):
+                service_tir_mask(d)
                 folders.append(d); zips.append(z)
         return folders, catalogue(), zips
     z = tmp / "upload.zip"; platform.download_source(job, z)

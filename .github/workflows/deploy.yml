@@ -1,0 +1,83 @@
+name: deploy
+# Two-hop auto-deploy for the CoreTrace service: GitHub runner → Cloudflare tunnel → SSH jump box
+# → app server. Ships the tracked tree, then runs the SHARED redeploy.sh (owned by the Groundwork
+# repo, already on the server), which rebuilds the coretrace container from ../CoreTrace and
+# waits until the platform lists its models. scp + sha256 verify on both hops.
+#
+# All infra specifics live in repo Secrets (no host/IP/path in-repo):
+#   DEPLOY_TUNNEL_HOSTNAME   the jump box's Cloudflare Access hostname
+#   DEPLOY_USER DEPLOY_SSH_KEY   the jump box account and a deploy key authorised on it
+#   DEPLOY_SERVER DEPLOY_SERVER_USER DEPLOY_BASE   the app server (reachable from the jump box) and its base dir
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+concurrency:
+  group: deploy-prod
+  cancel-in-progress: false
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync --frozen
+      - run: uv run pytest -q
+
+  deploy:
+    name: Deploy core-scan → app server
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Open Cloudflare tunnel to the jump box
+        env:
+          TUNNEL_HOSTNAME: ${{ secrets.DEPLOY_TUNNEL_HOSTNAME }}
+        run: |
+          curl -fsSL https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 \
+            -o /tmp/cloudflared && chmod +x /tmp/cloudflared
+          /tmp/cloudflared access tcp --hostname "$TUNNEL_HOSTNAME" --url 127.0.0.1:12222 \
+            > /tmp/cloudflared.log 2>&1 &
+          for i in $(seq 30); do nc -z 127.0.0.1 12222 && exit 0; sleep 1; done
+          echo "cloudflared did not open 127.0.0.1:12222"; cat /tmp/cloudflared.log; exit 1
+
+      - name: Two-hop deploy (core-scan)
+        env:
+          USER: ${{ secrets.DEPLOY_USER }}
+          KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          SERVER: ${{ secrets.DEPLOY_SERVER }}
+          SERVER_USER: ${{ secrets.DEPLOY_SERVER_USER }}
+          BASE: ${{ secrets.DEPLOY_BASE }}
+        run: |
+          set -e
+          install -m 600 /dev/null /tmp/deploy_key && printf '%s\n' "$KEY" > /tmp/deploy_key
+          TGZ="/tmp/ct-${GITHUB_RUN_ID}.tgz"
+          tar czf /tmp/app.tgz --exclude=.git --exclude=.env --exclude='**/.env' --exclude=.venv --exclude=work .
+          SUM=$(sha256sum /tmp/app.tgz | cut -d" " -f1)
+          echo "tarball sha256: $SUM ($(stat -c%s /tmp/app.tgz) bytes)"
+          OPTS="-i /tmp/deploy_key -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -o ServerAliveCountMax=40"
+          SSH="ssh $OPTS -p 12222 ${USER}@127.0.0.1"
+
+          ok=""
+          for i in 1 2 3; do
+            scp $OPTS -P 12222 /tmp/app.tgz "${USER}@127.0.0.1:${TGZ}" || true
+            remote=$($SSH "sha256sum ${TGZ}" | cut -d" " -f1) || remote=""
+            if [ "$remote" = "$SUM" ]; then ok=1; echo "hop1: verified on attempt $i"; break; fi
+            echo "hop1 attempt $i: checksum mismatch (remote=${remote:-none}), retrying"; sleep 3
+          done
+          [ -n "$ok" ] || { echo "hop1: tarball still corrupt after 3 attempts"; exit 1; }
+
+          $SSH "
+            set -e
+            scp -o StrictHostKeyChecking=no $TGZ ${SERVER_USER}@${SERVER}:$TGZ
+            ssh -o ServerAliveInterval=30 -o ServerAliveCountMax=40 -o StrictHostKeyChecking=no ${SERVER_USER}@${SERVER} '
+              set -e
+              echo \"$SUM  $TGZ\" | sha256sum -c -
+              bash ${BASE}/redeploy.sh $TGZ CoreTrace
+            '
+            rm -f $TGZ
+          "
+          rm -f /tmp/app.tgz /tmp/deploy_key

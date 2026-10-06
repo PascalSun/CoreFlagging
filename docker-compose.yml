@@ -6,9 +6,12 @@ services:
   coretrace:
     build: { context: ., target: prod }
     image: coretrace
+    container_name: geo-coretrace
     env_file: .env
     environment:
       CORETRACE_WORK: /work
+      CORETRACE_NVCL_ROOT: /nvcl/NVCL/tsg
+      CORETRACE_CATALOGUE: /nvcl/_catalog/all_datasets.json
     volumes:
       - coretrace_work:/work
       - ${NVCL_MIRROR:-/mnt/qnap/WAGeoData/WAGeoDataPublic/geossdi.dmp.wa.gov.au}:/nvcl:ro

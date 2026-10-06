@@ -120,10 +120,12 @@ and there from the NVCL data service (`scripts/parity_tokens.py`):
 
 - **Identical:** SWIR spectra, bin counts, lithology, gold assays and quality issues on all
   nine. With identical input, the three foundation models give identical output.
-- **TIR differs on two holes.** A TSG package carries one validity mask for TIR, synchronised
-  to the SWIR mask when the package was written. The data service keeps a separate, wider
-  TIR mask. On DRDD380 the package marks 15,000 fewer TIR samples valid, and results shift
-  (42 auto-log segments against 38). On WF14-98 the difference is 87 samples.
+- **TIR mask.** A TSG package carries one validity mask for TIR, synchronised to the SWIR mask
+  when the package was written. The NVCL data service keeps the TIR mask as logged, and the
+  models were trained on that one. For mirrored holes the worker fetches it from the service
+  (`sources.service_tir_mask`), which makes TIR identical too (checked on DRDD380, WF14-98,
+  MND036). An uploaded scan has only its package mask, so its TIR can differ from what the
+  service would give for the same hole (on DRDD380, 15,000 fewer valid TIR samples).
 - **Ties.** Where two minerals tie in a 10 cm bin the research code let the sort decide, so
   its answer depended on the machine. Here the alphabetically first wins. This moves 1–3 %
   of labels, and through them the conventional-methods gold score.
