@@ -2,7 +2,7 @@
 
   python -m app.cli process <hole> <folder> [<folder> ...]   run one hole from TSG folders, write the package to ./work
   python -m app.cli register [--requeue]                      tell the platform about every hole in the NVCL mirror
-  python -m app.cli work [--once]                             take jobs from the platform (no HTTP server)
+  python -m app.cli work [--once]                             take jobs from the platform (no HTTP server); --once stops when the queue is empty
 """
 from __future__ import annotations
 
@@ -34,11 +34,7 @@ def main() -> None:
     else:
         from .worker import Worker
         wk = Worker(runner); wk.announce()
-        if a.once:
-            while wk.run_one():
-                pass
-        else:
-            wk.loop()
+        wk.loop(until_idle=a.once)
 
 
 if __name__ == "__main__":

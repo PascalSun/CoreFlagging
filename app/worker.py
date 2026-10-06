@@ -67,9 +67,9 @@ class Worker:
             self.platform.done(job)
             log.info("job %s: done", job["job"])
         except (SourceError, TSGError, ValueError) as e:      # the scan itself is the problem: retrying will not help
-            self.platform.fail(job, str(e)); log.warning("job %s failed: %s", job["job"], e)
+            self._fail(job, str(e)); log.warning("job %s failed: %s", job["job"], e)
         except Exception as e:                                # noqa: BLE001 - NAS hiccup, platform restart: try again later
-            self.platform.fail(job, f"{type(e).__name__}: {e}", transient=True); log.error("job %s error:\n%s", job["job"], traceback.format_exc())
+            log.error("job %s error:\n%s", job["job"], traceback.format_exc()); self._fail(job, f"{type(e).__name__}: {e}", transient=True)
         finally:
             done.set(); shutil.rmtree(tmp, ignore_errors=True); self.runner.ws.remove(key)
         return True
@@ -87,10 +87,22 @@ class Worker:
                     log.warning("job %s: tray photographs of %s stopped: %s", job["job"], name, e)
         log.info("job %s: %s tray photographs", job["job"], sent)
 
-    def loop(self) -> None:
+    def _fail(self, job: dict, error: str, transient: bool = False) -> None:
+        """Report a failure. If the platform cannot be reached (it may be redeploying) the lease simply
+        runs out and the job is handed on, so this never takes the worker down."""
+        try:
+            self.platform.fail(job, error, transient=transient)
+        except httpx.HTTPError as e:
+            log.warning("job %s: could not report the failure (%s); its lease will run out", job["job"], e)
+
+    def loop(self, until_idle: bool = False) -> None:
+        """Take jobs until stopped (or, with until_idle, until the queue is empty). A platform that is
+        down for a while (a deploy) is waited out, not fatal."""
         while not self.stop.is_set():
             try:
                 if not self.run_one():
+                    if until_idle:
+                        return
                     self.stop.wait(IDLE_S)
             except httpx.HTTPError as e:
                 log.warning("platform not reachable (%s); waiting", e); self.stop.wait(30)
