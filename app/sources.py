@@ -68,6 +68,15 @@ def holes_in_catalogue() -> list[dict]:
             e = by.setdefault(hole.lower(), {"name": hole, "datasets": []}); e["datasets"].append(c["datasetName"])
             if c["datasetName"].lower() == hole.lower():
                 e["name"] = c["datasetName"]                                 # prefer the spelling of the dataset (URIs are sometimes lower-cased)
+    # collar details from the State list, so the platform can place a hole on the map before it is processed
+    ref = {}
+    rp = Path(C.REFERENCE) / "holes_ref.json"
+    if rp.exists():
+        ref = {r["hole"].lower(): r for r in json.loads(rp.read_text())}
+    for e in by.values():
+        r = ref.get(e["name"].lower())
+        if r:
+            e.update({k: r.get(k) for k in ("lat", "lon", "operator", "project", "region") if r.get(k) not in (None, "")})
     return sorted(by.values(), key=lambda e: e["name"])
 
 
