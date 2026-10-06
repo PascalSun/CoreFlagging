@@ -1,0 +1,28 @@
+# CoreTrace next to the platform (Groundwork): its own stack, meeting the platform on the
+# shared external network `geo_shared` (docker network create geo_shared).
+# On the platform side set CORETRACE_SERVICE_URL=http://coretrace:8000.
+name: coretrace
+services:
+  coretrace:
+    build: { context: ., target: prod }
+    image: coretrace
+    env_file: .env
+    environment:
+      CORETRACE_WORK: /work
+    volumes:
+      - coretrace_work:/work
+      - ${NVCL_MIRROR:-/mnt/qnap/WAGeoData/WAGeoDataPublic/geossdi.dmp.wa.gov.au}:/nvcl:ro
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    restart: unless-stopped
+    networks:
+      geo_shared: {}
+volumes:
+  coretrace_work: {}
+networks:
+  geo_shared:
+    external: true

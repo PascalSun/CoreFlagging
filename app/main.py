@@ -1,0 +1,82 @@
+"""CoreTrace service.
+
+It keeps no data of its own. It takes scans from the platform's queue, turns each into cleaned 10 cm tokens and the
+models' readings, and hands those back; the platform stores and serves them. The one question it answers live is
+"which core elsewhere in the State looks like this", because that needs the State library the models ship with.
+"""
+from __future__ import annotations
+
+import logging, threading
+from contextlib import asynccontextmanager
+
+import numpy as np
+import torch
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+
+from . import extras
+from .pipeline import config as C
+from .runner import Runner
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
+log = logging.getLogger("coretrace")
+torch.set_num_threads(C.THREADS)
+state: dict = {"runner": None, "worker": None}
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    state["runner"] = Runner()
+    if C.WORKER and C.PLATFORM_API_URL:
+        from .worker import Worker
+        w = Worker(state["runner"]); state["worker"] = w
+
+        def start():
+            while not w.stop.is_set():
+                try:
+                    w.announce(); break
+                except Exception as e:                        # noqa: BLE001 - the platform may come up after us
+                    log.warning("could not announce models yet (%s)", e); w.stop.wait(15)
+            w.loop()
+
+        threading.Thread(target=start, daemon=True, name="coretrace-worker").start()
+    yield
+    if state["worker"]:
+        state["worker"].stop.set()
+
+
+app = FastAPI(title="CoreTrace", version="0.1.0", lifespan=lifespan)
+
+
+@app.get("/health")
+def health():
+    r = state["runner"]
+    return {"status": "ok", "models": list(r.models.dirs) if r else [], "default": r.models.default if r else None,
+            "worker": bool(state["worker"]), "sources": state["worker"].sources if state["worker"] else []}
+
+
+@app.get("/api/v1/models")
+def models():
+    return state["runner"].models.listing()
+
+
+class Similar(BaseModel):
+    model: str = ""
+    fp: list[float]
+    hole: str = ""
+    lat: float | None = None
+    lon: float | None = None
+    k: int = 10
+
+
+@app.post("/api/v1/similar")
+def similar(body: Similar):
+    try:
+        eng = state["runner"].models.get(body.model or None)
+    except KeyError:
+        raise HTTPException(404, f"no model '{body.model}'")
+    try:
+        res = extras.similar(eng, np.array(body.fp, "f4"), body.hole, body.lat, body.lon, max(1, min(body.k, 50)))
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    return {"model": eng.run, "library": {"intervals": int(len(eng.L["hole"])), "holes": int(len(set(eng.L["hole"].tolist())))}, "results": res}

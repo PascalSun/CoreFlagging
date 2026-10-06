@@ -1,0 +1,112 @@
+{
+ "n_rows": 4613,
+ "n_holes_listed": 1897,
+ "n_holes_with_issue": 1601,
+ "types": [
+  {
+   "code": "listed_no_data",
+   "zh": "名单里有这个钻孔，但没有任何扫描数据",
+   "fix": "从名单里删除，或补传数据",
+   "rows": 197,
+   "holes": 197
+  },
+  {
+   "code": "dataset_skipped",
+   "zh": "扫描数据集没有用上",
+   "fix": "核对数据集类型（岩屑样不是连续岩芯）",
+   "rows": 34,
+   "holes": 30
+  },
+  {
+   "code": "tir_miscalibrated",
+   "zh": "热红外定标错误（反射率超过 1）",
+   "fix": "重新定标或标记热红外不可用",
+   "rows": 1,
+   "holes": 1
+  },
+  {
+   "code": "tir_none",
+   "zh": "没有可用的热红外",
+   "fix": "核对仪器型号和热红外文件",
+   "rows": 44,
+   "holes": 44
+  },
+  {
+   "code": "tir_sparse",
+   "zh": "可用的热红外太少",
+   "fix": "核对热红外文件",
+   "rows": 18,
+   "holes": 17
+  },
+  {
+   "code": "tir_many_bad",
+   "zh": "三成以上热红外采样点太暗、有负值或超过 1",
+   "fix": "检查扫描时的仪器状态",
+   "rows": 76,
+   "holes": 75
+  },
+  {
+   "code": "low_valid_share",
+   "zh": "一半以上采样点不是有效岩芯",
+   "fix": "核对有效标记（Final Mask）",
+   "rows": 35,
+   "holes": 35
+  },
+  {
+   "code": "core_gap",
+   "zh": "岩芯中间缺失超过 5 米",
+   "fix": "核对是否漏扫或深度记录有误",
+   "rows": 724,
+   "holes": 224
+  },
+  {
+   "code": "no_tsg_coordinates",
+   "zh": "扫描文件里坐标填的是 0",
+   "fix": "从钻孔数据库补坐标",
+   "rows": 316,
+   "holes": 316
+  },
+  {
+   "code": "coordinate_mismatch",
+   "zh": "扫描文件和钻孔名单的坐标相差超过 1 公里",
+   "fix": "核对哪一个坐标正确",
+   "rows": 68,
+   "holes": 68
+  },
+  {
+   "code": "inclination_missing",
+   "zh": "倾角填 0 或不可能的值",
+   "fix": "从钻孔数据库补倾角",
+   "rows": 592,
+   "holes": 592
+  },
+  {
+   "code": "elevation_missing",
+   "zh": "孔口高程填 0",
+   "fix": "从钻孔数据库补高程",
+   "rows": 1038,
+   "holes": 1038
+  },
+  {
+   "code": "drill_date_missing",
+   "zh": "没有钻孔日期",
+   "fix": "补日期",
+   "rows": 559,
+   "holes": 559
+  },
+  {
+   "code": "tectonic_unit_missing",
+   "zh": "没填所属构造单元",
+   "fix": "可用我们按 GSWA 构造单元图补出的地区（见 value 列）",
+   "rows": 905,
+   "holes": 905
+  },
+  {
+   "code": "profilometer_bad",
+   "zh": "岩芯表面高度读数为 0 或大于 200 毫米",
+   "fix": "检查表面高度传感器",
+   "rows": 6,
+   "holes": 6
+  }
+ ]
+}

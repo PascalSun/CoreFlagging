@@ -1,0 +1,12 @@
+# secrets / runtime config
+.env
+.env.*
+!.env.example
+# python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+# local working directory (scratch; the platform database is the record)
+/work/
+*.log
