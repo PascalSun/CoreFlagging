@@ -32,6 +32,11 @@ class TSGError(ValueError):
     pass
 
 
+# pytsg looks a class scalar's code up in the class table and fails on a code the table lacks
+# (seen in a few NVCL packages); such a sample is left unlabelled instead
+parse_tsg.ClassHeaders.map_ints = lambda self, index: [self.classes.get(int(i), "") if i >= 0 else "" for i in index]  # type: ignore[method-assign]
+
+
 def find_pairs(folder: Path) -> list[dict]:
     """The datasets in a folder: [{name, swir: (tsg, bip), tir: (tsg, bip) | None}]. File names are matched without case."""
     files = {p.name.lower(): p for p in Path(folder).rglob("*") if p.is_file()}

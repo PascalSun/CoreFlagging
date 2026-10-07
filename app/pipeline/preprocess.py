@@ -84,28 +84,43 @@ def _majority(bins, lab, keep_bins):
     return c.reindex(keep_bins).astype(object).where(lambda s: s.notna(), None).to_numpy()
 
 
-def clean_dataset(hd: Path, dsid: str, inst: str):
+def clean_dataset(hd: Path, dsid: str, inst: str, lenient: bool = False):
+    """One dataset cleaned into 10 cm bins under the rules the models were trained with.
+    `lenient` is for showing a scan the models cannot read (chips, a mask that rejects nearly
+    everything, another SWIR band grid): no spacing limit, a bin needs one sample, a missing or
+    empty mask lets every finite sample through, and SWIR is resampled to the standard grid.
+    Its output is for display only and never goes to a model."""
+    min_valid = 1 if lenient else C.MIN_VALID
     d8 = dsid[:8]; f = hd / "samples" / f"{d8}.parquet"; fs = hd / "spectra" / f"vnswir_{d8}.npy"
     if not f.exists():
         return "no per-sample table"
     if not fs.exists():
         return "no SWIR spectra"
     names = set(pq.read_schema(f).names)
-    if "mask_swir" not in names:
+    if "mask_swir" not in names and not lenient:
         return "no SWIR validity mask"
     want = ["start_depth", "mask_swir", "mask_tir"] + [c for pair in LABELS.values() for c in pair]
     t = pd.read_parquet(f, columns=[c for c in want if c in names]); sw = np.load(fs, mmap_mode="r")
+    if lenient and len(sw) == len(t) and sw.shape[1] != len(SW_WL):
+        wf = hd / "spectra" / f"vnswir_{d8}_wavelengths.npy"
+        if wf.exists():
+            src = np.load(wf).astype("f8")
+            sw = np.stack([np.interp(SW_WL, src, row) for row in np.asarray(sw, dtype="f8")]).astype("f4")
     if len(sw) != len(t) or sw.shape[1] != len(SW_WL):
         return f"SWIR shape {sw.shape} does not match the sample table ({len(t)})"
     depth = t.start_depth.to_numpy(); step = np.diff(depth); step = np.median(step[step > 0]) if (step > 0).any() else np.inf
-    if not np.isfinite(step) or step > C.MAX_STEP_M:
+    if not lenient and (not np.isfinite(step) or step > C.MAX_STEP_M):
         return f"sample spacing {step:.2f} m: chips or cuttings, not a core scan"
-    b = np.floor(depth / C.BIN_M + 1e-6).astype(np.int64); st = {"n_samples": len(t), "step_mm": float(step * 1000)}
-    ms = t.mask_swir.to_numpy() == 1; xs = np.asarray(sw, dtype="f4"); fin = np.isfinite(xs).all(1); ok = ms & fin
+    b = np.floor(depth / C.BIN_M + 1e-6).astype(np.int64); st = {"n_samples": len(t), "step_mm": float(step * 1000) if np.isfinite(step) else None}
+    xs = np.asarray(sw, dtype="f4"); fin = np.isfinite(xs).all(1)
+    ms = t.mask_swir.to_numpy() == 1 if "mask_swir" in t else np.ones(len(t), bool)
+    if lenient and (ms & fin).sum() < max(min_valid, 0.05 * len(t)):
+        ms = np.ones(len(t), bool); st["mask_ignored"] = True        # the mask leaves (almost) nothing: show every finite sample
+    ok = ms & fin
     st["swir_valid"] = int(ok.sum())
-    if ok.sum() < C.MIN_VALID:
+    if ok.sum() < min_valid:
         return "no valid SWIR samples"
-    ub, m_s, sd_s, n_s, _ = _bin_mean(np.clip(xs[ok], *C.SWIR_CLIP), b[ok], C.MIN_VALID)
+    ub, m_s, sd_s, n_s, _ = _bin_mean(np.clip(xs[ok], *C.SWIR_CLIP), b[ok], min_valid)
     st["bins_any"] = int(len(np.unique(b[ok]))); st["bins_kept"] = int(len(ub))
     if len(ub) == 0:
         return "no bin with enough valid SWIR samples"
@@ -124,14 +139,16 @@ def clean_dataset(hd: Path, dsid: str, inst: str):
                 j = np.clip(np.searchsorted(src_wl, TI_WL) - 1, 0, len(src_wl) - 2); w = (TI_WL - src_wl[j]) / (src_wl[j + 1] - src_wl[j])
                 xt = xt[:, j] * (1 - w) + xt[:, j + 1] * w
             okt = (t.mask_tir.to_numpy() == 1) & np.isfinite(xt).all(1)
-            if okt.sum() >= C.MIN_VALID:
+            if lenient and okt.sum() < max(min_valid, 0.05 * len(t)):
+                okt = np.isfinite(xt).all(1)
+            if okt.sum() >= min_valid:
                 xv = xt[okt]; inb = (TI_WL >= C.TIR_BANDS[0]) & (TI_WL <= C.TIR_BANDS[1]); over = (xv[:, inb] > C.TIR_MAX).any(1)
                 negb = (xv[:, inb] < C.TIR_CLIP_MIN).mean(1); xv = np.clip(xv, C.TIR_CLIP_MIN, 1.0); dark = xv[:, inb].mean(1) < C.TIR_DARK
                 drop = dark | (negb > C.TIR_NEG_BAND_SHARE) | over
                 st.update(tir_dark=float(dark.mean()), tir_over=float(over.mean()), tir_dropped=float(drop.mean()), tir_valid=int(okt.sum()))
                 miscal = over.mean() > C.TIR_OVER_SHARE
-                if (~drop).sum() >= C.MIN_VALID and not miscal:
-                    ubt, m_t, sdt, nt, _ = _bin_mean(xv[~drop], b[okt][~drop], C.MIN_VALID)
+                if (~drop).sum() >= min_valid and not miscal:
+                    ubt, m_t, sdt, nt, _ = _bin_mean(xv[~drop], b[okt][~drop], min_valid)
                     pos = np.searchsorted(ub, ubt); hit = (pos < len(ub)) & (ub[np.minimum(pos, len(ub) - 1)] == ubt)
                     tir[pos[hit]] = m_t[hit].astype(C.STORE_DTYPE); n_t[pos[hit]] = nt[hit]; sd_t[pos[hit]] = sdt[hit]
                 st["tir"] = "miscalibrated" if miscal else ("ok" if (n_t > 0).mean() >= 0.5 else ("sparse" if (n_t > 0).any() else "none"))
@@ -191,13 +208,13 @@ def _km(la1, lo1, la2, lo2):
 
 
 # ─────────────── one hole ───────────────
-def preprocess_hole(hd: Path, out_dir: Path, ref: dict | None = None, progress=lambda msg, frac=None: None) -> dict:
+def preprocess_hole(hd: Path, out_dir: Path, ref: dict | None = None, progress=lambda msg, frac=None: None, lenient: bool = False) -> dict:
     hole = hd.name; ref = ref or {}
     man = json.loads((hd / "manifest.json").read_text()); xml = (hd / "datasets.xml").read_text(errors="ignore")
     good, skipped, report = [], [], []
     for k, d in enumerate(man["datasets"]):
         progress(f"清洗数据集 {k + 1}/{len(man['datasets'])}：{d['name']}", 0.1 + 0.6 * k / max(len(man["datasets"]), 1))
-        r = clean_dataset(hd, d["dsid"], d.get("instrument") or "")
+        r = clean_dataset(hd, d["dsid"], d.get("instrument") or "", lenient=lenient)
         row = {"dataset": d["name"], "dsid": d["dsid"], "instrument": d.get("instrument") or "", "depth": d.get("depth")}
         if isinstance(r, str):
             skipped.append({"dsid": d["dsid"], "reason": r}); report.append({**row, "kept": False, "reason": r, "reason_zh": reason_zh(r)})
