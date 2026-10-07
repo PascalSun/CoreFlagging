@@ -286,7 +286,7 @@ def preprocess_hole(hd: Path, out_dir: Path, ref: dict | None = None, progress=l
     if not tsg.get("drill_date"):
         add("drill_date_missing")
     if not tsg.get("tectonic_unit"):
-        add("tectonic_unit_missing", value=ref.get("region"), evidence="filled from the GSWA 1:10M tectonic units by collar position")
+        add("tectonic_unit_missing", value=ref.get("region"), evidence="filled from the GSWA 1:10M tectonic units by collar position" if ref.get("region") else "")
     rep = {"funnel": funnel, "datasets": report, "rules": cleaning_rules(), "qc": qc}
     out_dir.mkdir(parents=True, exist_ok=True)
     tmp = out_dir / f"{hole}.part.npz"; np.savez_compressed(tmp, **arrays); tmp.rename(out_dir / f"{hole}.npz")
