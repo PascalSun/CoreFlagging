@@ -6,6 +6,7 @@ nothing; if this process dies the lease runs out and another worker takes the jo
 from __future__ import annotations
 
 import logging, os, shutil, socket, tempfile, threading, time, traceback
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import httpx
@@ -19,6 +20,7 @@ from .trays import extract
 
 log = logging.getLogger("coretrace.worker")
 IDLE_S, HEARTBEAT_S = 5, 60
+UPLOADS = int(os.environ.get("CORETRACE_UPLOADS", "4"))   # tray photographs in flight at once
 STAGE = {"reading": "reading", "cleaning": "cleaning", "modelling": "modelling"}
 
 
@@ -77,17 +79,41 @@ class Worker:
         return True
 
     def photos(self, job: dict, key: str, zips: list[Path], tmp: Path, state: dict) -> None:
-        """Tray photographs of the datasets that were used. A hole without photographs, or with a damaged one, is still a hole."""
-        index = self.runner.trays.pop(key, {}); sent = 0
+        """Tray photographs of the datasets that were used. A hole without photographs, or with a damaged one, is still a hole.
+
+        Each upload waits about a second on the platform's object store, which takes many writes at once, so a few go
+        in parallel; one that fails (a reset connection) is tried again rather than ending the dataset's photographs."""
+        index = self.runner.trays.pop(key, {}); sent = lost = 0
         state.clear()                                         # the hole is ready: heartbeats now only keep the lease
-        for z in zips:
-            for name, trays in index.items():
-                try:
-                    for tray, jpeg in extract(z, name, trays, tmp / "trays" / name):
-                        self.platform.tray(job, name, tray, jpeg); jpeg.unlink(missing_ok=True); sent += 1
-                except Exception as e:                        # noqa: BLE001
-                    log.warning("job %s: tray photographs of %s stopped: %s", job["job"], name, e)
-        log.info("job %s: %s tray photographs", job["job"], sent)
+
+        def send(name: str, tray: dict, jpeg: Path) -> bool:
+            try:
+                for attempt in range(4):
+                    try:
+                        self.platform.tray(job, name, tray, jpeg); return True
+                    except httpx.HTTPError as e:
+                        if attempt == 3:
+                            log.warning("job %s: tray %s of %s not sent: %s", job["job"], tray.get("n"), name, e); return False
+                        time.sleep(2 * (attempt + 1))
+                return False
+            finally:
+                jpeg.unlink(missing_ok=True)
+
+        with ThreadPoolExecutor(UPLOADS) as pool:
+            futures = []
+            for z in zips:
+                for name, trays in index.items():
+                    try:
+                        for tray, jpeg in extract(z, name, trays, tmp / "trays" / name):
+                            futures.append(pool.submit(send, name, tray, jpeg))
+                    except Exception as e:                    # noqa: BLE001 - a damaged zip member: keep what was read
+                        log.warning("job %s: tray photographs of %s stopped: %s", job["job"], name, e)
+            for f in futures:
+                if f.result():
+                    sent += 1
+                else:
+                    lost += 1
+        log.info("job %s: %s tray photographs%s", job["job"], sent, f" ({lost} not sent)" if lost else "")
 
     def _fail(self, job: dict, error: str, transient: bool = False) -> None:
         """Report a failure. If the platform cannot be reached (it may be redeploying) the lease simply
