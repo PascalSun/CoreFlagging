@@ -59,7 +59,8 @@ class Worker:
             folders, meta, zips = fetch(job, self.platform, tmp)
             # only a WA mirrored hole is matched to the WA reference list by its name: an upload's "DDH-1", or
             # another State's, is not GSWA's
-            ref = None if job["hole"]["source"] == "nvcl" and is_wa([p["ref"] for p in job["parts"]]) else {}
+            # (and only by its name when that is its key: BH01_Behemoth is not the BH01 of the list)
+            ref = None if job["hole"]["source"] == "nvcl" and is_wa([p["ref"] for p in job["parts"]]) and key == name else {}
             pkg = self.runner.process(key, name, folders, meta=meta, ref=ref, source="NVCL mirror" if job["hole"]["source"] == "nvcl" else "upload", progress=progress)
             if lost.is_set():
                 log.warning("job %s: lease lost, result dropped", job["job"]); return True

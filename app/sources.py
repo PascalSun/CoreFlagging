@@ -150,12 +150,14 @@ def _wa_holes() -> list[dict]:
             e.update({k: g[f].strip() for k, f in (("operator", "DRILL_OPER"), ("project", "PROJECT"), ("region", "TECT_NAME")) if (g.get(f) or "").strip()})
         else:
             e["offshore"] = False
-        r = ref.get(e["name"].lower())
+    _keys(groups)
+    for e in groups:
+        # the research list knows a hole by name only: a hole keyed apart from its name is the other one of that name
+        r = ref.get(e["name"].lower()) if e["key"] == e["name"] else None
         if r:
             e.update({k: r.get(k) for k in ("operator", "project", "region") if r.get(k) not in (None, "")})
             if "lat" not in e and r.get("lat") not in (None, ""):
                 e.update(lat=r["lat"], lon=r["lon"])
-    _keys(groups)
     return groups
 
 
