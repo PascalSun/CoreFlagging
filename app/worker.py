@@ -96,6 +96,8 @@ class Worker:
                             log.warning("job %s: tray %s of %s not sent: %s", job["job"], tray.get("n"), name, e); return False
                         time.sleep(2 * (attempt + 1))
                 return False
+            except Exception as e:                            # noqa: BLE001 - one photograph is never worth the hole
+                log.warning("job %s: tray %s of %s not sent: %s", job["job"], tray.get("n"), name, e); return False
             finally:
                 jpeg.unlink(missing_ok=True)
 
@@ -105,7 +107,10 @@ class Worker:
                 for name, trays in index.items():
                     try:
                         for tray, jpeg in extract(z, name, trays, tmp / "trays" / name):
-                            futures.append(pool.submit(send, name, tray, jpeg))
+                            # a package can hold two photographs of one tray (a SWIR and a TIR set) and extract names the
+                            # file by tray number: give each its own name before the next is written over it
+                            own = jpeg.with_name(f"{len(futures):05d}-{jpeg.name}"); jpeg.rename(own)
+                            futures.append(pool.submit(send, name, tray, own))
                     except Exception as e:                    # noqa: BLE001 - a damaged zip member: keep what was read
                         log.warning("job %s: tray photographs of %s stopped: %s", job["job"], name, e)
             for f in futures:
