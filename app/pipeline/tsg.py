@@ -62,11 +62,18 @@ def _text(col: pd.Series) -> pd.Series:
 def _labels(sp, name: str) -> pd.Series:
     """A class scalar as text. pytsg leaves scalars of class 0 as numeric codes (it tests class_number > 0), so those
     are mapped here from the class table."""
-    col = sp.scalars[name]; bh = next(b for b in sp.bandheaders if b.name == name)
+    col = _col(sp.scalars, name); bh = next(b for b in sp.bandheaders if b.name == name)
     if bh.class_number == 0 and bh.flag == 2 and col.dtype.kind in "fiu":
         names = sp.classes[0].classes; v = col.to_numpy("f8")
         col = pd.Series([names.get(int(x)) if np.isfinite(x) and x > NULL else None for x in v], dtype=object)
     return _text(col)
+
+
+def _col(df: pd.DataFrame, name: str) -> pd.Series:
+    """One column by name. Some TSG files carry two scalars of the same name (two Final Masks); the
+    first in band order is the scan's own."""
+    c = df[name]
+    return c.iloc[:, 0] if isinstance(c, pd.DataFrame) else c
 
 
 def _numeric(col: pd.Series) -> np.ndarray:
@@ -97,12 +104,12 @@ def write_dataset(pair: dict, hd: Path, meta: dict | None = None) -> dict:
         raise TSGError(f"{pair['swir'][0].name}: no 'Depth (m)' scalar")
     # TSG holds depth as float32; the NVCL service prints it to 5 decimals. Rounded the same way, so a sample on a
     # 10 cm boundary (23.8 m stored as 23.799999) lands in the same bin either way.
-    depth = np.round(sc["Depth (m)"].to_numpy("f8"), 5); n = len(depth)
+    depth = np.round(_col(sc, "Depth (m)").to_numpy("f8"), 5); n = len(depth)
     (hd / "spectra").mkdir(parents=True, exist_ok=True); (hd / "samples").mkdir(exist_ok=True)
     np.save(hd / "spectra" / f"vnswir_{d8}.npy", np.asarray(s.spectra, "f4")); np.save(hd / "spectra" / f"vnswir_{d8}_wavelengths.npy", np.asarray(s.wavelength, "f4"))
     cols = {"start_depth": depth, "end_depth": depth}
     if "Final Mask" in sc:
-        cols["mask_swir"] = (_numeric(sc["Final Mask"]) == 1).astype("uint8")
+        cols["mask_swir"] = (_numeric(_col(sc, "Final Mask")) == 1).astype("uint8")
     for name in sorted(LABEL_LOGS):
         if name in sc and name.endswith(("TSAS", "TSAV")):
             cols[name] = _labels(s, name)
@@ -120,7 +127,7 @@ def write_dataset(pair: dict, hd: Path, meta: dict | None = None) -> dict:
             if override is not None and len(override) == n:
                 cols["mask_tir"] = override.astype("uint8")
             elif "Final Mask" in t.scalars:
-                cols["mask_tir"] = (_numeric(t.scalars["Final Mask"]) == 1).astype("uint8")
+                cols["mask_tir"] = (_numeric(_col(t.scalars, "Final Mask")) == 1).astype("uint8")
             for name in sorted(LABEL_LOGS):
                 if name in t.scalars and name.endswith("jCLST"):
                     cols[name] = _labels(t, name)
@@ -135,7 +142,7 @@ def write_dataset(pair: dict, hd: Path, meta: dict | None = None) -> dict:
                 (hd / "ds1m").mkdir(exist_ok=True)
                 (hd / "ds1m" / f"{_safe(name)}__{d8}.csv").write_text("Depth,Classification,Colour,Count\n" + "".join(f"{m + 0.5},{c},0,{k}\n" for m, c, k in g.itertuples(index=False)))
         elif name not in class_logs and AU_RE.match(name.strip()):
-            v = _numeric(sc[name])
+            v = _numeric(_col(sc, name))
             if np.isfinite(v).any():
                 # a metre with samples but no assay comes back from the service as 0, not as missing; kept the same here
                 g = pd.DataFrame({"m": metre, "v": v}).groupby("m").v.mean().fillna(0.0)
@@ -154,7 +161,18 @@ def write_hole(hole: str, folders: list[Path], raw_root: Path, meta: dict[str, d
     pairs = [p for f in folders for p in find_pairs(Path(f))]
     if not pairs:
         raise TSGError("no <name>_tsg.tsg + <name>_tsg.bip pair found")
-    datasets = [write_dataset(p, hd, (meta or {}).get(p["name"])) for p in pairs]
+    # a scan package sometimes carries spectral libraries as TSG files too (reference spectra with no
+    # depth: "Mean VNIR-SWIR magnetite", "Lepidolite SWIR USGS"); they are not scans and are passed over
+    datasets, skipped = [], []
+    for p in pairs:
+        try:
+            datasets.append(write_dataset(p, hd, (meta or {}).get(p["name"])))
+        except TSGError as e:
+            if "no 'Depth (m)' scalar" not in str(e):
+                raise
+            skipped.append(str(e))
+    if not datasets:
+        raise TSGError("; ".join(skipped) or "no scan in these files")
     xml = "<DatasetCollection>" + "".join(f"<Dataset><DatasetID>{d['dsid']}</DatasetID><DatasetName>{escape(d['name'])}</DatasetName><description>{escape(d.pop('description'))}</description></Dataset>"
                                            for d in datasets) + "</DatasetCollection>"
     (hd / "datasets.xml").write_text(xml)
