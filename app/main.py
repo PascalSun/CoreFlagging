@@ -14,7 +14,10 @@ import torch
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
-from . import extras
+from fastapi import Query
+from fastapi.responses import FileResponse
+
+from . import extras, zoom
 from .pipeline import config as C
 from .runner import Runner
 
@@ -80,3 +83,20 @@ def similar(body: Similar):
     except ValueError as e:
         raise HTTPException(400, str(e))
     return {"model": eng.run, "library": {"intervals": int(len(eng.L["hole"])), "holes": int(len(set(eng.L["hole"].tolist())))}, "results": res}
+
+
+@app.get("/api/v1/trays/zoom/info")
+def tray_zoom_info(dataset: str, n: int, refs: list[str] = Query(...)):
+    """Size and tile layout of a tray photograph's original, cutting its tiles on first use."""
+    try:
+        return zoom.info(refs, dataset, n)
+    except zoom.NoPhoto as e:
+        raise HTTPException(404, str(e))
+
+
+@app.get("/api/v1/trays/zoom/tile/{level}/{col}_{row}.jpg")
+def tray_zoom_tile(level: int, col: int, row: int, dataset: str, n: int, refs: list[str] = Query(...)):
+    try:
+        return FileResponse(zoom.tile(refs, dataset, n, level, col, row), media_type="image/jpeg")
+    except zoom.NoPhoto as e:
+        raise HTTPException(404, str(e))
