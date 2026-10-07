@@ -6,6 +6,7 @@
   CORETRACE_BUNDLE      trained models + fitted heads (read-only)                                default: <repo>/bundle
   CORETRACE_REFERENCE   State reference tables (collars, regions, training split)                default: <repo>/reference
   CORETRACE_NVCL_ROOT   folder of the mirrored NVCL TSG zips (<dataset>.zip); empty = this worker takes uploads only
+  CORETRACE_NVCL_STORE  folder of the AuScope NVCL store mirror (every other State: <State>/<dataset>.zip, _catalog/store_index.json)
   CORETRACE_CATALOGUE   NVCL dataset catalogue (all_datasets.json) with the TSG header of each dataset
   CORETRACE_MODEL       default model run                                                        default: v2
   CORETRACE_THREADS     CPU threads for the model                                                default: min(8, cores)
@@ -22,6 +23,7 @@ BUNDLE = Path(os.environ.get("CORETRACE_BUNDLE", REPO / "bundle")).resolve()
 PLATFORM_API_URL = os.environ.get("PLATFORM_API_URL", "").rstrip("/")
 PLATFORM_API_TOKEN = os.environ.get("PLATFORM_API_TOKEN", "")
 NVCL_ROOT = os.environ.get("CORETRACE_NVCL_ROOT", "")
+NVCL_STORE = os.environ.get("CORETRACE_NVCL_STORE", "")       # AuScope store mirror, one folder per State: <State>/<dataset>.zip
 CATALOGUE = os.environ.get("CORETRACE_CATALOGUE", "")
 WORKER = os.environ.get("CORETRACE_WORKER", "1") == "1"
 THREADS = int(os.environ.get("CORETRACE_THREADS", min(8, os.cpu_count() or 1)))

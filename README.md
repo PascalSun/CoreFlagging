@@ -28,7 +28,8 @@ Groundwork (platform)                         CoreTrace (this repo)
 
 - A **job** is one hole. The worker claims it over HTTP with a lease, so a worker that dies
   loses the job to the next one.
-- A hole comes from the **NVCL mirror** (the worker reads `<dataset>.zip` from its own mount)
+- A hole comes from the **NVCL mirror** (the worker reads `<dataset>.zip` from its own mount: WA from
+  GSWA's node, every other State from the AuScope store)
   or from a **user upload** (the worker downloads the zip from the platform).
 - The result is plain data. The platform stores it and serves every page from its tables,
   so the map and the reports work with this service down. Only "similar core" needs it live.
@@ -85,7 +86,8 @@ uv run python -m app.cli process MND036 /path/to/folder/with/MND036_tsg.tsg
 | `PLATFORM_API_URL` | — | the platform, e.g. `http://platform:8000` |
 | `PLATFORM_API_TOKEN` | — | the service token both sides hold |
 | `CORETRACE_NVCL_ROOT` | empty | folder of mirrored NVCL zips; empty = this worker takes uploads only |
-| `CORETRACE_CATALOGUE` | empty | the mirror's `all_datasets.json` (TSG header fields per dataset) |
+| `CORETRACE_CATALOGUE` | empty | the WA mirror's `all_datasets.json` (TSG header fields per dataset); GSWA's `hylogger_drillholes.json` beside it gives the collars |
+| `CORETRACE_NVCL_STORE` | empty | the AuScope store mirror (`<State>/<dataset>.zip`, `_catalog/store_index.json`) for every other State |
 | `CORETRACE_WORK` | `./work` | scratch directory; safe to delete |
 | `CORETRACE_MODEL` | `v2` | the default model |
 | `CORETRACE_THREADS` | min(8, cores) | CPU threads for the model |
@@ -98,7 +100,15 @@ uv run python -m app.cli register            # tell the platform about every hol
 uv run python -m app.cli work                # take jobs until stopped (run several, each with its own CORETRACE_WORK)
 ```
 
-A hole's datasets are the catalogue entries that share a borehole. Uploads are always taken
+A hole's datasets are the catalogue entries that share a borehole URI. The WA node gives a few
+different holes one URI (BH01 at Behemoth and at Bunbury), so WA datasets whose GSWA collars are
+more than 20 km apart are kept as separate holes. Keys: a WA hole is keyed by its name, another
+State's by `<STATE>-<name>`; when two holes share a name, the one with a dataset of exactly that
+name keeps it and the other is keyed by its dataset. The collar comes from the State's own list
+(GSWA's HyLogger drillholes, the AuScope store index) and the platform keeps it over the scan header.
+
+Only WA holes use the NVCL node's TIR mask and the WA reference list; the models were trained on
+WA core, so another State's results are read outside the training area. Uploads are always taken
 before the mirror backlog.
 
 ## Deploy

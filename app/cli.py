@@ -21,7 +21,7 @@ def main() -> None:
         from .sources import holes_in_catalogue
         holes = holes_in_catalogue()
         if a.only:
-            want = {x.lower() for x in a.only}; holes = [h for h in holes if h["name"].lower() in want]
+            want = {x.lower() for x in a.only}; holes = [h for h in holes if h["name"].lower() in want or h["key"].lower() in want]
         pf = Platform(); out = {"created": 0, "queued": 0}
         for i in range(0, len(holes), 200):
             res = pf.register(holes[i:i + 200], requeue=a.requeue); out = {k: out[k] + res[k] for k in out}

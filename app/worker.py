@@ -14,7 +14,7 @@ from .pipeline import config as C
 from .pipeline.tsg import TSGError
 from .platform import Platform
 from .runner import Runner
-from .sources import SourceError, fetch
+from .sources import SourceError, fetch, is_wa
 from .trays import extract
 
 log = logging.getLogger("coretrace.worker")
@@ -25,7 +25,7 @@ STAGE = {"reading": "reading", "cleaning": "cleaning", "modelling": "modelling"}
 class Worker:
     def __init__(self, runner: Runner, platform: Platform | None = None):
         self.runner = runner; self.platform = platform or Platform()
-        self.name = f"{socket.gethostname()}:{os.getpid()}"; self.sources = ["upload"] + (["nvcl"] if C.NVCL_ROOT else [])
+        self.name = f"{socket.gethostname()}:{os.getpid()}"; self.sources = ["upload"] + (["nvcl"] if C.NVCL_ROOT or C.NVCL_STORE else [])
         self.stop = threading.Event()
 
     def announce(self) -> None:
@@ -57,8 +57,9 @@ class Worker:
         try:
             self.platform.heartbeat(job, **state)
             folders, meta, zips = fetch(job, self.platform, tmp)
-            # an upload is never matched to the State reference by its name: someone's "DDH-1" is not NVCL's
-            ref = None if job["hole"]["source"] == "nvcl" else {}
+            # only a WA mirrored hole is matched to the WA reference list by its name: an upload's "DDH-1", or
+            # another State's, is not GSWA's
+            ref = None if job["hole"]["source"] == "nvcl" and is_wa([p["ref"] for p in job["parts"]]) else {}
             pkg = self.runner.process(key, name, folders, meta=meta, ref=ref, source="NVCL mirror" if job["hole"]["source"] == "nvcl" else "upload", progress=progress)
             if lost.is_set():
                 log.warning("job %s: lease lost, result dropped", job["job"]); return True

@@ -12,9 +12,11 @@ services:
       CORETRACE_WORK: /work
       CORETRACE_NVCL_ROOT: /nvcl/NVCL/tsg
       CORETRACE_CATALOGUE: /nvcl/_catalog/all_datasets.json
+      CORETRACE_NVCL_STORE: /nvclstore
     volumes:
       - coretrace_work:/work
       - ${NVCL_MIRROR:-/mnt/qnap/WAGeoData/WAGeoDataPublic/geossdi.dmp.wa.gov.au}:/nvcl:ro
+      - ${NVCL_STORE:-/mnt/qnap/WAGeoData/WAGeoDataPublic/nvclstore.data.auscope.org.au}:/nvclstore:ro
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=5)"]
       interval: 30s

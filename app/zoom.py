@@ -15,6 +15,7 @@ from pathlib import Path
 from PIL import Image
 
 from .pipeline import config as C
+from .sources import zip_path
 from .trays import PHOTO, _norm
 
 Image.MAX_IMAGE_PIXELS = 300_000_000
@@ -35,11 +36,9 @@ def _safe(s: str) -> str:
 
 def _original(refs: list[str], dataset: str, n: int) -> bytes:
     """The original photograph of tray `n` of `dataset`, from whichever of the hole's mirrored zips holds it."""
-    if not C.NVCL_ROOT:
-        raise NoPhoto("this service has no NVCL mirror")
     for ref in refs:
-        z = Path(C.NVCL_ROOT) / f"{ref}.zip"
-        if not z.exists():
+        z = zip_path(ref)
+        if z is None or not z.exists():
             continue
         with zipfile.ZipFile(z) as zf:
             names = [(i, i.filename.replace("\\\\", "/").split("/")[-1]) for i in zf.infolist()]
