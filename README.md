@@ -168,12 +168,12 @@ hole, the hole pages, the assistant and the PDF report. It is a Next.js app of i
 directly: everything it shows comes from the platform's public API (`https://platform.nlp-tlp.org/api/docs/`),
 and the browser signs in through the platform (OAuth with PKCE; this app is the platform's `coretrace-web`
 client, sent back to `/auth/callback`). The shared pieces (sign-in, API calls, chrome) are
-`frontend/packages/platform-client`, a copy of the platform's client package until that is published.
+[`@ntlp/platform-client`](https://github.com/PascalSun/platform-client), the platform's public client package (sign-in through the platform, tokens, `platformFetch`), depended on by git tag in `frontend/package.json`.
 
 ```bash
 cd frontend && cp .env.example .env.local   # fill in the Mapbox token etc.
 bun install && bun run dev                  # http://localhost:3000
 ```
 
-Env (see `frontend/.env.example`): `NEXT_PUBLIC_PLATFORM_URL`, `NEXT_PUBLIC_PLATFORM_CLIENT_ID`,
-`NEXT_PUBLIC_MAPBOX_TOKEN`; server side `OPENROUTER_API_KEY`, `PLATFORM_API_URL`, `PLATFORM_API_TOKEN`.
+Env (see `frontend/.env.example`): `NEXT_PUBLIC_PLATFORM_URL`, `NEXT_PUBLIC_PLATFORM_CLIENT_ID`, `NEXT_PUBLIC_PLATFORM_OIDC`,
+`NEXT_PUBLIC_SUPPORT_EMAIL` (read by the client package), `NEXT_PUBLIC_MAPBOX_TOKEN`; server side `OPENROUTER_API_KEY`, `PLATFORM_API_URL`, `PLATFORM_API_TOKEN`.

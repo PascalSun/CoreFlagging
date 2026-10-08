@@ -1,6 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // the shared platform client ships as TypeScript source (a public git dependency); Next compiles it
+  transpilePackages: ["@ntlp/platform-client"],
   output: "standalone", // self-contained server for the production Docker image
   async redirects() {
     return [

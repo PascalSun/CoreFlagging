@@ -19,9 +19,7 @@
       }
     ],
     "paths": {
-      "@/*": ["./src/*"],
-      "@ntlp/platform-client": ["./packages/platform-client/src/index.ts"],
-      "@ntlp/platform-client/*": ["./packages/platform-client/src/*"]
+      "@/*": ["./src/*"]
     }
   },
   "include": [
