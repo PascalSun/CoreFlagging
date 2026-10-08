@@ -1,0 +1,226 @@
+@import "tailwindcss";
+
+:root {
+  color-scheme: light; /* force light so the glass chrome + slate text stay readable */
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+
+  --shadow-glass: 0 8px 40px rgba(15, 23, 42, 0.12);
+  --shadow-glass-sm: 0 6px 24px rgba(15, 23, 42, 0.12);
+
+  /* landing-page (template) tokens — additive; used only by the home page
+     chrome under src/components/landing/ */
+  --color-ink: #111111;
+  --color-ink-soft: #404040;
+  --color-paper: #f4f4f4;
+  --color-line: #e5e5e5;
+  --color-blue: #0099ff;
+  --color-blue-deep: #0099cc;
+  --color-cyan: #00c4f5;
+  --color-orange: #ff6b35;
+  --font-display: var(--font-manrope);
+}
+
+/* landing-page utilities (template) */
+@layer utilities {
+  .container-site {
+    @apply mx-auto w-full px-5 md:px-[2.5%];
+  }
+  .heading-display {
+    @apply font-display font-bold tracking-tight text-balance;
+  }
+  .label-caps {
+    @apply font-display text-xs font-semibold tracking-[0.12em] uppercase;
+  }
+}
+
+html { scroll-behavior: smooth; }
+
+/* Buttons / links aren't cursor:pointer by default — make every enabled control read as clickable. */
+button:not(:disabled), [role="button"]:not([aria-disabled="true"]), a[href], summary, label[for] {
+  cursor: pointer;
+}
+button:disabled { cursor: not-allowed; }
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+}
+
+/* Native Mapbox chrome is replaced by custom glass controls — EXCEPT the
+   attribution + wordmark, which the Mapbox terms require to stay visible and
+   which also carry the GSWA/DMIRS credit lines set on every source. They were
+   hidden here; that hid the basemap credit on every map in the app. Restyled
+   to match the glass chrome instead of removed. */
+.mapboxgl-ctrl-top-right { display: none; }
+.mapboxgl-ctrl-bottom-right,
+.mapboxgl-ctrl-bottom-left { display: block; }
+.mapboxgl-ctrl-bottom-left .mapboxgl-ctrl,
+.mapboxgl-ctrl-bottom-right .mapboxgl-ctrl { margin: 0 6px 5px; }
+/* The wordmark is left exactly as Mapbox ships it: their SVG already carries a
+   white halo behind a dark mark, so it stays legible on imagery AND on the light
+   basemap. Recolouring or chipping it would break that and alter the brand mark.
+
+   The attribution is ours to style. The map opens on satellite imagery, so this
+   chrome sits on dark pixels most of the time and a translucent WHITE pill read
+   as a glare spot; dark glass instead — fine over imagery and over the light
+   outdoors basemap. Compact = a small ⓘ that expands on click. */
+.mapboxgl-ctrl-attrib.mapboxgl-compact {
+  background: rgba(15, 23, 42, 0.55);
+  backdrop-filter: blur(8px);
+  border-radius: 9999px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+  min-height: 22px;
+}
+/* the ⓘ button itself ships as a dark glyph on white — invert it for the dark pill */
+.mapboxgl-ctrl-attrib-button {
+  background-color: transparent !important;
+  filter: invert(1) brightness(1.6);
+  opacity: 0.85;
+}
+.mapboxgl-ctrl-attrib-inner { font-size: 10px; color: #e2e8f0; }
+.mapboxgl-ctrl-attrib a { color: #f1f5f9; text-decoration: underline; text-underline-offset: 2px; }
+.mapboxgl-ctrl-attrib a:hover { color: #ffffff; }
+/* the map fills the viewport under floating panels; keep credits clear of the
+   bottom dock on small screens */
+@media (max-width: 640px) {
+  .mapboxgl-ctrl-bottom-right, .mapboxgl-ctrl-bottom-left { bottom: 2px; }
+}
+
+/* ── Chat → PDF export ─────────────────────────────────────────────────────
+   A body-level portal holds a clean render of the conversation (user questions,
+   assistant answers, evidence cards — no thinking / tool chain). Off-screen on
+   screen; on print we hide everything else and lay it out normally. */
+/* Fixed px offset, NOT -100vw: on a ~390px phone -100vw only shifts 390px, so half of
+   this 760px-wide capture container poked into view during export. */
+.print-portal { position: fixed; left: -9999px; top: 0; width: 760px; }
+.print-page { max-width: 760px; margin: 0 auto; padding: 4px; color: #0f172a;
+  font: 14px/1.6 var(--font-sans), system-ui, sans-serif; }
+.print-title { font-size: 20px; font-weight: 700; }
+.print-sub { color: #64748b; font-size: 12px; margin-bottom: 18px; }
+.print-turn { margin: 0 0 16px; }
+.print-user-wrap { text-align: right; margin: 14px 0 6px; }
+.print-user { display: inline-block; max-width: 82%; text-align: left;
+  padding: 8px 12px; background: #0f172a; color: #fff; border-radius: 14px; }
+.print-evi-title { font-size: 12px; font-weight: 600; color: #be123c; margin: 8px 0 2px; }
+@media print {
+  body > *:not(.print-portal) { display: none !important; }
+  .print-portal { position: static; left: 0; width: auto; }
+  .print-page { padding: 0; }
+  @page { margin: 16mm; }
+}
+
+/* Result-feature tooltip (map_query / highlighted footprints). Its own class so the fixed
+   layers' plain tooltips keep their own look — this one carries a caption, a headline and a
+   key/value list, and needs to read as a small card rather than a label. */
+.qr-popup .mapboxgl-popup-content {
+  padding: 0; border-radius: 12px; overflow: hidden; border: 1px solid #e2e8f0;
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.14); font: 12px/1.5 var(--font-sans), system-ui, sans-serif;
+}
+.qr-popup .mapboxgl-popup-tip { border-top-color: #fff; border-bottom-color: #fff; }
+.qr-cap {
+  padding: 5px 10px; background: #fff7f3; border-bottom: 1px solid #fde3d6;
+  border-left: 3px solid #eb6834;                      /* the layer's own colour, as a tie */
+  font-size: 10px; letter-spacing: 0.04em; text-transform: uppercase; color: #b4541f;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.qr-body { padding: 8px 10px 9px; background: #fff; }
+.qr-head { font-size: 13px; font-weight: 600; color: #0f172a; margin-bottom: 5px; line-height: 1.35; }
+.qr-row { display: grid; grid-template-columns: 6.5rem 1fr; gap: 8px; align-items: baseline; }
+.qr-row + .qr-row { margin-top: 2px; }
+.qr-k {
+  font-family: var(--font-mono), ui-monospace, monospace; font-size: 10.5px; color: #94a3b8;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.qr-v { color: #334155; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.qr-empty { color: #94a3b8; font-style: italic; }
+
+/* User-dataset feature popup: the same card as .qr-popup, with the caption strip in the
+   layer's own colour, a scroll cap for files with dozens of attributes, and a proper
+   close button. */
+.ud-popup .mapboxgl-popup-content {
+  padding: 0; border-radius: 12px; overflow: hidden; border: 1px solid #e2e8f0;
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.14); font: 12px/1.5 var(--font-sans), system-ui, sans-serif;
+}
+.ud-popup .mapboxgl-popup-tip { border-top-color: #fff; border-bottom-color: #fff; }
+.ud-popup .mapboxgl-popup-close-button {
+  top: 4px; right: 4px; width: 22px; height: 22px; border-radius: 6px; padding: 0; line-height: 22px;
+  font-size: 15px; color: #94a3b8; background: transparent;
+}
+.ud-popup .mapboxgl-popup-close-button:hover { background: #f1f5f9; color: #334155; }
+.ud-cap {
+  display: flex; align-items: center; gap: 6px; padding: 5px 30px 5px 10px;
+  background: color-mix(in srgb, var(--ud-color) 8%, #fff); border-bottom: 1px solid color-mix(in srgb, var(--ud-color) 22%, #fff);
+  border-left: 3px solid var(--ud-color);
+  font-size: 10px; letter-spacing: 0.04em; text-transform: uppercase; color: color-mix(in srgb, var(--ud-color) 70%, #0f172a);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.ud-cap .ud-dot { width: 7px; height: 7px; border-radius: 999px; background: var(--ud-color); flex: none; }
+.ud-body { padding: 8px 10px 9px; background: #fff; max-height: 260px; overflow-y: auto; }
+.ud-head { font-size: 13px; font-weight: 600; color: #0f172a; margin-bottom: 5px; line-height: 1.35; }
+.ud-head .ud-id { font-weight: 500; color: #94a3b8; font-variant-numeric: tabular-nums; }
+.ud-row { display: grid; grid-template-columns: 6.5rem 1fr; gap: 8px; align-items: baseline; }
+.ud-row + .ud-row { margin-top: 2px; }
+.ud-k {
+  font-family: var(--font-mono), ui-monospace, monospace; font-size: 10.5px; color: #94a3b8;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.ud-v { color: #334155; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.ud-empty { color: #94a3b8; font-style: italic; }
+
+/* Instant tooltip for icon-only and terse controls: the text lives in data-tip and shows
+   above the control on hover or keyboard focus, without the browser's 1 s title delay. */
+[data-tip] { position: relative; }
+[data-tip]::after {
+  content: attr(data-tip); position: absolute; left: 50%; bottom: calc(100% + 6px); transform: translateX(-50%) translateY(2px);
+  width: max-content; max-width: 16rem; padding: 4px 8px; border-radius: 6px;
+  background: #0f172a; color: #fff; font: 500 11px/1.4 var(--font-sans), system-ui, sans-serif; text-align: left; white-space: normal;
+  opacity: 0; pointer-events: none; transition: opacity 0.12s ease 0.15s, transform 0.12s ease 0.15s; z-index: 50;
+}
+[data-tip]:hover::after, [data-tip]:focus-visible::after, [data-tip]:has(:focus-visible)::after { opacity: 1; transform: translateX(-50%) translateY(0); }
+/* near the panel edges the bubble anchors to the control's own edge instead of centring */
+[data-tip-left]::after { left: auto; right: 0; transform: translateY(2px); }
+[data-tip-left]:hover::after, [data-tip-left]:focus-visible::after, [data-tip-left]:has(:focus-visible)::after { transform: translateY(0); }
+[data-tip-start]::after { left: 0; transform: translateY(2px); }
+[data-tip-start]:hover::after, [data-tip-start]:focus-visible::after, [data-tip-start]:has(:focus-visible)::after { transform: translateY(0); }
+
+/* Share page: the score-ramp hairline on the document tile carries the export's
+   progress. Indeterminate on purpose — the exporter renders the whole conversation
+   before it can say how long it will take, so a percentage would be invented. */
+@keyframes share-sweep {
+  0%   { transform: translateX(-100%); opacity: 0; }
+  35%  { opacity: 1; }
+  100% { transform: translateX(300%); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-\[share-sweep_1\.6s_ease-in-out_infinite\] { animation: none; opacity: 0.5; }
+}
+
+/* CoreTrace: the card on a hole under the pointer */
+.ct-popup .mapboxgl-popup-content { padding: 0; border-radius: 14px; background: rgba(255,255,255,.97); box-shadow: 0 1px 2px rgba(15,23,42,.08), 0 12px 32px rgba(15,23,42,.22); border: 1px solid rgba(226,232,240,.9); }
+.ct-popup .mapboxgl-popup-tip { border-top-color: rgba(255,255,255,.97); border-bottom-color: rgba(255,255,255,.97); }
+.ct-card { width: 248px; padding: 11px 12px 10px; font: 12px/1.45 var(--font-sans), system-ui, sans-serif; color: #334155; }
+.ct-card-head { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.ct-card-name { font: 600 14px/1.25 var(--font-display, inherit); color: #0f172a; letter-spacing: -0.01em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.ct-card-chip { flex: none; border-radius: 999px; background: #f1f5f9; color: #475569; font-size: 10px; font-weight: 600; padding: 1px 7px; }
+.ct-card-chip-sea { background: #e0f2fe; color: #075985; }
+.ct-card-sub { margin-top: 1px; color: #64748b; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ct-card-strip { display: flex; height: 8px; margin-top: 9px; border-radius: 999px; overflow: hidden; box-shadow: inset 0 0 0 1px rgba(15,23,42,.06); }
+.ct-card-strip i { flex: 1 1 0; height: 100%; }
+.ct-card-ends { display: flex; justify-content: space-between; margin-top: 2px; font: 10px/1.2 ui-monospace, monospace; color: #94a3b8; }
+.ct-card-facts { margin-top: 8px; display: grid; gap: 3px; }
+.ct-card-fact { display: grid; grid-template-columns: 5.6rem 1fr; gap: 8px; align-items: baseline; font-size: 11.5px; }
+.ct-card-k { color: #94a3b8; }
+.ct-card-v { color: #0f172a; min-width: 0; }
+.ct-card-cls { display: inline-flex; align-items: center; gap: 5px; }
+.ct-card-cls svg { flex: none; }
+.ct-card-wait { margin-top: 8px; color: #64748b; font-size: 11.5px; }
+.ct-card-hint { margin-top: 9px; padding-top: 7px; border-top: 1px solid #f1f5f9; color: #0891b2; font-size: 11px; font-weight: 600; }

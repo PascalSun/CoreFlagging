@@ -1,0 +1,5 @@
+# bun test config — coverage on every run. Bun counts only files the tests load,
+# so the threshold guards the TESTED modules (lib logic), not untested React UI.
+[test]
+coverage = true
+coverageThreshold = { lines = 0.9, functions = 0.9 }

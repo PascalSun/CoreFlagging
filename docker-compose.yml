@@ -26,6 +26,27 @@ services:
     restart: unless-stopped
     networks:
       geo_shared: {}
+  # CoreTrace's own frontend (coretrace.nlp-tlp.org). NEXT_PUBLIC_* are inlined at build time → build args.
+  # Talks to the platform only through its public API; the browser signs in through the platform (OAuth).
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_PLATFORM_URL: ${NEXT_PUBLIC_PLATFORM_URL:-https://platform.nlp-tlp.org}
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_PLATFORM_URL:-https://platform.nlp-tlp.org}
+        NEXT_PUBLIC_PLATFORM_CLIENT_ID: ${NEXT_PUBLIC_PLATFORM_CLIENT_ID:-coretrace-web}
+        NEXT_PUBLIC_MAPBOX_TOKEN: ${NEXT_PUBLIC_MAPBOX_TOKEN}
+        NEXT_PUBLIC_BUILD_ID: ${NEXT_PUBLIC_BUILD_ID:-manual}
+    image: coretrace-web
+    container_name: geo-coretrace-web
+    env_file: .env                   # OPENROUTER_API_KEY, PLATFORM_API_TOKEN, PLATFORM_API_URL for the assistant's route
+    environment:
+      PLATFORM_API_URL: ${PLATFORM_API_URL:-http://platform:8000}
+    ports:
+      - "3003:3000"
+    restart: unless-stopped
+    networks:
+      geo_shared: {}
 volumes:
   coretrace_work: {}
 networks:

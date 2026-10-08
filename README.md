@@ -159,3 +159,21 @@ and there from the NVCL data service (`scripts/parity_tokens.py`):
 ```bash
 uv run pytest
 ```
+
+## Frontend
+
+`frontend/` is CoreTrace's website (coretrace.nlp-tlp.org): the landing page, the map with every scanned
+hole, the hole pages, the assistant and the PDF report. It is a Next.js app of its own, built and run by the
+`frontend` service in `docker-compose.yml` (host port 3003). It never reaches this service or the database
+directly: everything it shows comes from the platform's public API (`https://platform.nlp-tlp.org/api/docs/`),
+and the browser signs in through the platform (OAuth with PKCE; this app is the platform's `coretrace-web`
+client, sent back to `/auth/callback`). The shared pieces (sign-in, API calls, chrome) are
+`frontend/packages/platform-client`, a copy of the platform's client package until that is published.
+
+```bash
+cd frontend && cp .env.example .env.local   # fill in the Mapbox token etc.
+bun install && bun run dev                  # http://localhost:3000
+```
+
+Env (see `frontend/.env.example`): `NEXT_PUBLIC_PLATFORM_URL`, `NEXT_PUBLIC_PLATFORM_CLIENT_ID`,
+`NEXT_PUBLIC_MAPBOX_TOKEN`; server side `OPENROUTER_API_KEY`, `PLATFORM_API_URL`, `PLATFORM_API_TOKEN`.
