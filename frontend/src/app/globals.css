@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@source "../../node_modules/@ntlp/platform-client/src";
 
 :root {
   color-scheme: light; /* force light so the glass chrome + slate text stay readable */

@@ -6,6 +6,7 @@ import { usePathname, useSearchParams } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronDown, ChevronUp, HelpCircle, MessageCircle, SlidersHorizontal, Upload, X } from "lucide-react";
 import { AccountMenu } from "@/components/auth/AccountMenu";
+import { EmailGate } from "@ntlp/platform-client/email-gate";
 import { VerifyEmailDialog } from "@/components/auth/VerifyEmailDialog";
 import { CoreChat, type OpenTarget } from "@/components/coretrace/CoreChat";
 import { CoreMap, type Basemap } from "@/components/coretrace/CoreMap";
@@ -161,7 +162,9 @@ export function CoreTraceMap() {
   const mine = holes.filter((h) => h.mine).length;
 
   // sign-in is the platform's: /auth/signin sends the browser there and back here (one sign-in for every app)
-  const toSignIn = () => { window.location.assign(`/auth/signin?next=${encodeURIComponent(window.location.pathname + window.location.search)}`); };
+  // Sign-in happens right here, in the platform's shared dialog (no trip to another site).
+  const [gate, setGate] = useState(false);
+  const toSignIn = () => setGate(true);;
   const openUpload = () => { if (!isAuthed()) toSignIn(); else if (!isVerified()) setVerify(true); else setUpload(true); };
   // "?upload=1" (the landing page's link) opens the upload flow once
   const wantUpload = sp.get("upload") === "1";
@@ -345,6 +348,7 @@ export function CoreTraceMap() {
 
       <UploadDialog open={upload} onClose={() => setUpload(false)} onNeedVerify={() => { setUpload(false); setVerify(true); }}
         onQueued={(h) => { setUpload(false); qc.invalidateQueries({ queryKey: ["core-holes"] }); setFilter("mine"); set({ hole: h.key, m: null, full: null }); }} />
+      <EmailGate open={gate} onClose={() => setGate(false)} onAuthed={() => { setGate(false); setAuthed(true); }} />
       <VerifyEmailDialog open={verify} onClose={() => setVerify(false)} onVerified={() => { setVerify(false); setUpload(true); }} />
     </div>
   );
