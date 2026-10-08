@@ -10,3 +10,4 @@ __pycache__/
 # local working directory (scratch; the platform database is the record)
 /work/
 *.log
+.claude/worktrees/
