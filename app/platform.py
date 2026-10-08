@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+from urllib.parse import quote
 from pathlib import Path
 
 import httpx
@@ -47,6 +48,10 @@ class Platform:
         with open(jpeg, "rb") as f:
             r = self.http.post(f"jobs/{job['job']}/trays/", data={"token": job["token"], "dataset": dataset, "tray": json.dumps(tray)}, files={"image": (jpeg.name, f, "image/jpeg")})
         r.raise_for_status()
+
+    def tray_rows(self, key: str, trays: list[dict]) -> int:
+        r = self.http.post(f"holes/{quote(key, safe='')}/tray-rows/", json={"trays": trays}); r.raise_for_status()
+        return int(r.json().get("updated", 0))
 
     def done(self, job: dict) -> None:
         self.http.post(f"jobs/{job['job']}/done/", json={"token": job["token"]}).raise_for_status()

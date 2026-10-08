@@ -24,16 +24,36 @@ _norm = lambda s: re.sub(r"[^a-z0-9]", "", s.lower())   # noqa: E731 - photograp
 
 
 def index(sp, depth: np.ndarray) -> list[dict]:
-    """Trays of a scan from its sample headers (T = tray, L = row of core in the tray)."""
+    """Trays of a scan from its sample headers (T = tray, L = row of core in the tray, X = position along the row in
+    mm). Each row keeps its depth range and `xmm`, where its first and last samples lie along the scan: within a row
+    depth is linear in X, and the photograph runs at a fixed scale in X, so this places any depth on the photograph."""
     h = sp.sampleheaders
     if "T" not in h or "L" not in h:
         return []
-    d = pd.DataFrame({"t": pd.to_numeric(h["T"], errors="coerce"), "l": pd.to_numeric(h["L"], errors="coerce"), "d": depth}).dropna()
+    x = pd.to_numeric(h["X"], errors="coerce") if "X" in h else np.nan
+    d = pd.DataFrame({"t": pd.to_numeric(h["T"], errors="coerce"), "l": pd.to_numeric(h["L"], errors="coerce"), "d": depth, "x": x}).dropna(subset=["t", "l", "d"])
     out = []
     for t, g in d.groupby("t"):
-        rows = [{"from_m": round(float(r.d.min()), 3), "to_m": round(float(r.d.max()), 3)} for _, r in g.groupby("l")]
+        rows = []
+        for _, r in g.groupby("l"):
+            row = {"from_m": round(float(r.d.min()), 3), "to_m": round(float(r.d.max()), 3)}
+            if r.x.notna().any():
+                row["xmm"] = [round(float(r.x.min()), 2), round(float(r.x.max()), 2)]
+            rows.append(row)
         out.append({"n": int(t), "from_m": round(float(g.d.min()), 3), "to_m": round(float(g.d.max()), 3), "rows": rows})
     return out
+
+
+def row_mm(tsg: Path) -> dict[int, list[list[float]]]:
+    """{tray: [[first, last] mm per row, top to bottom]} from the sample headers of a .tsg file alone (no spectra)."""
+    from pytsg import parse_tsg
+    lines = parse_tsg._read_tsg_file(tsg)
+    info = parse_tsg._parse_tsg(lines, parse_tsg._find_header_sections(lines))
+    h = info.get("sample headers")
+    if h is None or not {"T", "L", "X"} <= set(h.columns):
+        return {}
+    d = pd.DataFrame({"t": pd.to_numeric(h["T"], errors="coerce"), "l": pd.to_numeric(h["L"], errors="coerce"), "x": pd.to_numeric(h["X"], errors="coerce")}).dropna()
+    return {int(t): [[round(float(r.x.min()), 2), round(float(r.x.max()), 2)] for _, r in g.groupby("l")] for t, g in d.groupby("t")}
 
 
 def layout(comment: str) -> list[list[int]] | None:

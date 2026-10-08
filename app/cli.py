@@ -2,6 +2,7 @@
 
   python -m app.cli process <hole> <folder> [<folder> ...]   run one hole from TSG folders, write the package to ./work
   python -m app.cli register [--requeue]                      tell the platform about every hole in the NVCL mirror
+  python -m app.cli tray-mm [--only ...]                      give stored tray rows their positions along the scan (reads .tsg headers only)
   python -m app.cli work [--once]                             take jobs from the platform (no HTTP server); --once stops when the queue is empty
 """
 from __future__ import annotations
@@ -15,6 +16,7 @@ def main() -> None:
     p = sub.add_parser("process"); p.add_argument("hole"); p.add_argument("folders", nargs="+")
     r = sub.add_parser("register"); r.add_argument("--requeue", action="store_true"); r.add_argument("--only", nargs="*", default=[])
     w = sub.add_parser("work"); w.add_argument("--once", action="store_true")
+    tm = sub.add_parser("tray-mm"); tm.add_argument("--only", nargs="*", default=[]); tm.add_argument("--threads", type=int, default=8)
     a = ap.parse_args(); logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
     if a.cmd == "register":
         from .platform import Platform
@@ -26,6 +28,14 @@ def main() -> None:
         for i in range(0, len(holes), 200):
             res = pf.register(holes[i:i + 200], requeue=a.requeue); out = {k: out[k] + res[k] for k in out}
         print(json.dumps({"holes": len(holes), **out})); return
+    if a.cmd == "tray-mm":
+        from .platform import Platform
+        from .sources import holes_in_catalogue
+        from .traymm import backfill
+        holes = holes_in_catalogue()
+        if a.only:
+            want = {x.lower() for x in a.only}; holes = [h for h in holes if h["key"].lower() in want]
+        print(json.dumps(backfill(holes, Platform(), a.threads))); return
     from .runner import Runner
     runner = Runner()
     if a.cmd == "process":
