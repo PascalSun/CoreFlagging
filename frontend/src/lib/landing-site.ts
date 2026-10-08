@@ -35,8 +35,8 @@ export const footerContact = [
 ] as const;
 
 export const footerSocials = [
-  { label: "GitHub", href: "https://github.com/" },
-  { label: "Linkedin", href: "https://linkedin.com/" },
+  { label: "GitHub", href: "https://github.com/AI4WA" },
+  { label: "LinkedIn", href: "https://www.linkedin.com/in/pascalsun23" },
 ] as const;
 
 /** Footer reveal: the fixed footer and the spacer at the end of <main> must
