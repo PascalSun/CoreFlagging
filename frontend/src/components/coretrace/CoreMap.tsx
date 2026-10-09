@@ -153,6 +153,19 @@ export function CoreMap({ holes, colour, card, selected, onSelect, padRight, pad
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fitTo]);
 
+  // A deep link from another app (the Geo Data Platform's "Explore in CoreTrace"): ?bbox=w,s,e,n
+  // fits that box, else ?lon&lat(&z) flies there. Applied once, after the first view.
+  useEffect(() => {
+    const map = mapRef.current; if (!map) return;
+    const q = new URLSearchParams(window.location.search);
+    const bbox = q.get("bbox")?.split(",").map(Number); const lon = Number(q.get("lon")), lat = Number(q.get("lat"));
+    const go = () => {
+      if (bbox && bbox.length === 4 && bbox.every(Number.isFinite)) map.fitBounds([[bbox[0], bbox[1]], [bbox[2], bbox[3]]], { padding: 40, maxZoom: 11, duration: 0 });
+      else if (Number.isFinite(lon) && Number.isFinite(lat) && q.has("lon")) map.jumpTo({ center: [lon, lat], zoom: Number(q.get("z")) || 9 });
+    };
+    if (readyRef.current) go(); else map.once("load", go);
+  }, []);
+
   const key = selected?.key ?? null; const lon = selected?.lon ?? null; const lat = selected?.lat ?? null;
   useEffect(() => {
     const map = mapRef.current; if (!map) return;
