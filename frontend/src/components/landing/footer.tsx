@@ -105,11 +105,11 @@ export function Footer({ chrome = groundworkChrome }: { chrome?: Chrome }) {
         <div className="label-caps flex flex-col justify-between gap-2 pb-10 text-ink/80 md:flex-row">
           <p>Copyright 2026 {site.name}. All rights reserved.</p>
           <p className="flex items-center gap-2">
-            <Link href="/policies/privacy-notice" className="hover:text-ink">
+            <Link href="https://geo.nlp-tlp.org/privacy" className="hover:text-ink">
               Privacy policy
             </Link>
             <span aria-hidden>・</span>
-            <Link href="/policies/terms-of-use" className="hover:text-ink">
+            <Link href="https://geo.nlp-tlp.org/terms" className="hover:text-ink">
               Terms of use
             </Link>
           </p>
