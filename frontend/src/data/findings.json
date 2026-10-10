@@ -1,0 +1,991 @@
+{
+ "headline": {
+  "wa_holes": 1754,
+  "wa_metres": 546063,
+  "au_holes_read": 5450
+ },
+ "case": {
+  "hole": "KPDDH 006",
+  "region": "Eastern Goldfields Superterrane",
+  "log": "Mafic volcanic",
+  "log_from": 126,
+  "log_to": 339,
+  "um_to": 305,
+  "assays": [
+   {
+    "m": 204,
+    "MgO": 25.1,
+    "Ni": 1300,
+    "Cr": 1681
+   },
+   {
+    "m": 320,
+    "MgO": 5.7,
+    "Ni": 69,
+    "Cr": 230
+   },
+   {
+    "m": 322,
+    "MgO": null,
+    "Ni": 54,
+    "Cr": 143
+   }
+  ],
+  "tray": {
+   "id": "5a2fc652-259b-4e73-8eb3-6ebf490314c9",
+   "from_m": 200.6,
+   "to_m": 205.1
+  }
+ },
+ "underlogged": {
+  "intervals": 79,
+  "holes": 36,
+  "metres": 1651,
+  "minerals": [
+   {
+    "label": "Logged basalt, CoreTrace agrees",
+    "share": 0.017,
+    "ci": [
+     0.0107,
+     0.0254
+    ]
+   },
+   {
+    "label": "Logged basalt, gabbro or sediment; CoreTrace reads ultramafic",
+    "share": 0.639,
+    "ci": [
+     0.5195,
+     0.7617
+    ],
+    "highlight": true
+   },
+   {
+    "label": "Logged ultramafic, CoreTrace agrees",
+    "share": 0.819,
+    "ci": [
+     0.7783,
+     0.8504
+    ]
+   }
+  ],
+  "list": [
+   {
+    "hole": "KPDDH 006",
+    "from_m": 126,
+    "to_m": 339,
+    "logged": "Mafic volcanic",
+    "source": "NVCL log",
+    "share": 0.85,
+    "scanner_um": 0.84,
+    "chem": "split at the contact",
+    "region": "Eastern Goldfields Superterrane"
+   },
+   {
+    "hole": "CHRCD03",
+    "from_m": 333,
+    "to_m": 403,
+    "logged": "Mafic intrusive",
+    "source": "NVCL log",
+    "share": 1.0,
+    "scanner_um": 0.99,
+    "chem": "ni only",
+    "region": "Youanmi Terrane"
+   },
+   {
+    "hole": "18KLDD007",
+    "from_m": 390,
+    "to_m": 458,
+    "logged": "Clastic sedimentary",
+    "source": "company log",
+    "share": 0.54,
+    "scanner_um": 0.91,
+    "chem": "not assayed",
+    "region": "Pilbara Craton"
+   },
+   {
+    "hole": "WRDD004",
+    "from_m": 286,
+    "to_m": 353,
+    "logged": "Mafic volcanic",
+    "source": "company log",
+    "share": 0.94,
+    "scanner_um": 0.82,
+    "chem": "ultramafic",
+    "region": "Capricorn Orogen"
+   },
+   {
+    "hole": "WRDD004",
+    "from_m": 356,
+    "to_m": 416,
+    "logged": "Mafic volcanic",
+    "source": "company log",
+    "share": 1.0,
+    "scanner_um": 0.95,
+    "chem": "ultramafic",
+    "region": "Capricorn Orogen"
+   },
+   {
+    "hole": "MCPDH0002",
+    "from_m": 208,
+    "to_m": 261,
+    "logged": "Mafic intrusive",
+    "source": "NVCL log",
+    "share": 0.85,
+    "scanner_um": 1.0,
+    "chem": "not ultramafic",
+    "region": "Eastern Goldfields Superterrane"
+   },
+   {
+    "hole": "MCPDH0001",
+    "from_m": 121,
+    "to_m": 170,
+    "logged": "Mafic intrusive",
+    "source": "NVCL log",
+    "share": 0.94,
+    "scanner_um": 1.0,
+    "chem": "not ultramafic",
+    "region": "Eastern Goldfields Superterrane"
+   },
+   {
+    "hole": "ORTL07",
+    "from_m": 12,
+    "to_m": 60,
+    "logged": "Mafic volcanic",
+    "source": "company log",
+    "share": 0.5,
+    "scanner_um": 0.19,
+    "chem": "not assayed",
+    "region": "Eastern Goldfields Superterrane"
+   },
+   {
+    "hole": "18GSCRCD0001",
+    "from_m": 378,
+    "to_m": 423,
+    "logged": "Mafic intrusive",
+    "source": "company log",
+    "share": 0.56,
+    "scanner_um": 0.09,
+    "chem": "not assayed",
+    "region": "Youanmi Terrane"
+   },
+   {
+    "hole": "ORTL05",
+    "from_m": 38,
+    "to_m": 81,
+    "logged": "Mafic volcanic",
+    "source": "company log",
+    "share": 1.0,
+    "scanner_um": 1.0,
+    "chem": "not assayed",
+    "region": "Eastern Goldfields Superterrane"
+   },
+   {
+    "hole": "VNTRCD0002",
+    "from_m": 200,
+    "to_m": 239,
+    "logged": "Mafic volcanic",
+    "source": "company log",
+    "share": 1.0,
+    "scanner_um": 1.0,
+    "chem": "ultramafic",
+    "region": "Yilgarn Craton"
+   },
+   {
+    "hole": "RRLRMDD041",
+    "from_m": 476,
+    "to_m": 509,
+    "logged": "Clastic sedimentary",
+    "source": "company log",
+    "share": 0.91,
+    "scanner_um": 0.76,
+    "chem": "not assayed",
+    "region": "Eastern Goldfields Superterrane"
+   },
+   {
+    "hole": "CHRCD04",
+    "from_m": 298,
+    "to_m": 328,
+    "logged": "Mafic volcanic",
+    "source": "NVCL log",
+    "share": 1.0,
+    "scanner_um": 0.57,
+    "chem": "ni only",
+    "region": "Youanmi Terrane"
+   },
+   {
+    "hole": "18KLDD008",
+    "from_m": 263,
+    "to_m": 292,
+    "logged": "Mafic intrusive",
+    "source": "company log",
+    "share": 0.62,
+    "scanner_um": 0.76,
+    "chem": "not assayed",
+    "region": "Pilbara Craton"
+   },
+   {
+    "hole": "NCB0003",
+    "from_m": 132,
+    "to_m": 160,
+    "logged": "Mafic intrusive",
+    "source": "company log",
+    "share": 0.92,
+    "scanner_um": 0.92,
+    "chem": "ultramafic",
+    "region": "Eastern Goldfields Superterrane"
+   },
+   {
+    "hole": "RRLRMDD041W1",
+    "from_m": 673,
+    "to_m": 697,
+    "logged": "Vein and alteration",
+    "source": "company log",
+    "share": 0.88,
+    "scanner_um": 0.88,
+    "chem": "not assayed",
+    "region": "Eastern Goldfields Superterrane"
+   },
+   {
+    "hole": "CWDD005",
+    "from_m": 195,
+    "to_m": 219,
+    "logged": "Mafic volcanic",
+    "source": "company log",
+    "share": 0.88,
+    "scanner_um": 0.5,
+    "chem": "ultramafic",
+    "region": "Yilgarn Craton"
+   },
+   {
+    "hole": "CHRCD04",
+    "from_m": 185,
+    "to_m": 209,
+    "logged": "Mafic volcanic",
+    "source": "NVCL log",
+    "share": 1.0,
+    "scanner_um": 0.71,
+    "chem": "not assayed",
+    "region": "Youanmi Terrane"
+   },
+   {
+    "hole": "18KLDD008",
+    "from_m": 203,
+    "to_m": 226,
+    "logged": "Clastic sedimentary",
+    "source": "company log",
+    "share": 0.87,
+    "scanner_um": 1.0,
+    "chem": "not assayed",
+    "region": "Pilbara Craton"
+   },
+   {
+    "hole": "KPDDH 006",
+    "from_m": 386,
+    "to_m": 409,
+    "logged": "Mafic intrusive",
+    "source": "NVCL log",
+    "share": 0.52,
+    "scanner_um": 1.0,
+    "chem": "not assayed",
+    "region": "Eastern Goldfields Superterrane"
+   },
+   {
+    "hole": "VNTRCD0002",
+    "from_m": 178,
+    "to_m": 199,
+    "logged": "Mafic volcanic",
+    "source": "company log",
+    "share": 0.86,
+    "scanner_um": 1.0,
+    "chem": "ultramafic",
+    "region": "Yilgarn Craton"
+   },
+   {
+    "hole": "PDD434",
+    "from_m": 355,
+    "to_m": 376,
+    "logged": "Mafic volcanic",
+    "source": "company log",
+    "share": 0.62,
+    "scanner_um": 0.95,
+    "chem": "not assayed",
+    "region": "Capricorn Orogen"
+   },
+   {
+    "hole": "CHRCD01",
+    "from_m": 124,
+    "to_m": 145,
+    "logged": "Mafic volcanic",
+    "source": "NVCL log",
+    "share": 1.0,
+    "scanner_um": 0.95,
+    "chem": "ni only",
+    "region": "Youanmi Terrane"
+   },
+   {
+    "hole": "KMRD057",
+    "from_m": 199,
+    "to_m": 220,
+    "logged": "Intermediate intrusive",
+    "source": "company log",
+    "share": 0.74,
+    "scanner_um": 0.32,
+    "chem": "mixed",
+    "region": "Halls Creek Orogen"
+   },
+   {
+    "hole": "THD003",
+    "from_m": 227,
+    "to_m": 247,
+    "logged": "Mafic intrusive",
+    "source": "company log",
+    "share": 1.0,
+    "scanner_um": 0.35,
+    "chem": "not assayed",
+    "region": "Youanmi Terrane"
+   },
+   {
+    "hole": "JPDD02",
+    "from_m": 247,
+    "to_m": 267,
+    "logged": "Mafic volcanic",
+    "source": "company log",
+    "share": 1.0,
+    "scanner_um": 0.2,
+    "chem": "ni only",
+    "region": "Youanmi Terrane"
+   },
+   {
+    "hole": "ORTL05",
+    "from_m": 112,
+    "to_m": 132,
+    "logged": "Mafic volcanic",
+    "source": "company log",
+    "share": 1.0,
+    "scanner_um": 1.0,
+    "chem": "not assayed",
+    "region": "Eastern Goldfields Superterrane"
+   },
+   {
+    "hole": "CHRCD03",
+    "from_m": 236,
+    "to_m": 256,
+    "logged": "Mafic intrusive",
+    "source": "NVCL log",
+    "share": 1.0,
+    "scanner_um": 0.9,
+    "chem": "not assayed",
+    "region": "Youanmi Terrane"
+   },
+   {
+    "hole": "WRDD004",
+    "from_m": 254,
+    "to_m": 272,
+    "logged": "Mafic volcanic",
+    "source": "company log",
+    "share": 0.88,
+    "scanner_um": 0.94,
+    "chem": "ultramafic",
+    "region": "Capricorn Orogen"
+   },
+   {
+    "hole": "18KLDD010",
+    "from_m": 250,
+    "to_m": 267,
+    "logged": "Clastic sedimentary",
+    "source": "company log",
+    "share": 0.53,
+    "scanner_um": 1.0,
+    "chem": "not assayed",
+    "region": "Pilbara Craton"
+   },
+   {
+    "hole": "W2DDH007",
+    "from_m": 357,
+    "to_m": 374,
+    "logged": "Mafic volcanic",
+    "source": "company log",
+    "share": 0.76,
+    "scanner_um": 0.0,
+    "chem": "mixed",
+    "region": "Youanmi Terrane"
+   },
+   {
+    "hole": "CHRCD02",
+    "from_m": 223,
+    "to_m": 240,
+    "logged": "Mafic volcanic",
+    "source": "NVCL log",
+    "share": 1.0,
+    "scanner_um": 0.24,
+    "chem": "ni only",
+    "region": "Youanmi Terrane"
+   },
+   {
+    "hole": "GDD005",
+    "from_m": 39,
+    "to_m": 55,
+    "logged": "Regolith and cover",
+    "source": "company log",
+    "share": 0.94,
+    "scanner_um": 0.94,
+    "chem": "not assayed",
+    "region": "Youanmi Terrane"
+   },
+   {
+    "hole": "CHRCD02",
+    "from_m": 194,
+    "to_m": 210,
+    "logged": "Mafic volcanic",
+    "source": "NVCL log",
+    "share": 1.0,
+    "scanner_um": 0.44,
+    "chem": "ni only",
+    "region": "Youanmi Terrane"
+   },
+   {
+    "hole": "CHRCD03",
+    "from_m": 260,
+    "to_m": 275,
+    "logged": "Mafic volcanic",
+    "source": "NVCL log",
+    "share": 1.0,
+    "scanner_um": 0.13,
+    "chem": "not assayed",
+    "region": "Youanmi Terrane"
+   },
+   {
+    "hole": "18KLDD007",
+    "from_m": 365,
+    "to_m": 380,
+    "logged": "Mafic intrusive",
+    "source": "company log",
+    "share": 0.67,
+    "scanner_um": 0.67,
+    "chem": "not assayed",
+    "region": "Pilbara Craton"
+   },
+   {
+    "hole": "CHRCD02",
+    "from_m": 210,
+    "to_m": 223,
+    "logged": "Mafic intrusive",
+    "source": "NVCL log",
+    "share": 1.0,
+    "scanner_um": 0.08,
+    "chem": "not assayed",
+    "region": "Youanmi Terrane"
+   },
+   {
+    "hole": "GUD174",
+    "from_m": 34,
+    "to_m": 47,
+    "logged": "Mafic intrusive",
+    "source": "company log",
+    "share": 0.62,
+    "scanner_um": 0.69,
+    "chem": "not assayed",
+    "region": "Eastern Goldfields Superterrane"
+   },
+   {
+    "hole": "NCB0003",
+    "from_m": 177,
+    "to_m": 190,
+    "logged": "Mafic intrusive",
+    "source": "company log",
+    "share": 1.0,
+    "scanner_um": 0.38,
+    "chem": "ultramafic",
+    "region": "Eastern Goldfields Superterrane"
+   },
+   {
+    "hole": "CHRCD02",
+    "from_m": 376,
+    "to_m": 388,
+    "logged": "Mafic volcanic",
+    "source": "NVCL log",
+    "share": 0.83,
+    "scanner_um": 0.17,
+    "chem": "ni only",
+    "region": "Youanmi Terrane"
+   },
+   {
+    "hole": "AELD0004",
+    "from_m": 333,
+    "to_m": 345,
+    "logged": "Felsic and intermediate volcanic",
+    "source": "company log",
+    "share": 0.5,
+    "scanner_um": 0.5,
+    "chem": "not ultramafic",
+    "region": "Eastern Goldfields Superterrane"
+   },
+   {
+    "hole": "CHRCD02",
+    "from_m": 182,
+    "to_m": 194,
+    "logged": "Mafic intrusive",
+    "source": "NVCL log",
+    "share": 1.0,
+    "scanner_um": 0.08,
+    "chem": "not assayed",
+    "region": "Youanmi Terrane"
+   },
+   {
+    "hole": "JPDD02",
+    "from_m": 202,
+    "to_m": 214,
+    "logged": "Mafic volcanic",
+    "source": "company log",
+    "share": 0.64,
+    "scanner_um": 0.0,
+    "chem": "ni only",
+    "region": "Youanmi Terrane"
+   },
+   {
+    "hole": "CHRCD03",
+    "from_m": 315,
+    "to_m": 327,
+    "logged": "Metamorphic",
+    "source": "NVCL log",
+    "share": 1.0,
+    "scanner_um": 0.17,
+    "chem": "ni only",
+    "region": "Youanmi Terrane"
+   },
+   {
+    "hole": "JPDD01",
+    "from_m": 299,
+    "to_m": 311,
+    "logged": "Mafic volcanic",
+    "source": "company log",
+    "share": 0.92,
+    "scanner_um": 0.0,
+    "chem": "ni only",
+    "region": "Youanmi Terrane"
+   },
+   {
+    "hole": "W2DDH007",
+    "from_m": 316,
+    "to_m": 327,
+    "logged": "Mafic volcanic",
+    "source": "company log",
+    "share": 0.55,
+    "scanner_um": 0.0,
+    "chem": "mixed",
+    "region": "Youanmi Terrane"
+   },
+   {
+    "hole": "18KLDD007",
+    "from_m": 313,
+    "to_m": 324,
+    "logged": "Clastic sedimentary",
+    "source": "company log",
+    "share": 0.91,
+    "scanner_um": 0.91,
+    "chem": "not assayed",
+    "region": "Pilbara Craton"
+   },
+   {
+    "hole": "ORTL05",
+    "from_m": 187,
+    "to_m": 198,
+    "logged": "Felsic and intermediate volcanic",
+    "source": "company log",
+    "share": 1.0,
+    "scanner_um": 0.0,
+    "chem": "not assayed",
+    "region": "Eastern Goldfields Superterrane"
+   },
+   {
+    "hole": "NCB0003",
+    "from_m": 165,
+    "to_m": 176,
+    "logged": "Mafic intrusive",
+    "source": "company log",
+    "share": 1.0,
+    "scanner_um": 0.64,
+    "chem": "ultramafic",
+    "region": "Eastern Goldfields Superterrane"
+   },
+   {
+    "hole": "CHRCD02",
+    "from_m": 139,
+    "to_m": 149,
+    "logged": "Mafic intrusive",
+    "source": "NVCL log",
+    "share": 1.0,
+    "scanner_um": 0.0,
+    "chem": "ni only",
+    "region": "Youanmi Terrane"
+   },
+   {
+    "hole": "18KLDD008",
+    "from_m": 229,
+    "to_m": 239,
+    "logged": "Clastic sedimentary",
+    "source": "company log",
+    "share": 0.6,
+    "scanner_um": 0.9,
+    "chem": "not assayed",
+    "region": "Pilbara Craton"
+   },
+   {
+    "hole": "20WNRCD002",
+    "from_m": 145,
+    "to_m": 155,
+    "logged": "Mafic intrusive",
+    "source": "company log",
+    "share": 0.8,
+    "scanner_um": 0.9,
+    "chem": "ultramafic",
+    "region": "Eastern Goldfields Superterrane"
+   },
+   {
+    "hole": "18KLDD010",
+    "from_m": 210,
+    "to_m": 220,
+    "logged": "Clastic sedimentary",
+    "source": "company log",
+    "share": 0.9,
+    "scanner_um": 1.0,
+    "chem": "not assayed",
+    "region": "Pilbara Craton"
+   },
+   {
+    "hole": "ORTL05",
+    "from_m": 95,
+    "to_m": 104,
+    "logged": "Mafic intrusive",
+    "source": "company log",
+    "share": 1.0,
+    "scanner_um": 0.22,
+    "chem": "not assayed",
+    "region": "Eastern Goldfields Superterrane"
+   },
+   {
+    "hole": "CHRCD02",
+    "from_m": 246,
+    "to_m": 255,
+    "logged": "Mafic intrusive",
+    "source": "NVCL log",
+    "share": 1.0,
+    "scanner_um": 0.33,
+    "chem": "not assayed",
+    "region": "Youanmi Terrane"
+   },
+   {
+    "hole": "CHRCD04",
+    "from_m": 210,
+    "to_m": 219,
+    "logged": "Mafic volcanic",
+    "source": "NVCL log",
+    "share": 1.0,
+    "scanner_um": 0.89,
+    "chem": "ni only",
+    "region": "Youanmi Terrane"
+   },
+   {
+    "hole": "WSXP1735",
+    "from_m": 231,
+    "to_m": 239,
+    "logged": "Clastic sedimentary",
+    "source": "company log",
+    "share": 0.88,
+    "scanner_um": 1.0,
+    "chem": "ni only",
+    "region": "Eastern Goldfields Superterrane"
+   },
+   {
+    "hole": "18KLDD007",
+    "from_m": 246,
+    "to_m": 254,
+    "logged": "Clastic sedimentary",
+    "source": "company log",
+    "share": 0.5,
+    "scanner_um": 1.0,
+    "chem": "not assayed",
+    "region": "Pilbara Craton"
+   },
+   {
+    "hole": "18KLDD007",
+    "from_m": 358,
+    "to_m": 365,
+    "logged": "Clastic sedimentary",
+    "source": "company log",
+    "share": 1.0,
+    "scanner_um": 1.0,
+    "chem": "not assayed",
+    "region": "Pilbara Craton"
+   },
+   {
+    "hole": "G50-22-005E",
+    "from_m": 201,
+    "to_m": 208,
+    "logged": "Vein and alteration",
+    "source": "company log",
+    "share": 0.5,
+    "scanner_um": 0.67,
+    "chem": "ni only",
+    "region": "Eastern Goldfields Superterrane"
+   },
+   {
+    "hole": "20WNRCD002",
+    "from_m": 159,
+    "to_m": 166,
+    "logged": "Mafic intrusive",
+    "source": "company log",
+    "share": 0.57,
+    "scanner_um": 0.86,
+    "chem": "ultramafic",
+    "region": "Eastern Goldfields Superterrane"
+   },
+   {
+    "hole": "18KLDD007",
+    "from_m": 257,
+    "to_m": 264,
+    "logged": "Mafic intrusive",
+    "source": "company log",
+    "share": 0.57,
+    "scanner_um": 0.71,
+    "chem": "not assayed",
+    "region": "Pilbara Craton"
+   },
+   {
+    "hole": "CHRCD02",
+    "from_m": 390,
+    "to_m": 397,
+    "logged": "Mafic volcanic",
+    "source": "NVCL log",
+    "share": 1.0,
+    "scanner_um": 0.57,
+    "chem": "ni only",
+    "region": "Youanmi Terrane"
+   },
+   {
+    "hole": "CHRCD02",
+    "from_m": 276,
+    "to_m": 283,
+    "logged": "Mafic volcanic",
+    "source": "NVCL log",
+    "share": 1.0,
+    "scanner_um": 0.0,
+    "chem": "not assayed",
+    "region": "Youanmi Terrane"
+   },
+   {
+    "hole": "CHRCD02",
+    "from_m": 349,
+    "to_m": 356,
+    "logged": "Mafic volcanic",
+    "source": "NVCL log",
+    "share": 1.0,
+    "scanner_um": 1.0,
+    "chem": "ni only",
+    "region": "Youanmi Terrane"
+   },
+   {
+    "hole": "RRLRMDD041W1",
+    "from_m": 625,
+    "to_m": 631,
+    "logged": "Clastic sedimentary",
+    "source": "company log",
+    "share": 1.0,
+    "scanner_um": 0.67,
+    "chem": "not assayed",
+    "region": "Eastern Goldfields Superterrane"
+   },
+   {
+    "hole": "MTD026",
+    "from_m": 429,
+    "to_m": 435,
+    "logged": "Vein and alteration",
+    "source": "company log",
+    "share": 1.0,
+    "scanner_um": 1.0,
+    "chem": "ultramafic",
+    "region": "Eastern Goldfields Superterrane"
+   },
+   {
+    "hole": "ORTL07",
+    "from_m": 216,
+    "to_m": 222,
+    "logged": "Mafic volcanic",
+    "source": "company log",
+    "share": 1.0,
+    "scanner_um": 0.33,
+    "chem": "ni only",
+    "region": "Eastern Goldfields Superterrane"
+   },
+   {
+    "hole": "10LAD009",
+    "from_m": 234,
+    "to_m": 240,
+    "logged": "Metamorphic",
+    "source": "NVCL log",
+    "share": 0.67,
+    "scanner_um": 0.83,
+    "chem": "ni-cr",
+    "region": "Youanmi Terrane"
+   },
+   {
+    "hole": "18KLDD007",
+    "from_m": 380,
+    "to_m": 386,
+    "logged": "Clastic sedimentary",
+    "source": "company log",
+    "share": 0.83,
+    "scanner_um": 0.5,
+    "chem": "not assayed",
+    "region": "Pilbara Craton"
+   },
+   {
+    "hole": "CHRCD03",
+    "from_m": 327,
+    "to_m": 333,
+    "logged": "Mafic volcanic",
+    "source": "NVCL log",
+    "share": 1.0,
+    "scanner_um": 1.0,
+    "chem": "ni only",
+    "region": "Youanmi Terrane"
+   },
+   {
+    "hole": "18KLDD007",
+    "from_m": 348,
+    "to_m": 353,
+    "logged": "Clastic sedimentary",
+    "source": "company log",
+    "share": 1.0,
+    "scanner_um": 1.0,
+    "chem": "not assayed",
+    "region": "Pilbara Craton"
+   },
+   {
+    "hole": "18KLDD007",
+    "from_m": 277,
+    "to_m": 282,
+    "logged": "Clastic sedimentary",
+    "source": "company log",
+    "share": 1.0,
+    "scanner_um": 1.0,
+    "chem": "not assayed",
+    "region": "Pilbara Craton"
+   },
+   {
+    "hole": "WSXP1735",
+    "from_m": 240,
+    "to_m": 245,
+    "logged": "Clastic sedimentary",
+    "source": "company log",
+    "share": 0.8,
+    "scanner_um": 1.0,
+    "chem": "ni only",
+    "region": "Eastern Goldfields Superterrane"
+   },
+   {
+    "hole": "GXDD0010",
+    "from_m": 232,
+    "to_m": 237,
+    "logged": "Mafic volcanic",
+    "source": "company log",
+    "share": 0.8,
+    "scanner_um": 0.8,
+    "chem": "not assayed",
+    "region": "Youanmi Terrane"
+   },
+   {
+    "hole": "CHRCD02",
+    "from_m": 241,
+    "to_m": 246,
+    "logged": "Mafic volcanic",
+    "source": "NVCL log",
+    "share": 0.8,
+    "scanner_um": 0.0,
+    "chem": "ni only",
+    "region": "Youanmi Terrane"
+   },
+   {
+    "hole": "ORTL08",
+    "from_m": 111,
+    "to_m": 116,
+    "logged": "Mafic volcanic",
+    "source": "company log",
+    "share": 0.8,
+    "scanner_um": 0.8,
+    "chem": "ni only",
+    "region": "Eastern Goldfields Superterrane"
+   },
+   {
+    "hole": "NCB0003",
+    "from_m": 127,
+    "to_m": 132,
+    "logged": "Mafic volcanic",
+    "source": "company log",
+    "share": 1.0,
+    "scanner_um": 1.0,
+    "chem": "ultramafic",
+    "region": "Eastern Goldfields Superterrane"
+   },
+   {
+    "hole": "ORTL09",
+    "from_m": 87,
+    "to_m": 92,
+    "logged": "Mafic volcanic",
+    "source": "company log",
+    "share": 0.6,
+    "scanner_um": 0.0,
+    "chem": "ni only",
+    "region": "Eastern Goldfields Superterrane"
+   }
+  ]
+ },
+ "referee": {
+  "n": 102,
+  "holes": 62,
+  "observed": 0.745,
+  "ci": [
+   0.6442,
+   0.8462
+  ],
+  "chance": 0.509,
+  "chance_band": [
+   0.418,
+   0.603
+  ],
+  "clay": {
+   "n": 23,
+   "observed": 0.087
+  },
+  "labels": {
+   "observed": "74%",
+   "ci": "64\u201385%",
+   "chance": "51%"
+  }
+ },
+ "misses": {
+  "example": {
+   "hole": "MCPDH0002",
+   "from_m": 208,
+   "to_m": 261,
+   "MgO": 3.0,
+   "Ni": 35,
+   "tray": {
+    "id": "1a893610-8c40-493d-8ee0-82232c9f71d5",
+    "from_m": 228.1,
+    "to_m": 232.2
+   }
+  },
+  "reverse": 230
+ },
+ "weathering": {
+  "n": 135,
+  "median_err": 8,
+  "ci": [
+   5,
+   11
+  ],
+  "within10": 0.57,
+  "added": 376
+ }
+}
