@@ -2,7 +2,7 @@
  "headline": {
   "wa_holes": 1754,
   "wa_metres": 546063,
-  "au_holes_read": 5450
+  "au_holes_read": 5841
  },
  "case": {
   "hole": "KPDDH 006",
@@ -78,7 +78,8 @@
     "share": 0.85,
     "scanner_um": 0.84,
     "chem": "split at the contact",
-    "region": "Eastern Goldfields Superterrane"
+    "region": "Eastern Goldfields Superterrane",
+    "key": "KPDDH 006"
    },
    {
     "hole": "CHRCD03",
@@ -89,7 +90,8 @@
     "share": 1.0,
     "scanner_um": 0.99,
     "chem": "ni only",
-    "region": "Youanmi Terrane"
+    "region": "Youanmi Terrane",
+    "key": "CHRCD03"
    },
    {
     "hole": "18KLDD007",
@@ -100,7 +102,8 @@
     "share": 0.54,
     "scanner_um": 0.91,
     "chem": "not assayed",
-    "region": "Pilbara Craton"
+    "region": "Pilbara Craton",
+    "key": "18KLDD007"
    },
    {
     "hole": "WRDD004",
@@ -111,7 +114,8 @@
     "share": 0.94,
     "scanner_um": 0.82,
     "chem": "ultramafic",
-    "region": "Capricorn Orogen"
+    "region": "Capricorn Orogen",
+    "key": "WRDD004"
    },
    {
     "hole": "WRDD004",
@@ -122,7 +126,8 @@
     "share": 1.0,
     "scanner_um": 0.95,
     "chem": "ultramafic",
-    "region": "Capricorn Orogen"
+    "region": "Capricorn Orogen",
+    "key": "WRDD004"
    },
    {
     "hole": "MCPDH0002",
@@ -133,7 +138,8 @@
     "share": 0.85,
     "scanner_um": 1.0,
     "chem": "not ultramafic",
-    "region": "Eastern Goldfields Superterrane"
+    "region": "Eastern Goldfields Superterrane",
+    "key": "MCPDH0002"
    },
    {
     "hole": "MCPDH0001",
@@ -144,7 +150,8 @@
     "share": 0.94,
     "scanner_um": 1.0,
     "chem": "not ultramafic",
-    "region": "Eastern Goldfields Superterrane"
+    "region": "Eastern Goldfields Superterrane",
+    "key": "MCPDH0001"
    },
    {
     "hole": "ORTL07",
@@ -155,7 +162,8 @@
     "share": 0.5,
     "scanner_um": 0.19,
     "chem": "not assayed",
-    "region": "Eastern Goldfields Superterrane"
+    "region": "Eastern Goldfields Superterrane",
+    "key": "ORTL07"
    },
    {
     "hole": "18GSCRCD0001",
@@ -166,7 +174,8 @@
     "share": 0.56,
     "scanner_um": 0.09,
     "chem": "not assayed",
-    "region": "Youanmi Terrane"
+    "region": "Youanmi Terrane",
+    "key": "18GSCRCD0001"
    },
    {
     "hole": "ORTL05",
@@ -177,7 +186,8 @@
     "share": 1.0,
     "scanner_um": 1.0,
     "chem": "not assayed",
-    "region": "Eastern Goldfields Superterrane"
+    "region": "Eastern Goldfields Superterrane",
+    "key": "ORTL05"
    },
    {
     "hole": "VNTRCD0002",
@@ -188,7 +198,8 @@
     "share": 1.0,
     "scanner_um": 1.0,
     "chem": "ultramafic",
-    "region": "Yilgarn Craton"
+    "region": "Yilgarn Craton",
+    "key": "VNTRCD0002"
    },
    {
     "hole": "RRLRMDD041",
@@ -199,7 +210,8 @@
     "share": 0.91,
     "scanner_um": 0.76,
     "chem": "not assayed",
-    "region": "Eastern Goldfields Superterrane"
+    "region": "Eastern Goldfields Superterrane",
+    "key": "RRLRMDD041"
    },
    {
     "hole": "CHRCD04",
@@ -210,7 +222,8 @@
     "share": 1.0,
     "scanner_um": 0.57,
     "chem": "ni only",
-    "region": "Youanmi Terrane"
+    "region": "Youanmi Terrane",
+    "key": "CHRCD04"
    },
    {
     "hole": "18KLDD008",
@@ -221,7 +234,8 @@
     "share": 0.62,
     "scanner_um": 0.76,
     "chem": "not assayed",
-    "region": "Pilbara Craton"
+    "region": "Pilbara Craton",
+    "key": "18KLDD008"
    },
    {
     "hole": "NCB0003",
@@ -232,7 +246,8 @@
     "share": 0.92,
     "scanner_um": 0.92,
     "chem": "ultramafic",
-    "region": "Eastern Goldfields Superterrane"
+    "region": "Eastern Goldfields Superterrane",
+    "key": "NCB0003"
    },
    {
     "hole": "RRLRMDD041W1",
@@ -243,7 +258,8 @@
     "share": 0.88,
     "scanner_um": 0.88,
     "chem": "not assayed",
-    "region": "Eastern Goldfields Superterrane"
+    "region": "Eastern Goldfields Superterrane",
+    "key": "RRLRMDD041W1"
    },
    {
     "hole": "CWDD005",
@@ -254,7 +270,8 @@
     "share": 0.88,
     "scanner_um": 0.5,
     "chem": "ultramafic",
-    "region": "Yilgarn Craton"
+    "region": "Yilgarn Craton",
+    "key": "CWDD005"
    },
    {
     "hole": "CHRCD04",
@@ -265,7 +282,8 @@
     "share": 1.0,
     "scanner_um": 0.71,
     "chem": "not assayed",
-    "region": "Youanmi Terrane"
+    "region": "Youanmi Terrane",
+    "key": "CHRCD04"
    },
    {
     "hole": "18KLDD008",
@@ -276,7 +294,8 @@
     "share": 0.87,
     "scanner_um": 1.0,
     "chem": "not assayed",
-    "region": "Pilbara Craton"
+    "region": "Pilbara Craton",
+    "key": "18KLDD008"
    },
    {
     "hole": "KPDDH 006",
@@ -287,7 +306,8 @@
     "share": 0.52,
     "scanner_um": 1.0,
     "chem": "not assayed",
-    "region": "Eastern Goldfields Superterrane"
+    "region": "Eastern Goldfields Superterrane",
+    "key": "KPDDH 006"
    },
    {
     "hole": "VNTRCD0002",
@@ -298,7 +318,8 @@
     "share": 0.86,
     "scanner_um": 1.0,
     "chem": "ultramafic",
-    "region": "Yilgarn Craton"
+    "region": "Yilgarn Craton",
+    "key": "VNTRCD0002"
    },
    {
     "hole": "PDD434",
@@ -309,7 +330,8 @@
     "share": 0.62,
     "scanner_um": 0.95,
     "chem": "not assayed",
-    "region": "Capricorn Orogen"
+    "region": "Capricorn Orogen",
+    "key": "PDD434"
    },
    {
     "hole": "CHRCD01",
@@ -320,7 +342,8 @@
     "share": 1.0,
     "scanner_um": 0.95,
     "chem": "ni only",
-    "region": "Youanmi Terrane"
+    "region": "Youanmi Terrane",
+    "key": "CHRCD01"
    },
    {
     "hole": "KMRD057",
@@ -331,7 +354,8 @@
     "share": 0.74,
     "scanner_um": 0.32,
     "chem": "mixed",
-    "region": "Halls Creek Orogen"
+    "region": "Halls Creek Orogen",
+    "key": "KMRD057"
    },
    {
     "hole": "THD003",
@@ -342,7 +366,8 @@
     "share": 1.0,
     "scanner_um": 0.35,
     "chem": "not assayed",
-    "region": "Youanmi Terrane"
+    "region": "Youanmi Terrane",
+    "key": "THD003"
    },
    {
     "hole": "JPDD02",
@@ -353,7 +378,8 @@
     "share": 1.0,
     "scanner_um": 0.2,
     "chem": "ni only",
-    "region": "Youanmi Terrane"
+    "region": "Youanmi Terrane",
+    "key": "JPDD02"
    },
    {
     "hole": "ORTL05",
@@ -364,7 +390,8 @@
     "share": 1.0,
     "scanner_um": 1.0,
     "chem": "not assayed",
-    "region": "Eastern Goldfields Superterrane"
+    "region": "Eastern Goldfields Superterrane",
+    "key": "ORTL05"
    },
    {
     "hole": "CHRCD03",
@@ -375,7 +402,8 @@
     "share": 1.0,
     "scanner_um": 0.9,
     "chem": "not assayed",
-    "region": "Youanmi Terrane"
+    "region": "Youanmi Terrane",
+    "key": "CHRCD03"
    },
    {
     "hole": "WRDD004",
@@ -386,7 +414,8 @@
     "share": 0.88,
     "scanner_um": 0.94,
     "chem": "ultramafic",
-    "region": "Capricorn Orogen"
+    "region": "Capricorn Orogen",
+    "key": "WRDD004"
    },
    {
     "hole": "18KLDD010",
@@ -397,7 +426,8 @@
     "share": 0.53,
     "scanner_um": 1.0,
     "chem": "not assayed",
-    "region": "Pilbara Craton"
+    "region": "Pilbara Craton",
+    "key": "18KLDD010"
    },
    {
     "hole": "W2DDH007",
@@ -408,7 +438,8 @@
     "share": 0.76,
     "scanner_um": 0.0,
     "chem": "mixed",
-    "region": "Youanmi Terrane"
+    "region": "Youanmi Terrane",
+    "key": "W2DDH007"
    },
    {
     "hole": "CHRCD02",
@@ -419,7 +450,8 @@
     "share": 1.0,
     "scanner_um": 0.24,
     "chem": "ni only",
-    "region": "Youanmi Terrane"
+    "region": "Youanmi Terrane",
+    "key": "CHRCD02"
    },
    {
     "hole": "GDD005",
@@ -430,7 +462,8 @@
     "share": 0.94,
     "scanner_um": 0.94,
     "chem": "not assayed",
-    "region": "Youanmi Terrane"
+    "region": "Youanmi Terrane",
+    "key": "GDD005"
    },
    {
     "hole": "CHRCD02",
@@ -441,7 +474,8 @@
     "share": 1.0,
     "scanner_um": 0.44,
     "chem": "ni only",
-    "region": "Youanmi Terrane"
+    "region": "Youanmi Terrane",
+    "key": "CHRCD02"
    },
    {
     "hole": "CHRCD03",
@@ -452,7 +486,8 @@
     "share": 1.0,
     "scanner_um": 0.13,
     "chem": "not assayed",
-    "region": "Youanmi Terrane"
+    "region": "Youanmi Terrane",
+    "key": "CHRCD03"
    },
    {
     "hole": "18KLDD007",
@@ -463,7 +498,8 @@
     "share": 0.67,
     "scanner_um": 0.67,
     "chem": "not assayed",
-    "region": "Pilbara Craton"
+    "region": "Pilbara Craton",
+    "key": "18KLDD007"
    },
    {
     "hole": "CHRCD02",
@@ -474,7 +510,8 @@
     "share": 1.0,
     "scanner_um": 0.08,
     "chem": "not assayed",
-    "region": "Youanmi Terrane"
+    "region": "Youanmi Terrane",
+    "key": "CHRCD02"
    },
    {
     "hole": "GUD174",
@@ -485,7 +522,8 @@
     "share": 0.62,
     "scanner_um": 0.69,
     "chem": "not assayed",
-    "region": "Eastern Goldfields Superterrane"
+    "region": "Eastern Goldfields Superterrane",
+    "key": "GUD174"
    },
    {
     "hole": "NCB0003",
@@ -496,7 +534,8 @@
     "share": 1.0,
     "scanner_um": 0.38,
     "chem": "ultramafic",
-    "region": "Eastern Goldfields Superterrane"
+    "region": "Eastern Goldfields Superterrane",
+    "key": "NCB0003"
    },
    {
     "hole": "CHRCD02",
@@ -507,7 +546,8 @@
     "share": 0.83,
     "scanner_um": 0.17,
     "chem": "ni only",
-    "region": "Youanmi Terrane"
+    "region": "Youanmi Terrane",
+    "key": "CHRCD02"
    },
    {
     "hole": "AELD0004",
@@ -518,7 +558,8 @@
     "share": 0.5,
     "scanner_um": 0.5,
     "chem": "not ultramafic",
-    "region": "Eastern Goldfields Superterrane"
+    "region": "Eastern Goldfields Superterrane",
+    "key": "AELD0004"
    },
    {
     "hole": "CHRCD02",
@@ -529,7 +570,8 @@
     "share": 1.0,
     "scanner_um": 0.08,
     "chem": "not assayed",
-    "region": "Youanmi Terrane"
+    "region": "Youanmi Terrane",
+    "key": "CHRCD02"
    },
    {
     "hole": "JPDD02",
@@ -540,7 +582,8 @@
     "share": 0.64,
     "scanner_um": 0.0,
     "chem": "ni only",
-    "region": "Youanmi Terrane"
+    "region": "Youanmi Terrane",
+    "key": "JPDD02"
    },
    {
     "hole": "CHRCD03",
@@ -551,7 +594,8 @@
     "share": 1.0,
     "scanner_um": 0.17,
     "chem": "ni only",
-    "region": "Youanmi Terrane"
+    "region": "Youanmi Terrane",
+    "key": "CHRCD03"
    },
    {
     "hole": "JPDD01",
@@ -562,7 +606,8 @@
     "share": 0.92,
     "scanner_um": 0.0,
     "chem": "ni only",
-    "region": "Youanmi Terrane"
+    "region": "Youanmi Terrane",
+    "key": "JPDD01"
    },
    {
     "hole": "W2DDH007",
@@ -573,7 +618,8 @@
     "share": 0.55,
     "scanner_um": 0.0,
     "chem": "mixed",
-    "region": "Youanmi Terrane"
+    "region": "Youanmi Terrane",
+    "key": "W2DDH007"
    },
    {
     "hole": "18KLDD007",
@@ -584,7 +630,8 @@
     "share": 0.91,
     "scanner_um": 0.91,
     "chem": "not assayed",
-    "region": "Pilbara Craton"
+    "region": "Pilbara Craton",
+    "key": "18KLDD007"
    },
    {
     "hole": "ORTL05",
@@ -595,7 +642,8 @@
     "share": 1.0,
     "scanner_um": 0.0,
     "chem": "not assayed",
-    "region": "Eastern Goldfields Superterrane"
+    "region": "Eastern Goldfields Superterrane",
+    "key": "ORTL05"
    },
    {
     "hole": "NCB0003",
@@ -606,7 +654,8 @@
     "share": 1.0,
     "scanner_um": 0.64,
     "chem": "ultramafic",
-    "region": "Eastern Goldfields Superterrane"
+    "region": "Eastern Goldfields Superterrane",
+    "key": "NCB0003"
    },
    {
     "hole": "CHRCD02",
@@ -617,7 +666,8 @@
     "share": 1.0,
     "scanner_um": 0.0,
     "chem": "ni only",
-    "region": "Youanmi Terrane"
+    "region": "Youanmi Terrane",
+    "key": "CHRCD02"
    },
    {
     "hole": "18KLDD008",
@@ -628,7 +678,8 @@
     "share": 0.6,
     "scanner_um": 0.9,
     "chem": "not assayed",
-    "region": "Pilbara Craton"
+    "region": "Pilbara Craton",
+    "key": "18KLDD008"
    },
    {
     "hole": "20WNRCD002",
@@ -639,7 +690,8 @@
     "share": 0.8,
     "scanner_um": 0.9,
     "chem": "ultramafic",
-    "region": "Eastern Goldfields Superterrane"
+    "region": "Eastern Goldfields Superterrane",
+    "key": "20WNRCD002"
    },
    {
     "hole": "18KLDD010",
@@ -650,7 +702,8 @@
     "share": 0.9,
     "scanner_um": 1.0,
     "chem": "not assayed",
-    "region": "Pilbara Craton"
+    "region": "Pilbara Craton",
+    "key": "18KLDD010"
    },
    {
     "hole": "ORTL05",
@@ -661,7 +714,8 @@
     "share": 1.0,
     "scanner_um": 0.22,
     "chem": "not assayed",
-    "region": "Eastern Goldfields Superterrane"
+    "region": "Eastern Goldfields Superterrane",
+    "key": "ORTL05"
    },
    {
     "hole": "CHRCD02",
@@ -672,7 +726,8 @@
     "share": 1.0,
     "scanner_um": 0.33,
     "chem": "not assayed",
-    "region": "Youanmi Terrane"
+    "region": "Youanmi Terrane",
+    "key": "CHRCD02"
    },
    {
     "hole": "CHRCD04",
@@ -683,7 +738,8 @@
     "share": 1.0,
     "scanner_um": 0.89,
     "chem": "ni only",
-    "region": "Youanmi Terrane"
+    "region": "Youanmi Terrane",
+    "key": "CHRCD04"
    },
    {
     "hole": "WSXP1735",
@@ -694,7 +750,8 @@
     "share": 0.88,
     "scanner_um": 1.0,
     "chem": "ni only",
-    "region": "Eastern Goldfields Superterrane"
+    "region": "Eastern Goldfields Superterrane",
+    "key": "WSXP1735"
    },
    {
     "hole": "18KLDD007",
@@ -705,7 +762,8 @@
     "share": 0.5,
     "scanner_um": 1.0,
     "chem": "not assayed",
-    "region": "Pilbara Craton"
+    "region": "Pilbara Craton",
+    "key": "18KLDD007"
    },
    {
     "hole": "18KLDD007",
@@ -716,7 +774,8 @@
     "share": 1.0,
     "scanner_um": 1.0,
     "chem": "not assayed",
-    "region": "Pilbara Craton"
+    "region": "Pilbara Craton",
+    "key": "18KLDD007"
    },
    {
     "hole": "G50-22-005E",
@@ -727,7 +786,8 @@
     "share": 0.5,
     "scanner_um": 0.67,
     "chem": "ni only",
-    "region": "Eastern Goldfields Superterrane"
+    "region": "Eastern Goldfields Superterrane",
+    "key": "G50-22-005E"
    },
    {
     "hole": "20WNRCD002",
@@ -738,7 +798,8 @@
     "share": 0.57,
     "scanner_um": 0.86,
     "chem": "ultramafic",
-    "region": "Eastern Goldfields Superterrane"
+    "region": "Eastern Goldfields Superterrane",
+    "key": "20WNRCD002"
    },
    {
     "hole": "18KLDD007",
@@ -749,7 +810,8 @@
     "share": 0.57,
     "scanner_um": 0.71,
     "chem": "not assayed",
-    "region": "Pilbara Craton"
+    "region": "Pilbara Craton",
+    "key": "18KLDD007"
    },
    {
     "hole": "CHRCD02",
@@ -760,7 +822,8 @@
     "share": 1.0,
     "scanner_um": 0.57,
     "chem": "ni only",
-    "region": "Youanmi Terrane"
+    "region": "Youanmi Terrane",
+    "key": "CHRCD02"
    },
    {
     "hole": "CHRCD02",
@@ -771,7 +834,8 @@
     "share": 1.0,
     "scanner_um": 0.0,
     "chem": "not assayed",
-    "region": "Youanmi Terrane"
+    "region": "Youanmi Terrane",
+    "key": "CHRCD02"
    },
    {
     "hole": "CHRCD02",
@@ -782,7 +846,8 @@
     "share": 1.0,
     "scanner_um": 1.0,
     "chem": "ni only",
-    "region": "Youanmi Terrane"
+    "region": "Youanmi Terrane",
+    "key": "CHRCD02"
    },
    {
     "hole": "RRLRMDD041W1",
@@ -793,7 +858,8 @@
     "share": 1.0,
     "scanner_um": 0.67,
     "chem": "not assayed",
-    "region": "Eastern Goldfields Superterrane"
+    "region": "Eastern Goldfields Superterrane",
+    "key": "RRLRMDD041W1"
    },
    {
     "hole": "MTD026",
@@ -804,7 +870,8 @@
     "share": 1.0,
     "scanner_um": 1.0,
     "chem": "ultramafic",
-    "region": "Eastern Goldfields Superterrane"
+    "region": "Eastern Goldfields Superterrane",
+    "key": "MTD026"
    },
    {
     "hole": "ORTL07",
@@ -815,7 +882,8 @@
     "share": 1.0,
     "scanner_um": 0.33,
     "chem": "ni only",
-    "region": "Eastern Goldfields Superterrane"
+    "region": "Eastern Goldfields Superterrane",
+    "key": "ORTL07"
    },
    {
     "hole": "10LAD009",
@@ -826,7 +894,8 @@
     "share": 0.67,
     "scanner_um": 0.83,
     "chem": "ni-cr",
-    "region": "Youanmi Terrane"
+    "region": "Youanmi Terrane",
+    "key": "10LAD009"
    },
    {
     "hole": "18KLDD007",
@@ -837,7 +906,8 @@
     "share": 0.83,
     "scanner_um": 0.5,
     "chem": "not assayed",
-    "region": "Pilbara Craton"
+    "region": "Pilbara Craton",
+    "key": "18KLDD007"
    },
    {
     "hole": "CHRCD03",
@@ -848,7 +918,8 @@
     "share": 1.0,
     "scanner_um": 1.0,
     "chem": "ni only",
-    "region": "Youanmi Terrane"
+    "region": "Youanmi Terrane",
+    "key": "CHRCD03"
    },
    {
     "hole": "18KLDD007",
@@ -859,7 +930,8 @@
     "share": 1.0,
     "scanner_um": 1.0,
     "chem": "not assayed",
-    "region": "Pilbara Craton"
+    "region": "Pilbara Craton",
+    "key": "18KLDD007"
    },
    {
     "hole": "18KLDD007",
@@ -870,7 +942,8 @@
     "share": 1.0,
     "scanner_um": 1.0,
     "chem": "not assayed",
-    "region": "Pilbara Craton"
+    "region": "Pilbara Craton",
+    "key": "18KLDD007"
    },
    {
     "hole": "WSXP1735",
@@ -881,7 +954,8 @@
     "share": 0.8,
     "scanner_um": 1.0,
     "chem": "ni only",
-    "region": "Eastern Goldfields Superterrane"
+    "region": "Eastern Goldfields Superterrane",
+    "key": "WSXP1735"
    },
    {
     "hole": "GXDD0010",
@@ -892,7 +966,8 @@
     "share": 0.8,
     "scanner_um": 0.8,
     "chem": "not assayed",
-    "region": "Youanmi Terrane"
+    "region": "Youanmi Terrane",
+    "key": "GXDD0010"
    },
    {
     "hole": "CHRCD02",
@@ -903,7 +978,8 @@
     "share": 0.8,
     "scanner_um": 0.0,
     "chem": "ni only",
-    "region": "Youanmi Terrane"
+    "region": "Youanmi Terrane",
+    "key": "CHRCD02"
    },
    {
     "hole": "ORTL08",
@@ -914,7 +990,8 @@
     "share": 0.8,
     "scanner_um": 0.8,
     "chem": "ni only",
-    "region": "Eastern Goldfields Superterrane"
+    "region": "Eastern Goldfields Superterrane",
+    "key": "ORTL08"
    },
    {
     "hole": "NCB0003",
@@ -925,7 +1002,8 @@
     "share": 1.0,
     "scanner_um": 1.0,
     "chem": "ultramafic",
-    "region": "Eastern Goldfields Superterrane"
+    "region": "Eastern Goldfields Superterrane",
+    "key": "NCB0003"
    },
    {
     "hole": "ORTL09",
@@ -936,7 +1014,8 @@
     "share": 0.6,
     "scanner_um": 0.0,
     "chem": "ni only",
-    "region": "Eastern Goldfields Superterrane"
+    "region": "Eastern Goldfields Superterrane",
+    "key": "ORTL09"
    }
   ]
  },
@@ -987,5 +1066,130 @@
   ],
   "within10": 0.57,
   "added": 376
+ },
+ "beyond": {
+  "holes_read": 5841,
+  "confirmed_by_text": {
+   "hole": "TARDD 86",
+   "key": "SA-TARDD 86",
+   "state": "SA",
+   "region": "Gawler Craton",
+   "from_m": 77,
+   "to_m": 132,
+   "code": "Schist",
+   "text": "chlorite-actinolite-tremolite-talc-serpentine \u2026 metakomatiite",
+   "tray_id": "2617ea56-8dad-4e09-be80-b2ceb0db6f33",
+   "tray_from": 85.0,
+   "tray_to": 88.4,
+   "also": "TARDD 85 has the same pattern: code \u201cSchist\u201d, text \u201cmeta-komatiite \u2026 talc\u201d."
+  },
+  "candidates": [
+   {
+    "hole": "KODD11_004",
+    "key": "NT-KODD11_004",
+    "state": "NT",
+    "region": "Pine Creek Orogen",
+    "from_m": 60,
+    "to_m": 211,
+    "log": "Mount Dean Volcanic Member",
+    "share": 0.81,
+    "scanner": 0.66,
+    "tray_id": "4de76d8e-a6c8-4237-acc5-862b3fdc97aa",
+    "tray_from": 128.6,
+    "tray_to": 134.9
+   },
+   {
+    "hole": "TCGA01",
+    "key": "TAS-TCGA01",
+    "state": "TAS",
+    "from_m": 362,
+    "to_m": 582,
+    "log": null,
+    "share": 0.91,
+    "scanner": 1.0,
+    "tray_id": "fec0e93d-ceaf-4706-86cd-ef842a282d1d",
+    "tray_from": 464.6,
+    "tray_to": 469.8
+   },
+   {
+    "hole": "WL6",
+    "key": "NSW-WL6",
+    "state": "NSW",
+    "from_m": 111,
+    "to_m": 210,
+    "log": null,
+    "share": 0.96,
+    "scanner": 0.88,
+    "tray_id": "048e54ed-8803-4697-9e46-45fb5883791f",
+    "tray_from": 149.9,
+    "tray_to": 154.6
+   }
+  ],
+  "false_positive": {
+   "hole": "BRDD003",
+   "key": "SA-BRDD003",
+   "state": "SA",
+   "from_m": 123,
+   "to_m": 137,
+   "note": "logged as magnesian skarn (phlogopite, tremolite, carbonate): likely a false positive"
+  },
+  "readiness": [
+   {
+    "state": "WA",
+    "scanned": 1898,
+    "read_by_coretrace": 1754,
+    "with_a_log": 962,
+    "chemistry": "Mg, Ni, Cr by hole",
+    "check_today": "Yes"
+   },
+   {
+    "state": "SA",
+    "scanned": 1833,
+    "read_by_coretrace": 1516,
+    "with_a_log": 532,
+    "chemistry": "Ni only, not joined by hole",
+    "check_today": "Partly"
+   },
+   {
+    "state": "NT",
+    "scanned": 562,
+    "read_by_coretrace": 545,
+    "with_a_log": 180,
+    "chemistry": "none joined",
+    "check_today": "Partly"
+   },
+   {
+    "state": "TAS",
+    "scanned": 496,
+    "read_by_coretrace": 491,
+    "with_a_log": 98,
+    "chemistry": "none joined",
+    "check_today": "Partly"
+   },
+   {
+    "state": "QLD",
+    "scanned": 540,
+    "read_by_coretrace": 534,
+    "with_a_log": 22,
+    "chemistry": "none joined",
+    "check_today": "Partly"
+   },
+   {
+    "state": "NSW",
+    "scanned": 1269,
+    "read_by_coretrace": 993,
+    "with_a_log": 11,
+    "chemistry": "none joined",
+    "check_today": "Partly"
+   },
+   {
+    "state": "VIC",
+    "scanned": 29,
+    "read_by_coretrace": 8,
+    "with_a_log": 0,
+    "chemistry": "none joined",
+    "check_today": "No"
+   }
+  ]
  }
 }

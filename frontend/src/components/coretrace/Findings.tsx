@@ -14,9 +14,9 @@ import data from "@/data/findings.json";
 const UM = SERIES.orange, LOGGED = "#8d96a3", OTHER = "#c9ced6";
 const pct = (x: number) => `${Math.round(x * 100)}%`;
 const fmt = (n: number) => n.toLocaleString("en-AU");
-const holeHref = (hole: string, m?: number) => `/map?hole=${encodeURIComponent(hole)}&full=1${m != null ? `&m=${m}` : ""}`;
+const holeHref = (hole: string, m?: number | null) => `/map?hole=${encodeURIComponent(hole)}&full=1${m != null ? `&m=${m}` : ""}`;
 
-type Beyond = { holes_read?: number; candidates?: { hole: string; state: string; from_m?: number; to_m?: number; log?: string | null; tray_id?: string | null }[]; readiness?: { state: string; [k: string]: string | number | null }[] };
+type Beyond = typeof data.beyond;
 
 export function Findings() {
   return (
@@ -133,7 +133,7 @@ function Case() {
   const c = data.case;
   return (
     <Section id="case" title={`One hole: ${c.hole}`} tone="white"
-      lead={<>The log that came with the scan records <b className="text-ink">&ldquo;{c.log.toLowerCase()}&rdquo; from {c.log_from} to {c.log_to} m</b>. CoreTrace reads its talc&ndash;serpentine (Mg-OH) ultramafic type down to {c.um_to} m. CoreTrace never saw an assay; the one inside its ultramafic stretch is textbook ultramafic, and below its contact the assays are basalt.</>}>
+      lead={<>The log that came with the scan records <b className="text-ink">&ldquo;{c.log.toLowerCase()}&rdquo; from {c.log_from} to {c.log_to} m</b>. CoreTrace reads its talc&ndash;serpentine (Mg-OH) ultramafic type down to {c.um_to} m (on the map this type is labelled &ldquo;Other Mg-OH minerals + chlorite&rdquo;). CoreTrace never saw an assay; the one inside its ultramafic stretch is textbook ultramafic, and below its contact the assays are basalt.</>}>
       <div className="grid gap-10 lg:grid-cols-[1.2fr_1fr]">
         <Reveal><CaseStrip /></Reveal>
         <Reveal delay={0.1} className="flex flex-col gap-5">
@@ -248,30 +248,49 @@ function Misses() {
 }
 
 function BeyondWA() {
-  const b = (data as { beyond?: Beyond }).beyond;
+  const b: Beyond = data.beyond;
+  const t = b.confirmed_by_text, f = b.false_positive;
   return (
     <Section id="beyond" title="Beyond WA: candidates awaiting verification" tone="white"
-      lead={<>CoreTrace has read about {fmt(b?.holes_read ?? data.headline.au_holes_read)} holes across Australia. Outside WA it can only flag candidates. WA is the only State where we could check every claim against a log and multi-element chemistry, because GSWA&rsquo;s drillhole database compiles both.</>}>
-      {b?.candidates?.length ? (
-        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-          {b.candidates.slice(0, 4).map((c) => (
-            <Reveal key={c.hole} className="flex flex-col gap-3 rounded-2xl bg-paper p-4">
-              {c.tray_id && <Tray hole={c.hole} id={c.tray_id} caption={`${c.hole}${c.from_m != null ? `, ${c.from_m}–${c.to_m} m` : ""}`} />}
-              <p className="text-[14px] text-ink"><Link href={holeHref(c.hole, c.from_m)} className="font-semibold underline-offset-4 hover:underline">{c.hole}</Link> · {c.state}</p>
-              <p className="text-[13px] text-ink-soft">Log: {c.log || "no log text"}</p>
-              <span className="self-start rounded-full border px-2.5 py-0.5 text-[12px] font-semibold" style={{ color: UM, borderColor: UM }}>Awaiting verification</span>
-            </Reveal>
-          ))}
+      lead={<>CoreTrace has read {fmt(b.holes_read)} holes across Australia. Outside WA it can only flag candidates. WA is the only State where we could check every claim against a log and multi-element chemistry, because GSWA&rsquo;s drillhole database compiles both.</>}>
+      <Reveal>
+        <div className="grid gap-8 rounded-3xl bg-paper p-6 md:grid-cols-[1.2fr_1fr] md:p-8">
+          <Tray hole={t.key} id={t.tray_id} caption={`${t.hole}, ${t.tray_from}–${t.tray_to} m (${t.state}, ${t.region}).`} />
+          <div className="flex flex-col gap-3">
+            <p className="text-[13px] font-semibold" style={{ color: UM }}>Confirmed by the log&rsquo;s own words</p>
+            <p className="text-[16px] leading-relaxed text-ink"><Link href={holeHref(t.key, t.from_m)} className="font-semibold underline-offset-4 hover:underline">{t.hole}</Link>, {t.from_m}–{t.to_m} m: the rock code says <b>&ldquo;{t.code}&rdquo;</b>; the geologist&rsquo;s description says <b>&ldquo;{t.text}&rdquo;</b>. CoreTrace reads its ultramafic type here: it agrees with the words, which the code lost.</p>
+            <p className="text-[14px] text-ink-soft">{t.also}</p>
+          </div>
         </div>
-      ) : <p className="text-[15px] text-ink-soft">Candidate holes are being prepared.</p>}
-      {b?.readiness?.length ? (
+      </Reveal>
+      <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+        {b.candidates.map((c) => (
+          <Reveal key={c.key} className="flex flex-col gap-3 rounded-2xl bg-paper p-4">
+            <Tray hole={c.key} id={c.tray_id} caption={`${c.tray_from}–${c.tray_to} m`} />
+            <p className="text-[14px] text-ink"><Link href={holeHref(c.key, c.from_m)} className="font-semibold underline-offset-4 hover:underline">{c.hole}</Link> · {c.state} · {c.from_m}–{c.to_m} m</p>
+            <p className="text-[13px] text-ink-soft">Log: {c.log ? <>&ldquo;{c.log}&rdquo;</> : "none we hold"}. Ultramafic type {pct(c.share)} of metres; scanner talc, serpentine or Mg-chlorite {pct(c.scanner)}.</p>
+            <span className="self-start rounded-full border px-2.5 py-0.5 text-[12px] font-semibold" style={{ color: UM, borderColor: UM }}>Awaiting verification</span>
+          </Reveal>
+        ))}
+      </div>
+      <p className="text-[14px] text-ink-soft">Likely wrong: <Link href={holeHref(f.key, f.from_m)} className="text-ink underline underline-offset-4">{f.hole}</Link> ({f.state}, {f.from_m}–{f.to_m} m) is {f.note}.</p>
+      <Reveal>
         <div className="overflow-x-auto">
-          <table className="min-w-[560px] text-left text-[14px]">
-            <thead className="text-[12px] text-ink-soft"><tr className="border-b border-line">{Object.keys(b.readiness[0]).map((k) => <th key={k} className="px-3 py-2 font-medium capitalize">{k.replace(/_/g, " ")}</th>)}</tr></thead>
-            <tbody>{b.readiness.map((r) => <tr key={r.state} className="border-b border-line/70">{Object.keys(b.readiness![0]).map((k) => <td key={k} className="px-3 py-2 text-ink-soft">{r[k] ?? "—"}</td>)}</tr>)}</tbody>
+          <table className="w-full min-w-[620px] text-left text-[14px]">
+            <thead className="text-[12px] text-ink-soft"><tr className="border-b border-line">
+              <th className="py-2 pr-3 font-medium">State</th><th className="px-3 py-2 text-right font-medium">Scanned holes</th><th className="px-3 py-2 text-right font-medium">Read by CoreTrace</th>
+              <th className="px-3 py-2 text-right font-medium">With a log we hold</th><th className="px-3 py-2 font-medium">Multi-element chemistry</th><th className="px-3 py-2 font-medium">Can be checked today</th>
+            </tr></thead>
+            <tbody>{b.readiness.map((r) => (
+              <tr key={r.state} className="border-b border-line/70">
+                <td className="py-2 pr-3 font-medium text-ink">{r.state}</td><td className="px-3 py-2 text-right tabular-nums text-ink-soft">{fmt(r.scanned)}</td>
+                <td className="px-3 py-2 text-right tabular-nums text-ink-soft">{fmt(r.read_by_coretrace)}</td><td className="px-3 py-2 text-right tabular-nums text-ink-soft">{fmt(r.with_a_log)}</td>
+                <td className="px-3 py-2 text-ink-soft">{r.chemistry}</td><td className="px-3 py-2 text-ink-soft">{r.check_today}</td>
+              </tr>
+            ))}</tbody>
           </table>
         </div>
-      ) : null}
+      </Reveal>
     </Section>
   );
 }
