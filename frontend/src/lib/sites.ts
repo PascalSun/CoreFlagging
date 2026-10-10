@@ -5,9 +5,9 @@
 import { footerContact, footerSitemap, footerSocials, navLinks } from "@/lib/landing-site";
 
 // the Chrome type and appEntry live in the shared client; re-exported so imports keep working
-export type { Chrome } from "@ntlp/platform-client/chrome";
-export { appEntry } from "@ntlp/platform-client/chrome";
-import type { Chrome } from "@ntlp/platform-client/chrome";
+export type { Chrome } from "@ntlp/geodata-web/chrome";
+export { appEntry } from "@ntlp/geodata-web/chrome";
+import type { Chrome } from "@ntlp/geodata-web/chrome";
 
 export const groundworkChrome: Chrome = {
   brand: ["MINETRACE", ""],

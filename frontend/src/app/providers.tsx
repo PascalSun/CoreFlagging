@@ -2,7 +2,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState } from "react";
 import { LocaleProvider } from "@/lib/i18n";
-import { configurePlatformClient } from "@ntlp/platform-client";
+import { configurePlatformClient } from "@ntlp/geodata-web";
 import { track } from "@/lib/analytics";
 import { site } from "@/lib/landing-site";
 

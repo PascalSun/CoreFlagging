@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { completeSignIn } from "@ntlp/platform-client";
+import { completeSignIn } from "@ntlp/geodata-web";
 
 /** Where the platform sends the browser back after signing in. Finishes the sign-in and goes on. */
 export default function AuthCallbackPage() {

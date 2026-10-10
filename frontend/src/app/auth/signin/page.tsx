@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { signIn } from "@ntlp/platform-client";
+import { signIn } from "@ntlp/geodata-web";
 
 /** /auth/signin?next=/where: the one way into the platform's sign-in from this app. */
 export default function SignInPage() {
