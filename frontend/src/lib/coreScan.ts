@@ -3,8 +3,8 @@
 // Reads are public for NVCL holes; a signed-in caller also sees their own uploads, so a
 // token is sent when there is one. Uploading needs a verified session.
 
-import { PLATFORM_URL, platformFetch, sharedRefresh } from "@ntlp/platform-client/fetch";
-import { authToken } from "@ntlp/platform-client/auth";
+import { PLATFORM_URL, platformFetch, sharedRefresh } from "@ntlp/geodata-web/fetch";
+import { authToken } from "@ntlp/geodata-web/auth";
 
 export const CORE_BASE = `${PLATFORM_URL}/core-scan/api`;
 

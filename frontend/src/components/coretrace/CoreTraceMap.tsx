@@ -6,7 +6,7 @@ import { usePathname, useSearchParams } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronDown, ChevronUp, HelpCircle, MessageCircle, SlidersHorizontal, Upload, X } from "lucide-react";
 import { AccountMenu } from "@/components/auth/AccountMenu";
-import { EmailGate } from "@ntlp/platform-client/email-gate";
+import { EmailGate } from "@ntlp/geodata-web/email-gate";
 import { VerifyEmailDialog } from "@/components/auth/VerifyEmailDialog";
 import { CoreChat, type OpenTarget } from "@/components/coretrace/CoreChat";
 import { CoreMap, type Basemap } from "@/components/coretrace/CoreMap";
