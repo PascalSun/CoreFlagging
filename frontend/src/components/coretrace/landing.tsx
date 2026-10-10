@@ -84,15 +84,16 @@ export function CoreHero() {
           <div className="max-w-4xl">
             <p className="font-display text-lg font-semibold tracking-tight text-white md:text-xl">CoreTRACE</p>
             <h1 className="mt-1.5 font-display text-[34px] font-semibold leading-[1.1] tracking-tight md:mt-2.5 md:text-6xl md:leading-tight">
-              <span className="bg-linear-to-r from-white from-40% to-cyan bg-clip-text text-transparent">Read the core, metre by metre.</span>
+              <span className="bg-linear-to-r from-white from-40% to-cyan bg-clip-text text-transparent">A second opinion on every metre of core.</span>
             </h1>
-            <p className="mt-2 font-display text-base font-medium text-white/75 md:mt-3 md:text-2xl">Every HyLogger-scanned drillhole in Australia, on one map.</p>
+            <p className="mt-2 max-w-3xl font-display text-base font-medium text-white/75 md:mt-3 md:text-2xl">CoreTrace reads HyLogger scans the same way for every hole, and shows where the core and the geologist&rsquo;s log tell different stories.</p>
             <div className="mt-5 flex flex-wrap items-center gap-2.5 md:mt-7 md:gap-3">
               <Link href={`${base}/map`} className="flex h-11 items-center gap-2 rounded-full bg-white px-5 font-display text-[15px] font-bold md:h-12 md:px-6 text-ink transition-colors hover:bg-cyan focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan">
                 Open the map<ArrowRight className="size-4" />
               </Link>
-              <Link href={`${base}/map?upload=1`} className="flex h-11 items-center rounded-full px-4 font-display text-[15px] font-semibold md:h-12 md:px-5 text-white/85 ring-1 ring-white/35 transition-colors hover:bg-white/10 hover:text-white">Upload your own scan</Link>
+              <Link href={`${base}/findings`} className="flex h-11 items-center rounded-full px-4 font-display text-[15px] font-semibold md:h-12 md:px-5 text-white/85 ring-1 ring-white/35 transition-colors hover:bg-white/10 hover:text-white">See what it found</Link>
             </div>
+            <Link href={`${base}/map?upload=1`} className="mt-3 inline-block text-sm text-white/60 underline-offset-4 hover:text-white hover:underline md:mt-4">Or upload your own scan</Link>
           </div>
           <div className="flex flex-col items-start gap-3 md:items-end">
             <div className="flex max-w-sm flex-wrap gap-x-3 gap-y-1 text-[11px] text-white/70 md:justify-end md:gap-y-1.5 md:text-xs">
@@ -118,18 +119,30 @@ const LIBRARIES: [string, string][] = [
   ["540", "Queensland"], ["496", "Tasmania"], ["29", "Victoria"], ["5", "CSIRO"],
 ];
 
-/** The statement: heading left, paragraph right, then where the holes come from. */
+/** Why the scan is worth a second reading: three plain reasons. */
+const WHY: [string, string][] = [
+  ["Logs are written by eye.", "By many geologists, for many companies, over decades, each with their own codes and level of detail."],
+  ["Nobody has time to check them again.", "Re-reading hundreds of thousands of metres of core by hand does not happen."],
+  ["The scan sees what the eye can miss.", "Minerals such as talc and serpentine in altered ultramafic rock, which in a tray can look like basalt."],
+];
+
+/** The statement: heading left, reasons right, then where the holes come from. */
 export function CoreIntro() {
   return (
     <section id="intro" className="bg-paper pt-24 pb-16 md:pt-32 md:pb-24">
       <div className="container-site flex flex-col gap-10 lg:flex-row lg:items-start lg:gap-20">
         <Reveal className="lg:w-2/5">
-          <h2 className="font-display text-[32px] font-medium leading-[1.1] tracking-tight text-balance text-ink md:text-6xl">Australia&rsquo;s scanned drill core, read for you</h2>
+          <h2 className="font-display text-[32px] font-medium leading-[1.1] tracking-tight text-balance text-ink md:text-6xl">Why a second opinion</h2>
         </Reveal>
         <Reveal delay={0.12} className="flex flex-1 flex-col gap-12">
-          <p className="font-display text-[17px] font-medium leading-relaxed text-ink-soft md:text-2xl">
-            Every State keeps its drill core in a library, and most of it has been scanned by a HyLogger: a spectrum every centimetre or so, and a photograph of every tray. CoreTrace reads those scans with a model trained on the Geological Survey of Western Australia&rsquo;s core. For each hole it checks the data, logs the hole metre by metre, flags what stands out and ranks the likelihood of gold. Open any hole, or ask the assistant.
-          </p>
+          <ul className="flex flex-col gap-5">
+            {WHY.map(([t, b]) => (
+              <li key={t} className="border-t border-line pt-5">
+                <p className="font-display text-[19px] font-semibold text-ink md:text-2xl">{t}</p>
+                <p className="mt-1.5 max-w-[60ch] text-[15px] leading-relaxed text-ink-soft md:text-lg">{b}</p>
+              </li>
+            ))}
+          </ul>
           <dl className="grid grid-cols-2 gap-x-8 gap-y-6 border-t border-line pt-8 sm:grid-cols-4">
             {LIBRARIES.map(([n, where]) => (
               <div key={where}>
@@ -163,11 +176,11 @@ function TrayPicture({ offset }: { offset: number }) {
   );
 }
 
-const FEATURES: { title: string; body: string; offset: number; tint: string }[] = [
-  { title: "Every hole, one map", body: "About 6,600 scanned holes from every State's core library, coloured by what the core is made of and where gold was assayed.", offset: 0.05, tint: "#0d3a4c" },
-  { title: "Read a hole metre by metre", body: "An automatic log, the minerals every 10 cm, and the metres that differ most from the core around them.", offset: 0.3, tint: "#173523" },
-  { title: "See the core itself", body: "Every tray photograph at full resolution, with the metre you are reading boxed on it.", offset: 0.55, tint: "#3b2916" },
-  { title: "Ask about the core", body: "An assistant that answers from the same data, in plain words, and opens the hole it is talking about.", offset: 0.15, tint: "#2a2446" },
+const FEATURES: { title: string; body: string; offset: number; tint: string; to: "map" | "findings" }[] = [
+  { title: "Every hole, one map", body: "About 6,600 scanned holes from every State's core library, coloured by what the core is made of.", offset: 0.05, tint: "#0d3a4c", to: "map" },
+  { title: "The log next to the scan", body: "Open a hole: the tray photographs, the minerals every 10 cm and CoreTrace's reading, beside the geologist's log.", offset: 0.3, tint: "#173523", to: "map" },
+  { title: "Where they disagree", body: "The intervals where the core and the log tell different stories, each with its photograph, to look at again.", offset: 0.55, tint: "#3b2916", to: "findings" },
+  { title: "Ask about the core", body: "An assistant that answers from the same data, in plain words, and opens the hole it is talking about.", offset: 0.15, tint: "#2a2446", to: "map" },
 ];
 
 /** What you can do: four large picture cards, title at the foot, as on the platform's landing page. */
@@ -183,7 +196,7 @@ export function CoreFeatures() {
       <div className="container-site mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {FEATURES.map((f, i) => (
           <Reveal key={f.title} delay={i * 0.06}>
-            <Link href={`${base}/map`} className="group relative block aspect-[4/5] overflow-hidden rounded-3xl focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-blue">
+            <Link href={`${base}/${f.to}`} className="group relative block aspect-[4/5] overflow-hidden rounded-3xl focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-blue">
               <div className="absolute inset-0 transition-transform duration-700 ease-out group-hover:scale-[1.03]"><TrayPicture offset={f.offset} /></div>
               {/* the words sit on a solid panel in the card's colour, which fades up into the core */}
               <div aria-hidden className="absolute inset-0" style={{ background: `linear-gradient(to top, ${f.tint} 0%, ${f.tint} 44%, ${f.tint}00 64%)` }} />
@@ -215,10 +228,10 @@ export function CoreRun({ rows, caption }: { rows: string[]; caption: string }) 
 }
 
 const NOTES: [string, string][] = [
-  ["Trained on Western Australian core.", "The models learned from the Geological Survey of WA's library. Holes from other States are read outside that training, so take their results with more caution."],
-  ["Unusual is not mineralised.", "A flagged metre differs from the core around it. That points at change, not at grade."],
-  ["Gold ranking is a modest edge.", "It reads the spectra only and does a little better than conventional methods. Where a scan carries assays, it is checked against them."],
-  ["Descriptions are written by rule.", "They come from the scan software's mineral readings. No geologist has reviewed them. Chips and cuttings are shown without the models."],
+  ["A second opinion, not a replacement.", "CoreTrace points at intervals worth another look. A geologist, the tray photograph and the core decide."],
+  ["Checked in Western Australia.", "Against the logs and the chemistry in GSWA's drillhole database. Holes from other States are read the same way but not yet checked."],
+  ["It is wrong sometimes.", "Some intervals it reads as ultramafic are basalt by their chemistry, and weathering clays hide the rock they came from."],
+  ["Not a targeting tool.", "We make no claim about gold or nickel. Differing from the log points at the rock, not at grade."],
 ];
 
 /** What to keep in mind, in plain words. */
@@ -274,6 +287,83 @@ export function CoreTeam() {
             </li>
           ))}
         </ul>
+      </div>
+    </section>
+  );
+}
+
+const STEPS: [string, string][] = [
+  ["Spectra every 10 cm", "The HyLogger measures short-wave infrared (clays, micas, carbonates, talc) and thermal infrared (quartz, feldspar) all along the core."],
+  ["A model learns the core", "Trained with no labels, it learns what core looks like to the scanner. It never sees the logs, the assays or the deposits."],
+  ["A reading for every 10 cm", "Each stretch of core gets a reading, grouped into 12 core types named by their minerals."],
+  ["Set beside the log", "Where the reading and the log agree, the log is confirmed. Where they differ, the interval is worth another look."],
+];
+
+/** How it works: four steps in order, in the notes' quiet card style. */
+export function CoreHow() {
+  return (
+    <section id="how" className="scroll-mt-24 bg-paper pb-16 md:pb-24">
+      <div className="container-site">
+        <Reveal><h2 className="font-display text-2xl font-medium tracking-tight text-ink md:text-4xl">How it works</h2></Reveal>
+        <ol className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          {STEPS.map(([t, b], i) => (
+            <Reveal key={t} delay={i * 0.06}>
+              <li className="flex h-full flex-col rounded-3xl border border-line bg-white p-6">
+                <span className="font-display text-sm font-semibold text-ink-soft tabular-nums">{i + 1}</span>
+                <p className="mt-3 font-display text-xl font-semibold text-ink">{t}</p>
+                <p className="mt-2 text-[15px] leading-relaxed text-ink-soft">{b}</p>
+              </li>
+            </Reveal>
+          ))}
+        </ol>
+      </div>
+    </section>
+  );
+}
+
+const FOUND: [string, string][] = [
+  ["74%", "When CoreTrace and the log disagree, the chemistry backs CoreTrace in 74% of cases, against 51% by chance."],
+  ["79 intervals", "Ultramafic rock in WA logged as something else, confirmed by the scanner's own minerals."],
+  ["5,841 holes", "Read across Australia. Checked against logs and chemistry in Western Australia."],
+];
+
+/** A short look at the findings, three tested numbers and the way in. */
+export function CoreFound() {
+  const { base } = useChrome();
+  return (
+    <section id="found" className="scroll-mt-24 bg-paper pb-16 md:pb-24">
+      <div className="container-site">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <Reveal><h2 className="font-display text-2xl font-medium tracking-tight text-ink md:text-4xl">What it found</h2></Reveal>
+          <Link href={`${base}/findings`} className="inline-flex items-center gap-1.5 font-display text-[15px] font-semibold text-ink underline-offset-4 hover:underline">
+            See the findings<ArrowRight className="size-4" />
+          </Link>
+        </div>
+        <dl className="mt-8 grid gap-x-10 sm:grid-cols-3">
+          {FOUND.map(([n, b]) => (
+            <Reveal key={n}>
+              <div className="border-t border-line py-6">
+                <dt className="font-display text-4xl font-semibold tracking-tight text-ink tabular-nums md:text-5xl">{n}</dt>
+                <dd className="mt-2 max-w-[38ch] text-[15px] leading-relaxed text-ink-soft">{b}</dd>
+              </div>
+            </Reveal>
+          ))}
+        </dl>
+      </div>
+    </section>
+  );
+}
+
+/** The closing line, on its own before the team. */
+export function CoreClosing() {
+  return (
+    <section aria-label="In short" className="bg-paper py-16 md:py-24">
+      <div className="container-site">
+        <Reveal>
+          <p className="max-w-4xl font-display text-[26px] font-medium leading-snug tracking-tight text-balance text-ink md:text-[40px]">
+            CoreTrace doesn&rsquo;t replace the geologist. It reads every metre the geologist didn&rsquo;t have time to, and where the core and the log disagree, it asks for another pair of eyes.
+          </p>
+        </Reveal>
       </div>
     </section>
   );
