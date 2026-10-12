@@ -7,6 +7,7 @@ import { Streamdown, type Components } from "streamdown";
 import { Loader2, RotateCcw, Send } from "lucide-react";
 import { MD_COMPONENTS } from "@/components/chat/mdTable";
 import { authToken, refreshAccessToken, refreshToken } from "@/lib/auth";
+import { platformFetch } from "@ntlp/geodata-web/fetch";
 import { cn } from "@/lib/utils";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -58,6 +59,32 @@ export function CoreChat({ context, onOpen, signedIn, onSignIn }: {
     },
   });
   const busy = status === "submitted" || status === "streaming";
+
+  // The conversation is kept on the platform, as on the hub and MineTrace: it survives a reload,
+  // and staff can read it there. Loaded once on sign-in, saved after each finished answer.
+  const loaded = useRef(false);
+  const saved = useRef("");
+  useEffect(() => {
+    if (!signedIn || loaded.current) return;
+    loaded.current = true;
+    platformFetch("/chats/conversation/").then((r) => (r.ok ? r.json() : null)).then((c) => {
+      if (!Array.isArray(c?.messages) || c.messages.length === 0) return;
+      saved.current = JSON.stringify(c.messages);
+      setMessages((now: any[]) => (now.length ? now : c.messages));
+    }).catch(() => {});
+  }, [signedIn, setMessages]);
+  useEffect(() => {
+    if (!signedIn || status !== "ready" || messages.length === 0) return;
+    const body = JSON.stringify(messages);
+    if (body === saved.current) return;
+    saved.current = body;
+    platformFetch("/chats/conversation/", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ messages }) }).catch(() => {});
+  }, [signedIn, status, messages]);
+  const startOver = () => {
+    setMessages([]);
+    saved.current = "";
+    platformFetch("/chats/conversation/clear/", { method: "POST" }).catch(() => {});
+  };
   useEffect(() => { endRef.current?.scrollIntoView({ block: "end" }); }, [messages, status]);
 
   const send = (text: string) => { const t = text.trim(); if (!t || busy) return; setInput(""); sendMessage({ text: t }); };
@@ -133,7 +160,7 @@ export function CoreChat({ context, onOpen, signedIn, onSignIn }: {
           <textarea value={input} onChange={(e) => setInput(e.target.value)} rows={1} placeholder={context.hole ? `Ask about ${context.hole}…` : "Ask about the core…"} aria-label="Message"
             onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(input); } }}
             className="max-h-[96px] min-h-[24px] flex-1 resize-none overflow-y-auto bg-transparent text-base leading-[22px] text-slate-700 outline-none placeholder:text-slate-400 sm:text-sm" />
-          {messages.length > 0 && !busy && <button type="button" onClick={() => setMessages([])} aria-label="New conversation" title="New conversation" className="grid size-7 place-items-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700"><RotateCcw size={14} /></button>}
+          {messages.length > 0 && !busy && <button type="button" onClick={startOver} aria-label="New conversation" title="New conversation" className="grid size-7 place-items-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700"><RotateCcw size={14} /></button>}
           <button type="submit" disabled={busy || !input.trim()} aria-label="Send" className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-slate-900 text-white transition-opacity disabled:opacity-40">{busy ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}</button>
         </div>
       </form>
