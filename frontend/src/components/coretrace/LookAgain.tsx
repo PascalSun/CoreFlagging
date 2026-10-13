@@ -116,7 +116,7 @@ export function LookAgain({ hole, mv, run, metre, onJump, onSimilar }: { hole: H
           {!st ? <p className="text-[11px] text-slate-500">{stq.isPending ? "Reading…" : "Not available for this hole."}</p>
             : st.unlogged.length === 0 ? <Empty>The log covers every metre the model read.</Empty>
             : <ul className="flex flex-col gap-1 text-xs text-slate-700">{st.unlogged.map((u) => (
-                <li key={u.from_m}><button type="button" onClick={() => onJump(u.from_m, u.to_m)} className="text-left hover:underline"><span className="font-mono">{u.from_m}–{u.to_m} m</span> ({u.length_m} m) · no logged rock · the model reads <b className="font-medium text-slate-900">{u.reads}</b> over {pct(u.share)} of it</button></li>))}</ul>}
+                <li key={u.from_m}><button type="button" onClick={() => onJump(u.from_m, u.to_m)} className="text-left hover:underline"><span className="font-mono">{u.from_m}–{u.to_m} m</span> ({u.length_m} m) · no logged rock · the model reads <b className="font-medium text-slate-900">{u.reads}</b> {u.share >= 0.995 ? "all the way through" : `over ${pct(u.share)} of it`}</button></li>))}</ul>}
           {st && st.unlogged.length > 0 && <p className="text-[11px] leading-relaxed text-slate-500">Gaps of 2 m or more with no logged rock. Not a disagreement: a place the scan can fill in where nobody wrote anything.</p>}
         </section>
       )}
