@@ -19,7 +19,7 @@ const RINGS = [2, 5, 10] as const;
  * the flagged metres and the log disagreements are drawn thick. A click on a point opens that depth on the map. */
 export function Scene() {
   const sp = useSearchParams(); const router = useRouter();
-  const key = sp.get("hole"); const [km, setKm] = useState<number>(Number(sp.get("km")) || 5);
+  const key = sp.get("hole"); const [km, setKm] = useState<number>(Number(sp.get("km")) || 2);
   const [colourAll, setColourAll] = useState(false);
   const q = useQuery({ queryKey: ["core-trace", key, km], queryFn: () => coreScan.trace(key as string, km), enabled: !!key, staleTime: 10 * 60_000 });
   const host = useRef<HTMLDivElement>(null);
@@ -70,8 +70,8 @@ export function Scene() {
       mark(d.again, SERIES.orange, "Model disagrees with the log"); mark(d.flags, "#7c3aed", "Stands out from its surroundings");
       const layout = {
         margin: { l: 0, r: 0, t: 0, b: 0 }, paper_bgcolor: "rgba(0,0,0,0)", showlegend: false,
-        scene: { aspectmode: "data", xaxis: { title: "east (m)", gridcolor: "#e2e8f0", zerolinecolor: "#cbd5e1" }, yaxis: { title: "north (m)", gridcolor: "#e2e8f0", zerolinecolor: "#cbd5e1" },
-          zaxis: { title: c0.rl !== null ? "up (m, from this collar)" : "up (m)", gridcolor: "#e2e8f0", zerolinecolor: "#cbd5e1" }, camera: { eye: { x: 1.4, y: -1.6, z: 0.9 } }, bgcolor: "#f8fafc" },
+        scene: { aspectmode: "data", xaxis: { title: { text: "east (m)" }, gridcolor: "#e2e8f0", zerolinecolor: "#cbd5e1" }, yaxis: { title: { text: "north (m)" }, gridcolor: "#e2e8f0", zerolinecolor: "#cbd5e1" },
+          zaxis: { title: { text: c0.rl !== null ? "up (m, from this collar)" : "up (m)" }, gridcolor: "#e2e8f0", zerolinecolor: "#cbd5e1" }, camera: { eye: { x: 1.1, y: -1.3, z: 0.7 } }, bgcolor: "#f8fafc" },
       };
       await Plotly.react(el, traces, layout, { displaylogo: false, responsive: true, modeBarButtonsToRemove: ["toImage"] });
       (el as any).on?.("plotly_click", (ev: any) => {
