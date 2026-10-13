@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, Download, X } from "lucide-react";
 import { coreScan, type AgainInterval, type HoleDetail, type ModelView, type Review, type ReviewBody } from "@/lib/coreScan";
 import { csvRows } from "@/lib/lookAgain";
+import { chemText, chemistryOver, loggedOver } from "@/lib/package";
 import { coreTypeColor, fmt, pct, SERIES } from "@/components/coretrace/palette";
 import { isVerified } from "@/lib/auth";
 import { cn } from "@/lib/utils";
@@ -56,10 +57,13 @@ export function LookAgain({ hole, mv, run, metre, onJump }: { hole: HoleDetail; 
   const flags = mv.anomaly.runs;
   const canVote = isVerified();
   const rq = useQuery({ queryKey: ["core-reviews", hole.key], queryFn: () => coreScan.reviews(hole.key), staleTime: 30_000 });
+  // the DMIRS HyLogger package: the company's log and multi-element assays behind a WA hole (404 elsewhere)
+  const pq = useQuery({ queryKey: ["core-package", hole.key], queryFn: () => coreScan.package(hole.key), enabled: hole.source === "nvcl" && hole.state === "WA", staleTime: 60 * 60_000, retry: false });
+  const pkg = pq.data;
   const reviews = rq.data?.reviews ?? [];
   const verdictOf = (kind: "log" | "flag", from: number, to: number) => reviews.find((r) => r.mine && r.kind === kind && Math.abs(r.from_m - from) < 0.05 && Math.abs(r.to_m - to) < 0.05)?.verdict ?? "";
   const exportCsv = () => {
-    const blob = new Blob([csvRows(hole.name, run, ds, flags, verdictOf)], { type: "text/csv" });
+    const blob = new Blob([csvRows(hole.name, run, ds, flags, verdictOf, (from, to) => chemistryOver(pkg, from, to))], { type: "text/csv" });
     const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `CoreTrace_${hole.name.replace(/[^A-Za-z0-9_-]+/g, "_")}_look_again.csv`; a.click(); URL.revokeObjectURL(a.href);
   };
   const on = (d: { from_m: number; to_m: number }) => metre !== null && metre >= d.from_m && metre < d.to_m;
@@ -75,18 +79,23 @@ export function LookAgain({ hole, mv, run, metre, onJump }: { hole: HoleDetail; 
           : ds.length === 0 ? <Empty>The log and the model agree, by the one rule we have validated (ultramafic rock logged as something else, or the reverse). Other kinds of disagreement are not listed until they have been checked against chemistry the same way.</Empty>
           : (
             <table className="w-full border-collapse">
-              <thead><tr>{["Interval (m)", "The log says", "The model reads", "Talc, serpentine, Mg-chlorite", "Gold assays", "Your verdict"].map((h) => <th key={h} className={th}>{h}</th>)}</tr></thead>
+              <thead><tr>{["Interval (m)", "The log says", "The model reads", "Talc, serpentine, Mg-chlorite", pkg ? "Chemistry (WAMEX)" : "Gold assays", "Your verdict"].map((h) => <th key={h} className={th}>{h}</th>)}</tr></thead>
               <tbody>{ds.map((d: AgainInterval) => (
                 <tr key={`${d.from_m}-${d.to_m}`} onClick={() => onJump(d.from_m)} className={cn("cursor-pointer hover:bg-slate-50", on(d) && "bg-cyan/10")}>
                   <td className={cn(td, "font-mono whitespace-nowrap")}>{d.from_m}–{d.to_m}<div className="text-[10px] text-slate-400">{d.length_m} m</div></td>
-                  <td className={td}><span className="font-medium text-slate-900">{d.logged || d.logged_class}</span>{d.logged && d.logged !== d.logged_class && <div className="text-[10px] text-slate-500">{d.logged_class}</div>}</td>
+                  <td className={td}><span className="font-medium text-slate-900">{d.logged || d.logged_class}</span>{d.logged && d.logged !== d.logged_class && <div className="text-[10px] text-slate-500">{d.logged_class}</div>}
+                    {(() => { const l = loggedOver(pkg, d.from_m, d.to_m); return l.length ? <div className="mt-0.5 text-[10px] leading-snug text-slate-500" title="The company's own log for this depth, from the WAMEX report">WAMEX log: {l.join("; ")}</div> : null; })()}</td>
                   <td className={td}><span className="flex items-start gap-1.5"><i className="mt-[0.35em] inline-block h-2.5 w-2.5 flex-none rounded-[2px]" style={{ background: coreTypeColor(d.reads) }} />{d.reads}</span><div className="text-[10px] text-slate-500">{pct(d.share)} of the interval{d.flagged ? ` · ${d.flagged} m also stand out` : ""}</div></td>
                   <td className={td}><Minerals v={d.um_minerals} /></td>
-                  <td className={cn(td, "whitespace-nowrap")}>{d.assays.n ? <>{d.assays.n} m assayed<div className="text-[10px] text-slate-500">{d.assays.pos ? `${d.assays.pos} m at or above 0.1 ppm · max ${fmt(d.assays.max, 2)}` : "no gold in them"}</div></> : <span className="text-slate-400">none</span>}</td>
+                  <td className={cn(td, "whitespace-nowrap")}>{pkg ? (() => { const c = chemistryOver(pkg, d.from_m, d.to_m); return c.n
+                      ? <><span className="font-medium text-slate-900">{chemText(c) || `${c.n} samples`}</span><div className="text-[10px] text-slate-500">{c.n} {c.n === 1 ? "sample" : "samples"} in the interval{c.mgo !== null ? (c.mgo >= 18 ? " · ultramafic chemistry" : c.mgo <= 10 ? " · not ultramafic" : "") : ""}</div></>
+                      : <span className="text-slate-400">no chemistry here</span>; })()
+                    : d.assays.n ? <>{d.assays.n} m assayed<div className="text-[10px] text-slate-500">{d.assays.pos ? `${d.assays.pos} m at or above 0.1 ppm · max ${fmt(d.assays.max, 2)}` : "no gold in them"}</div></> : <span className="text-slate-400">none</span>}</td>
                   <td className={cn(td, "whitespace-nowrap")}><Verdict holeKey={hole.key} body={{ run, kind: "log", from_m: d.from_m, to_m: d.to_m }} reviews={reviews} canVote={canVote} /></td>
                 </tr>))}</tbody>
             </table>
           )}
+        {pkg && <p className="text-[11px] leading-relaxed text-slate-500">Chemistry and the WAMEX log come from DMIRS&rsquo;s HyLogger drillhole package (interim, Oct 2026): {pkg.assays.rows.length.toLocaleString()} assayed intervals and {pkg.geology.length.toLocaleString()} logged intervals for this hole{pkg.anumber ? `, report ${pkg.anumber}` : ""}. MgO above about 18% with high Ni and Cr is ultramafic chemistry; below 10% it is not.</p>}
         {ds.length > 0 && <p className="text-[11px] leading-relaxed text-slate-500">Rule: at least 5 m with the model&rsquo;s talc&ndash;serpentine type over half of it, inside an interval the log calls something else (or the reverse). Over 102 such disagreements in WA with chemistry, the chemistry sided with the model in 74%, against 51% by chance. The mineral bar is the scanner&rsquo;s own reading of talc, serpentine and Mg-chlorite, independent of the model.</p>}
       </section>
 
