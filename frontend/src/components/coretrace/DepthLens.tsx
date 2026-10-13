@@ -10,20 +10,8 @@ import { coreTypeColor, fmt, groupColor, groupName, mineralName, pct } from "@/c
 import { useState as useStateReact } from "react";
 import { cn } from "@/lib/utils";
 
-export type Window = [number, number];
-
-/** The levels the depth axis snaps to, by window length. */
-export const LEVELS: { id: string; label: string; span: number | null }[] = [
-  { id: "hole", label: "Whole hole", span: null }, { id: "10m", label: "10 m", span: 10 }, { id: "1m", label: "1 m", span: 1 }, { id: "10cm", label: "10 cm", span: 0.3 },
-];
-export const MIN_SPAN = 0.3;
-
-/** Which level a window is at: the finest whose span it fits. */
-export function levelOf(win: Window | null): string {
-  if (!win) return "hole";
-  const s = win[1] - win[0];
-  return s <= 0.5 ? "10cm" : s <= 2.5 ? "1m" : s <= 25 ? "10m" : "hole";
-}
+import { LEVELS, MIN_SPAN, fmtSpan, fmtWindow, levelOf, windowAt, type Window } from "@/lib/depth";
+export { LEVELS, MIN_SPAN, levelOf, type Window };
 
 const H4 = ({ children }: { children: React.ReactNode }) => <h4 className="pb-1.5 font-display text-[14px] font-semibold text-slate-900">{children}</h4>;
 const th = "border-b border-slate-200 px-2 py-1.5 text-left text-[11px] font-medium text-slate-500";
@@ -55,11 +43,14 @@ export function DepthLens({ hole, mv, win, onWindow, trays, metre, onMetre, type
     <div className="flex flex-col gap-5">
       {/* where we are, and the way up and sideways */}
       <div className="flex flex-wrap items-center gap-2 text-xs">
-        <nav className="flex items-center gap-1 text-slate-500" aria-label="Depth">
+        {/* the way down to here, level by level: each coarser window is a step back up */}
+        <nav className="flex flex-wrap items-center gap-1 text-slate-500" aria-label="Depth">
           <button type="button" onClick={() => onWindow(null)} className="font-medium text-slate-700 hover:underline">{hole.name}</button>
+          {LEVELS.slice(1, LEVELS.findIndex((l) => l.id === level)).map((l) => { const w = windowAt(l.id, (from + to) / 2, d0, d1); return w ? (
+            <span key={l.id} className="flex items-center gap-1"><span>›</span><button type="button" onClick={() => onWindow(w)} className="font-mono text-slate-600 hover:underline" title={`Back out to ${l.label}`}>{fmtWindow(w)}</button></span>) : null; })}
           <span>›</span>
-          <span className="font-semibold text-slate-900">{fmt(from, span < 1 ? 2 : span < 10 ? 1 : 0)}–{fmt(to, span < 1 ? 2 : span < 10 ? 1 : 0)} m</span>
-          <span className="text-slate-400">· {span >= 1 ? `${fmt(span, span < 10 ? 1 : 0)} m` : `${Math.round(span * 100)} cm`} window</span>
+          <span className="font-mono font-semibold text-slate-900">{fmtWindow(win)}</span>
+          <span className="text-slate-400">· {fmtSpan(span)} window</span>
         </nav>
         <div className="ml-auto flex items-center gap-1">
           <button type="button" onClick={() => step(-1)} aria-label="Up the hole" className="grid h-6 w-6 place-items-center rounded border border-slate-200 text-slate-600 hover:bg-slate-50"><ChevronLeft size={13} className="rotate-90" /></button>
@@ -221,6 +212,37 @@ function BinStrip({ bins, from, to, pick, hover, onHover, onPick, onZoom }: {
       {row("gs", "SWIR")}{row("gt", "TIR")}
       <div className="relative ml-10 h-4 font-mono text-[9px] text-slate-400">{ticks.map((t) => <span key={t} className="absolute -translate-x-1/2" style={{ left: x(t) }}>{t}</span>)}</div>
       <p className="text-[10.5px] text-slate-400">Hover a bin for its spectra, click to keep it, double-click to zoom to it. Grey TIR = not measured.</p>
+    </div>
+  );
+}
+
+
+/** The Window tab before a window is chosen: what the scale ladder is for, and places to start from — the
+ * metres that stand out and where the model disagrees with the log, each a window one click away. */
+export function WindowStart({ hole, mv, onWindow }: { hole: HoleDetail; mv: ModelView | undefined; onWindow: (w: Window) => void }) {
+  const d0 = hole.metres.m[0] ?? 0, d1 = (hole.metres.m[hole.metres.m.length - 1] ?? 0) + 1;
+  const flags = [...(mv?.anomaly.runs ?? [])].sort((a, b) => b.raw - a.raw).slice(0, 6);
+  const again = (mv?.summary.again?.intervals ?? []).slice(0, 6);
+  const levels = [{ label: "10 m", span: 10 }, { label: "1 m", span: 1 }, { label: "10 cm", span: 0.3 }];
+  return (
+    <div className="flex flex-col gap-5">
+      <section>
+        <H4>Read the hole at any scale</H4>
+        <p className="text-xs leading-relaxed text-slate-600">The log on the left is the whole hole. Zoom with the wheel or double-click a depth, pick a level above it, or drag the box in the narrow column beside it. Each level shows what there is at that scale: the auto log and the photographs over 10 m, the 10 cm bins and their spectra over a metre, the line scan and every sample at 10 cm.</p>
+        <div className="mt-2 flex flex-wrap gap-1.5">{levels.map((l) => <button key={l.label} type="button" onClick={() => onWindow(windowAt(l.label === "10 m" ? "10m" : l.label === "1 m" ? "1m" : "10cm", (d0 + d1) / 2, d0, d1) as Window)} className="rounded-full bg-slate-900 px-3 py-1 text-[11px] font-medium text-white hover:bg-slate-700">Open {l.label} at the middle</button>)}</div>
+      </section>
+      {flags.length > 0 && (
+        <section>
+          <H4>Start where the core stands out</H4>
+          <ul className="flex flex-wrap gap-1.5">{flags.map((r) => (
+            <li key={r.from_m}><button type="button" onClick={() => onWindow([r.from_m - 0.5, r.to_m + 0.5])} className="rounded-full border border-orange/50 bg-orange/10 px-2.5 py-1 font-mono text-[11px] text-slate-800 hover:border-orange">{r.from_m}–{r.to_m} m · {r.raw.toFixed(2)}</button></li>))}</ul>
+        </section>)}
+      {again.length > 0 && (
+        <section>
+          <H4>Or where the model disagrees with the log</H4>
+          <ul className="flex flex-col gap-1 text-xs text-slate-700">{again.map((d) => (
+            <li key={d.from_m}><button type="button" onClick={() => onWindow([d.from_m, d.to_m])} className="text-left hover:underline"><span className="font-mono">{d.from_m}–{d.to_m} m</span> · log: {d.logged || d.logged_class} · reads: {d.reads}</button></li>))}</ul>
+        </section>)}
     </div>
   );
 }
