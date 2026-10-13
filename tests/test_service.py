@@ -122,3 +122,32 @@ def test_similar_scopes_nearby_region_and_this_hole():
     assert "SELF" not in {r["hole"] for r in state} and "NEAR" not in {r["hole"] for r in state}
     with pytest.raises(ValueError):
         extras.similar(eng, Z[0], hole="SELF", scope="nearby")
+
+
+def test_linescan_decodes_only_the_chunks_of_the_window(tmp_path, monkeypatch):
+    """A toy cras: 4 JPEG chunks of 10 lines, a 3-sample-per-line... the rows of a sample window come back in depth order."""
+    import struct
+    from simplejpeg import encode_jpeg
+    from app import samples as smp
+    from types import SimpleNamespace
+    import pandas as pd
+    ns, chunk, nchunks, specny = 8, 10, 4, 5                      # 40 lines, 8 samples of 5 lines each
+    chunks = []
+    for c in range(nchunks):                                       # each chunk a flat colour, stored upside down as TSG does
+        img = np.full((chunk, ns, 3), 40 + 50 * c, np.uint8)
+        chunks.append(encode_jpeg(np.ascontiguousarray(np.flipud(img)), quality=100, colorspace="RGB"))
+    offs = np.cumsum([0] + [len(c) for c in chunks]).astype(np.uint32)
+    head = struct.pack(smp._CRAS_HEAD, b"CoreLog Linescan 1.1", ns, chunk * nchunks, 3, 2, 1, specny, 0, 0, 1, chunk, nchunks, 0, 0, 0, 0, 0)
+    assert len(head) == 64
+    d = tmp_path / "pkg" / "DS"; d.mkdir(parents=True)
+    (d / "DS_tsg_cras.bip").write_bytes(head + offs.tobytes() + b"".join(chunks)); (d / ".ready").touch()
+    monkeypatch.setattr(smp, "ROOT", tmp_path / "pkg")
+    # samples at 0.1 m spacing: depth 0.0 .. 0.7
+    sp = SimpleNamespace(sampleheaders=pd.DataFrame({"D": np.arange(8) * 0.1}))
+    monkeypatch.setattr(smp, "_spectra_of", lambda d_, ds: sp)
+    jpg = smp.linescan(["x"], "DS", 0.3, 0.5, width=0)              # samples 3 and 4 -> rows 15..24: chunk 1 (10..19) and 2 (20..29)
+    from PIL import Image
+    import io
+    im = np.asarray(Image.open(io.BytesIO(jpg)).convert("RGB"))
+    assert im.shape == (10, ns, 3)
+    assert abs(int(im[0, 0, 0]) - 90) < 6 and abs(int(im[-1, 0, 0]) - 140) < 6      # top rows from chunk 1 (90), bottom from chunk 2 (140)
