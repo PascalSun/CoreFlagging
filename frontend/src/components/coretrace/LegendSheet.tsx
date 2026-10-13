@@ -16,6 +16,8 @@ export function LegendSheet<C extends string, S extends string, B extends string
   shapeModes: { id: S; short: string }[]; shapeMode: S; onShapeMode: (m: S) => void;
   basemaps: { id: B; label: string }[]; basemap: B; onBasemap: (b: B) => void;
   legend: [string, Entry][]; shapes: [string, ShapeEntry][]; focus: string | null; onFocus: (f: string | null) => void;
+  /** context layers that can be shown under the holes */
+  overlays?: { id: string; label: string; color: string; on: boolean }[]; onOverlay?: (id: string) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [drag, setDrag] = useState(0); const start = useRef<number | null>(null);
@@ -74,6 +76,16 @@ export function LegendSheet<C extends string, S extends string, B extends string
                 <div className="flex flex-wrap gap-1.5">{p.shapeModes.map((m) => <button key={m.id} type="button" onClick={() => { p.onShapeMode(m.id); p.onFocus(null); }} className={chip(p.shapeMode === m.id)}>{m.short}</button>)}</div>
                 {p.shapes.length > 0 && <div className="mt-2.5 grid grid-cols-2 gap-x-1">{p.shapes.map(([l, e]) => row(l, <Mark shape={e.shape} color="#64748b" size={12} />, e.n))}</div>}
               </section>
+              {p.overlays && p.overlays.length > 0 && (
+                <section>
+                  <p className="mb-2 text-xs font-semibold text-slate-500">Also show</p>
+                  <div className="flex flex-col gap-1">{p.overlays.map((o) => (
+                    <label key={o.id} className="flex items-center gap-2.5 rounded-lg px-2 py-1.5 text-[13px] text-slate-700">
+                      <input type="checkbox" checked={o.on} onChange={() => p.onOverlay?.(o.id)} className="size-4 accent-slate-900" />
+                      <i className="inline-block size-3 rounded-full" style={{ background: o.color }} /><span className="min-w-0 flex-1 truncate">{o.label}</span><span className="text-[11px] text-slate-400">interim</span>
+                    </label>))}</div>
+                </section>
+              )}
               <p className="flex items-center justify-between border-t border-slate-100 pt-3 text-xs text-slate-500">
                 <span>{p.focus ? `Showing only: ${p.focus}` : "Tap a row to show only those holes"}{waiting ? ` · ${waiting.toLocaleString()} still being processed` : ""}</span>
                 {p.focus && <button type="button" onClick={() => p.onFocus(null)} className="font-semibold text-slate-900">Show all</button>}
