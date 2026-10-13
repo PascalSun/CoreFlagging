@@ -3,10 +3,11 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight, Maximize2 } from "lucide-react";
-import { coreScan, type HoleDetail, type ModelView, type Tray } from "@/lib/coreScan";
+import { coreScan, type HoleDetail, type ModelView, type Sample, type Tray } from "@/lib/coreScan";
 import { LINE, SpectraChart } from "@/components/coretrace/SpectraChart";
 import { TrayPhoto } from "@/components/coretrace/TrayPhoto";
 import { coreTypeColor, fmt, groupColor, groupName, mineralName, pct } from "@/components/coretrace/palette";
+import { useState as useStateReact } from "react";
 import { cn } from "@/lib/utils";
 
 export type Window = [number, number];
@@ -113,6 +114,7 @@ export function DepthLens({ hole, mv, win, onWindow, trays, metre, onMetre, type
               <p className="pt-1 text-[10.5px] text-slate-400">The model reads the core by the metre; below that, what you see is the scanner&rsquo;s own reading and the photograph.</p>
             </section>
           )}
+          {hole.source === "nvcl" && span <= 2.5 && <SampleLevel hole={hole} from={from} to={to} />}
           <section>
             <H4>Every 10 cm: what the scanner read</H4>
             {bq.data ? (
@@ -137,6 +139,49 @@ export function DepthLens({ hole, mv, win, onWindow, trays, metre, onMetre, type
 }
 
 const round1 = (v: number) => Math.round(v * 10) / 10;
+
+/** The finest level: the line-scan photograph of the window at full resolution beside every ~8 mm sample's
+ * TSG mineral, both from the mirrored package through the service (the first look at a hole unpacks it:
+ * a few seconds). Hover a sample for its depth and mineral. */
+function SampleLevel({ hole, from, to }: { hole: HoleDetail; from: number; to: number }) {
+  const lo = Math.floor(from * 100) / 100, hi = Math.ceil(to * 100) / 100;
+  const sq = useQuery({ queryKey: ["core-samples", hole.key, lo, hi], queryFn: () => coreScan.samples(hole.key, lo, hi), staleTime: 60 * 60_000, retry: false });
+  const [imgState, setImgState] = useStateReact<"loading" | "ok" | "none">("loading");
+  const [hov, setHov] = useStateReact<Sample | null>(null);
+  const url = coreScan.linescanUrl(hole.key, lo, hi, 420);
+  const samples = sq.data?.samples ?? [];
+  const span = hi - lo; const y = (d: number) => `${Math.max(0, Math.min(100, ((d - lo) / span) * 100))}%`;
+  return (
+    <section>
+      <H4>Every sample ({sq.data?.step_mm ? `${Math.round(sq.data.step_mm)} mm` : "~8 mm"}): the line scan and the scanner&rsquo;s mineral</H4>
+      {sq.isError && <p className="text-[11px] text-slate-500">{(sq.error as { status?: number }).status === 404 ? "This hole has no package to read at sample level." : "The sample level is not available right now (the service may be unpacking the package; try again in a moment)."}</p>}
+      <div className="flex gap-3">
+        {/* the line scan runs top to bottom at the window's scale; the mineral ticks sit beside it at the same scale */}
+        <div className="relative w-[120px] flex-none overflow-hidden rounded-md bg-slate-100" style={{ height: 420 }}>
+          {imgState !== "none" && <img src={url} alt={`Line scan, ${lo}–${hi} m`} onLoad={() => setImgState("ok")} onError={() => setImgState("none")} className="h-full w-full object-fill" />}
+          {imgState === "loading" && <div className="absolute inset-0 grid place-items-center text-[10px] text-slate-400">reading the line scan…</div>}
+          {imgState === "none" && <div className="absolute inset-0 grid place-items-center px-2 text-center text-[10px] text-slate-400">no line scan for this window yet</div>}
+          {hov && <div className="pointer-events-none absolute inset-x-0 border-t border-cyan" style={{ top: y(hov.depth) }} />}
+        </div>
+        <div className="relative w-7 flex-none rounded bg-slate-50" style={{ height: 420 }} onMouseLeave={() => setHov(null)}>
+          {samples.map((s, i) => { const next = samples[i + 1]?.depth ?? s.depth + (sq.data?.step_mm ?? 8) / 1000; return (
+            <div key={s.i} onMouseEnter={() => setHov(s)} title={`${s.depth.toFixed(3)} m · ${mineralName(s.mineral) || "no mineral read"}`}
+              className="absolute inset-x-0" style={{ top: y(s.depth), height: `${Math.max(0.2, ((next - s.depth) / span) * 100)}%`, background: s.mineral ? groupColor(s.group) : "#e2e8f0" }} />); })}
+        </div>
+        <div className="min-w-0 flex-1 text-xs text-slate-700">
+          {hov ? (
+            <div className="rounded-lg border border-slate-200 bg-white p-3">
+              <div className="font-semibold text-slate-900">{hov.depth.toFixed(3)} m</div>
+              <div>{mineralName(hov.mineral) || "No SWIR mineral read"}{hov.group ? <span className="text-slate-500"> · {groupName(hov.group)}</span> : null}{hov.weight !== null ? <span className="text-slate-500"> · weight {hov.weight}</span> : null}</div>
+              <div className="text-[11px] text-slate-500">tray {hov.tray}{hov.section !== null ? `, section ${hov.section}` : ""}, {hov.x_mm.toFixed(0)} mm along{hov.height_mm !== null ? ` · surface ${hov.height_mm.toFixed(1)} mm` : ""}</div>
+            </div>
+          ) : <p className="text-[11px] leading-relaxed text-slate-500">{samples.length ? `${samples.length} samples in this window. Move over the colour strip to read one.` : sq.isPending ? "Reading the samples…" : ""}</p>}
+          <p className="mt-2 text-[10.5px] leading-relaxed text-slate-400">The model does not read at this scale; what you see here is the scanner&rsquo;s own mineral per sample and its photograph, from the TSG package.</p>
+        </div>
+      </div>
+    </section>
+  );
+}
 
 /** One photograph per tray the window touches: the first metre of the window on each tray (a tray holds ~3.5 m). */
 function trayMetres(trays: Tray[], metres: number[]): number[] {
