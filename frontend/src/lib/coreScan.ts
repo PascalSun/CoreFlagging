@@ -37,6 +37,9 @@ export type AgainSheet = { model: string; n_holes: number; holes_listed: number;
 export type Review = { run: string; kind: "log" | "flag"; from_m: number; to_m: number; verdict: "agree" | "disagree"; note: string; mine: boolean; at: string };
 export type ReviewBody = { run: string; kind: "log" | "flag"; from_m: number; to_m: number; verdict: "agree" | "disagree"; note?: string };
 
+export type Bin = { bin: number; from_m: number; n_swir: number; n_tir: number; gs: string; ms: string; gt: string };
+export type BinSpectra = Bin & { swir_wl: number[]; swir: number[]; tir_wl: number[]; tir: number[] | null };
+
 /** What the DMIRS HyLogger drillhole package holds for a hole: the WAMEX collar, the company's logged
  * intervals and the multi-element assays by depth. 404 for uploads, other States and unmatched holes. */
 export type HolePackage = {
@@ -142,6 +145,10 @@ export const coreScan = {
   holes: () => json<{ holes: HoleRow[]; n: number; core_types: { k: number; name: string }[] }>("/holes/"),
   hole: (key: string) => json<HoleDetail>(`/holes/${enc(key)}/`),
   package: (key: string) => json<HolePackage>(`/holes/${enc(key)}/package/`),
+  /** The 10 cm bins of a depth window (up to 50 m): the scanner's reading of each. */
+  bins: (key: string, from: number, to: number) => json<{ from_m: number; to_m: number; bins: Bin[] }>(`/holes/${enc(key)}/bins/?from=${from}&to=${to}`),
+  /** One bin's own mean spectra. */
+  bin: (key: string, bin: number) => json<BinSpectra>(`/holes/${enc(key)}/bins/${bin}/`),
   /** The holes within `km` of this one, nearest first, each with its distance. */
   nearby: (key: string, km: number) => json<{ km: number; holes: (HoleRow & { km: number })[] }>(`/holes/${enc(key)}/nearby/?km=${km}`),
   /** Every interval where the model disagrees with the log, across the holes the caller may see. */
