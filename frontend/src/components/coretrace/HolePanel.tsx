@@ -5,7 +5,7 @@ import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-quer
 import { AlertTriangle, ArrowRight, ChevronLeft, ChevronRight, Download, ExternalLink, FileDown, Loader2, Maximize2, Minimize2, Trash2, X } from "lucide-react";
 import { downloadReportPdf } from "@/components/coretrace/pdf";
 import { PAGE_W, ReportDocument } from "@/components/coretrace/ReportDocument";
-import { ACTIVE, coreScan, sourceLabel, surveyOf, type CoreModelInfo, type HoleDetail, type HoleReport, type MetreView, type ModelView, type Tray } from "@/lib/coreScan";
+import { ACTIVE, coreScan, readDate, reportFileKind, sourceLabel, surveyOf, type CoreModelInfo, type HoleDetail, type HoleReport, type MetreView, type ModelView, type Tray } from "@/lib/coreScan";
 import { ISSUE_LABEL, STATUS_LABEL, SERIES, coreTypeColor, fmt, groupColor, groupName, issueLabel, pct } from "@/components/coretrace/palette";
 import { LINE, SpectraChart } from "@/components/coretrace/SpectraChart";
 import { StripLegend, StripLog } from "@/components/coretrace/StripLog";
@@ -39,12 +39,13 @@ function OriginalReport({ report, loading }: { report: HoleReport | undefined; l
   if (!report) return <p className="text-[11px] text-slate-500">The report is on the mirror but could not be listed right now.</p>;
   return (
     <div className="flex flex-col gap-2 text-xs text-slate-700">
-      <p className="text-[11px] text-slate-500">WAMEX {report.anumber}. The geologist&rsquo;s own account of this drilling, as lodged with GSWA.</p>
+      <p className="text-[11px] text-slate-500">WAMEX {report.anumber}: the geologist&rsquo;s own account of this drilling, as lodged with GSWA.</p>
       {report.abstract && <p className={cn("leading-relaxed", !open && "line-clamp-4")}>{report.abstract}</p>}
       {report.abstract && report.abstract.length > 280 && <button type="button" onClick={() => setOpen((o) => !o)} className="self-start text-[11px] font-medium text-slate-700 underline-offset-2 hover:underline">{open ? "Less" : "Read the whole abstract"}</button>}
+      {report.pdf_url && <a href={report.pdf_url} target="_blank" rel="noopener" className="inline-flex items-center gap-1.5 self-start rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-800 hover:bg-slate-50"><ExternalLink size={13} />Open the report (PDF)</a>}
       <ul className="flex flex-col gap-1">
         {report.files.map((f) => (
-          <li key={f.name}><a href={f.download_url} target="_blank" rel="noopener" className="inline-flex max-w-full items-center gap-1 text-[11px] text-slate-700 underline-offset-2 hover:underline"><Download size={11} className="flex-none" /><span className="truncate">{f.name}</span><span className="flex-none text-slate-400">{kb(f.bytes)}</span></a></li>
+          <li key={f.name}><a href={f.download_url} target="_blank" rel="noopener" title={f.name} className="inline-flex max-w-full items-center gap-1.5 text-[11px] text-slate-700 underline-offset-2 hover:underline"><Download size={11} className="flex-none" /><span className="truncate">{reportFileKind(f.name)}</span><span className="flex-none text-slate-400">{kb(f.bytes)}</span></a></li>
         ))}
       </ul>
     </div>
@@ -297,13 +298,13 @@ export function HolePanel({ holeKey, tab: tabProp, onTab, models, run, onRun, me
       <div className="min-w-0">
         <div className="flex items-center gap-2">
           <h2 className="truncate text-sm font-semibold text-slate-800">{hole?.name ?? holeKey}</h2>
-          {hole && <span className={cn("flex-none rounded-full px-2 py-0.5 text-[10px] font-medium", hole.source === "upload" ? "bg-orange/15 text-orange" : "bg-slate-100 text-slate-600")} title={hole.source === "upload" ? "A scan you uploaded" : `${surveyOf(hole.state || "WA")} core library, through the National Virtual Core Library`}>{sourceLabel(hole)}</span>}
+          {hole && <span className={cn("flex-none rounded-full px-2 py-0.5 text-[10px] font-medium", hole.source === "upload" ? "bg-orange/15 text-orange" : "bg-slate-100 text-slate-600")} title={`${hole.source === "upload" ? "A scan you uploaded" : `${surveyOf(hole.state || "WA")} core library, through the National Virtual Core Library`}${readDate(hole, true) ? `; read by the platform on ${readDate(hole, true)}` : ""}`}>{sourceLabel(hole)}</span>}
           {hole?.offshore && <span className="flex-none rounded-full bg-sky-50 px-2 py-0.5 text-[10px] font-medium text-sky-800" title="A petroleum well in offshore (Commonwealth) waters">Offshore</span>}
         </div>
         <p className="truncate text-xs text-slate-500">{hole ? [hole.operator, hole.project, hole.region].filter(Boolean).join(" · ") || "No collar details in the scan" : "Loading…"}</p>
       </div>
       <div className="flex flex-none items-center gap-1">
-        {hasReport && rq.data?.pdf_url && <a href={rq.data.pdf_url} target="_blank" rel="noopener" title={`Open the original exploration report (WAMEX ${rq.data.anumber})`} className="hidden h-8 items-center gap-1 rounded-lg px-2 text-[11px] font-medium text-slate-700 hover:bg-slate-100 sm:inline-flex"><ExternalLink size={13} />Original report</a>}
+        {hasReport && rq.data?.pdf_url && <a href={rq.data.pdf_url} target="_blank" rel="noopener" aria-label="Open the original report" title={`Open the original exploration report (WAMEX ${rq.data.anumber})`} className="grid h-8 w-8 place-items-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-900"><ExternalLink size={15} /></a>}
         {hole?.mine && <button type="button" onClick={del} aria-label="Delete this scan" title="Delete this scan" className="grid h-8 w-8 place-items-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-red-600"><Trash2 size={15} /></button>}
         {ready && <button type="button" onClick={() => onWide(!wide)} aria-label={wide ? "Back to the summary" : "Open the full log"} title={wide ? "Back to the summary" : "Open the full log"} className={cn("h-8 w-8 place-items-center rounded-lg text-slate-500 hover:bg-slate-100", wide ? "grid" : "hidden sm:grid")}>{wide ? <Minimize2 size={15} /> : <Maximize2 size={15} />}</button>}
         <button type="button" onClick={onClose} aria-label="Close" className="grid h-8 w-8 place-items-center rounded-lg text-slate-500 hover:bg-slate-100"><X size={16} /></button>
