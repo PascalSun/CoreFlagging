@@ -179,7 +179,7 @@ export function CoreMap({ holes, colour, card, selected, onSelect, padRight, pad
           const G = ["!=", ["get", "glyph"], ""];
           map.addLayer({ id: "holes-badge", type: "symbol", source: "holes", minzoom: BADGE_FROM, filter: ["all", ["==", ["get", "wait"], 0], G], layout: {
             "icon-image": ["get", "badge"], "icon-allow-overlap": true, "icon-ignore-placement": true, "symbol-sort-key": ["get", "z"],
-            "icon-size": ["interpolate", ["linear"], ["zoom"], 5.5, 0.62, 8, 0.8, 11, 1, 14, 1.2] },
+            "icon-size": ["interpolate", ["linear"], ["zoom"], 5.5, 0.6, 8, 0.78, 11, 0.95, 14, 1.15] },
             paint: { "icon-opacity": ["case", D, 0.12, 1] } });
           map.addLayer({ id: "holes-pt", type: "circle", source: "holes", maxzoom: BADGE_FROM, filter: ["all", ["==", ["get", "wait"], 0], G, ["==", ["get", "shape"], "circle"]],
             layout: { "circle-sort-key": ["get", "z"] }, paint: {
