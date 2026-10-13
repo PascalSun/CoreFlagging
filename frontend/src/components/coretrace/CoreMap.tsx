@@ -20,22 +20,67 @@ const STYLES: Record<Basemap, string> = { satellite: "mapbox://styles/mapbox/sat
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 type Look = { color: string; label: string; ring?: string; wait?: boolean; dim?: boolean; shape?: Shape; shapeLabel?: string; glyph?: string };
-const BADGE_FROM = 5.5;      // zoom from which a mark with letters is drawn as a badge; further out it is a dot like the rest
+const BADGE_FROM = 6;      // zoom from which a mark with letters is drawn as a badge; further out it is a dot like the rest
 
 // the rarer marks draw over the common ones, so a gold triangle is not buried under the circles around it
 const RANK: Record<Shape, number> = { circle: 1, square: 2, diamond: 3, triangle: 4 };
 
-function features(holes: HoleRow[], colour: (h: HoleRow) => Look) {
-  return {
+/** The classes a clustered map adds up: up to SLOTS of them, the commonest first, the rest in the last slot. */
+export type ClusterClass = { label: string; color: string; glyph: string; ring?: string };
+const SLOTS = 24;
+const CLUSTER_PROPS = Object.fromEntries([...Array(SLOTS).keys()].map((i) => [`c${i}`, ["+", ["coalesce", ["get", `s${i}`], 0]]]).concat([["dimn", ["+", ["coalesce", ["get", "dim"], 0]]]]));
+
+function features(holes: HoleRow[], colour: (h: HoleRow) => Look): { fc: any; classes: ClusterClass[] } {
+  const placed = holes.filter((h) => h.lon !== null && h.lat !== null && h.status === "ready");
+  const looks = placed.map(colour);
+  const count = new Map<string, { n: number; look: Look }>();
+  for (const l of looks) { const e = count.get(l.label); if (e) e.n++; else count.set(l.label, { n: 1, look: l }); }
+  const ranked = [...count.values()].sort((a, b) => b.n - a.n);
+  const classes: ClusterClass[] = ranked.slice(0, SLOTS - (ranked.length > SLOTS ? 1 : 0)).map(({ look }) => ({ label: look.label, color: look.color, glyph: look.glyph ?? "", ring: look.ring }));
+  if (ranked.length > SLOTS) classes.push({ label: "Other", color: "#94a3b8", glyph: "" });
+  const slot = new Map(classes.map((c, i) => [c.label, i]));
+  const fc = {
     type: "FeatureCollection" as const,
-    features: holes.filter((h) => h.lon !== null && h.lat !== null).map((h) => ({
+    features: placed.map((h, i) => ({
       type: "Feature" as const, geometry: { type: "Point" as const, coordinates: [h.lon as number, h.lat as number] },
-      properties: { key: h.key, name: h.name, mine: h.mine ? 1 : 0, ready: h.status === "ready" ? 1 : 0, issues: h.n_issues, ...(({ color, label, ring, wait, dim, shape, shapeLabel, glyph }) => ({
+      properties: { key: h.key, name: h.name, mine: h.mine ? 1 : 0, ready: 1, issues: h.n_issues, [`s${slot.get(looks[i].label) ?? SLOTS - 1}`]: 1, ...(({ color, label, ring, wait, dim, shape, shapeLabel, glyph }) => ({
         color, cls: [label, shapeLabel].filter(Boolean).join(" · "), ring: ring ?? "", wait: wait ? 1 : 0, dim: dim ? 1 : 0, z: dim ? 0 : RANK[shape ?? "circle"], shape: shape ?? "circle", glyph: glyph ?? "",
         icon: iconId(shape ?? "circle", ring ? "#ffffff" : color, h.mine ? "#111111" : ring ?? "rgba(255,255,255,0.9)", ring || h.mine ? 1.6 : 1),
-        badge: glyph ? iconId(shape ?? "circle", ring ? "#ffffff" : color, h.mine ? "#111111" : ring ?? "rgba(255,255,255,0.9)", ring || h.mine ? 1.6 : 1, glyph) : "" }))(colour(h)) },
+        badge: glyph ? iconId(shape ?? "circle", ring ? "#ffffff" : color, h.mine ? "#111111" : ring ?? "rgba(255,255,255,0.9)", ring || h.mine ? 1.6 : 1, glyph) : "" }))(looks[i]) },
     })),
   };
+  return { fc, classes };
+}
+
+/** The holes still waiting, as their own small source: they never cluster. */
+function waiting(holes: HoleRow[]) {
+  return { type: "FeatureCollection" as const, features: holes.filter((h) => h.lon !== null && h.lat !== null && h.status !== "ready").map((h) => ({
+    type: "Feature" as const, geometry: { type: "Point" as const, coordinates: [h.lon as number, h.lat as number] }, properties: { key: h.key, name: h.name, wait: 1, dim: 0 } })) };
+}
+
+/** A cluster as a donut: one arc per class in the order of the key, the count in the middle, sized by the count.
+ * The shape is the same at every size, so clusters read as one family of marks. */
+function donut(props: Record<string, number>, classes: ClusterClass[]): HTMLElement {
+  const n = props.point_count as number;
+  const parts = classes.map((c, i) => [i, props[`c${i}`] ?? 0] as const).filter(([, v]) => v > 0);
+  const r = Math.round(15 + Math.min(17, Math.sqrt(n) * 1.1)), w = Math.max(5, Math.round(r * 0.32)), S = r * 2 + 6, c = S / 2;
+  const arc = (a0: number, a1: number) => {
+    const big = a1 - a0 > Math.PI ? 1 : 0, x0 = c + r * Math.cos(a0), y0 = c + r * Math.sin(a0), x1 = c + r * Math.cos(a1), y1 = c + r * Math.sin(a1);
+    return `M${x0} ${y0}A${r} ${r} 0 ${big} 1 ${x1} ${y1}`;
+  };
+  let a = -Math.PI / 2; const paths: string[] = [];
+  for (const [i, v] of parts) {
+    const a1 = a + (v / n) * Math.PI * 2 - (parts.length > 1 ? 0.035 : 0);     // a hair of white between arcs
+    paths.push(`<path d="${arc(a, Math.max(a + 0.02, a1))}" stroke="${classes[i].color}" stroke-width="${w}" fill="none" stroke-linecap="butt"/>`);
+    a += (v / n) * Math.PI * 2;
+  }
+  const dim = (props.dimn ?? 0) >= n;
+  const el = document.createElement("div");
+  el.className = "ct-cluster"; el.style.width = el.style.height = `${S}px`; el.style.opacity = dim ? "0.25" : "1";
+  const fs = n >= 1000 ? 11 : n >= 100 ? 12 : 13;
+  el.innerHTML = `<svg width="${S}" height="${S}" viewBox="0 0 ${S} ${S}"><circle cx="${c}" cy="${c}" r="${r + w / 2 + 1.5}" fill="rgba(255,255,255,.96)"/><circle cx="${c}" cy="${c}" r="${r}" stroke="#e2e8f0" stroke-width="${w}" fill="none"/>${paths.join("")}<circle cx="${c}" cy="${c}" r="${r - w / 2 - 0.5}" fill="#fff"/><text x="${c}" y="${c + 0.5}" text-anchor="middle" dominant-baseline="central" font-size="${fs}" font-weight="700" fill="#0f172a" font-family="ui-sans-serif, system-ui, sans-serif">${n.toLocaleString()}</text></svg>`;
+  el.title = `${n.toLocaleString()} holes · ` + parts.sort((x, y) => y[1] - x[1]).slice(0, 4).map(([i, v]) => `${classes[i].label} ${v}`).join(", ");
+  return el;
 }
 
 /** The map of scanned holes, on satellite imagery or a terrain map; each hole has a white edge so its colour reads on any ground. A point is a hole; clicking one selects it. */
@@ -66,6 +111,7 @@ export function CoreMap({ holes, colour, card, selected, onSelect, padRight, pad
   const mapRef = useRef<any>(null);
   const readyRef = useRef(false);
   const holesRef = useRef(holes); const fitted = useRef(false); const colourRef = useRef(colour); const cardRef = useRef(card);
+  const classesRef = useRef<ClusterClass[]>([]); const dropClustersRef = useRef<() => void>(() => {});
   useEffect(() => { cardRef.current = card; }, [card]);
   const overlaysRef = useRef(overlays);
   useEffect(() => {
@@ -97,7 +143,10 @@ export function CoreMap({ holes, colour, card, selected, onSelect, padRight, pad
       // are added again each time a style has loaded (the click and hover handlers, bound by layer id, carry over)
       const addLayers = () => {
         if (map.getSource("holes")) return;
-          map.addSource("holes", { type: "geojson", data: features(holesRef.current, colourRef.current), promoteId: "key" });
+          // holes cluster through zoom 5 (the country, a State); from 6 each is its own mark
+          const built = features(holesRef.current, colourRef.current); classesRef.current = built.classes;
+          map.addSource("holes", { type: "geojson", data: built.fc, promoteId: "key", cluster: true, clusterRadius: 54, clusterMaxZoom: 5, clusterProperties: CLUSTER_PROPS });
+          map.addSource("holes-waiting", { type: "geojson", data: waiting(holesRef.current), promoteId: "key" });
           map.addSource("picked", { type: "geojson", data: pickedRef.current });
           // context layers under the holes: hidden until toggled, so they cost nothing by default
           map.addSource("open_pits", { type: "vector", tiles: [tilesUrl("open_pits")], minzoom: 4, maxzoom: 14, attribution: "Interim data © Gov of WA (DMIRS, CC BY 4.0)" });
@@ -120,7 +169,7 @@ export function CoreMap({ holes, colour, card, selected, onSelect, padRight, pad
           const D = ["==", ["get", "dim"], 1], R = ["!=", ["get", "ring"], ""], HOV = ["boolean", ["feature-state", "hover"], false];
           // zoom outermost, the hover case inside each stop
           const size = (k: number) => ["interpolate", ["linear"], ["zoom"], ...[[3, 3], [6, 4.2], [9, 6], [12, 8]].flatMap(([z, r]) => [z, ["case", HOV, r * k, r]])];
-          map.addLayer({ id: "holes-wait", type: "circle", source: "holes", filter: ["==", ["get", "wait"], 1], paint: {
+          map.addLayer({ id: "holes-wait", type: "circle", source: "holes-waiting", paint: {
             "circle-radius": ["interpolate", ["linear"], ["zoom"], 3, 1.2, 6, 2, 9, 3, 12, 4.5],
             "circle-color": "#f8fafc", "circle-opacity": ["case", D, 0.1, 0.45] } });
           map.addLayer({ id: "holes-halo", type: "circle", source: "holes", filter: ["==", ["get", "wait"], 0], paint: {
@@ -159,6 +208,27 @@ export function CoreMap({ holes, colour, card, selected, onSelect, padRight, pad
       map.on("style.load", addLayers);
       // icons are drawn the first time the map asks for one: a shape in a fill colour with an edge
       map.on("styleimagemissing", (e: any) => { const im = drawIcon(e.id); if (im && !map.hasImage(e.id)) map.addImage(e.id, im, { pixelRatio: ICON_PIXEL_RATIO }); });
+      // the clusters on screen as donut markers: made once per cluster, shown while in view, all dropped when the data changes
+      const made = new Map<number, any>(); let shown = new Map<number, any>();
+      const syncClusters = () => {
+        if (!map.getSource("holes") || !map.isSourceLoaded("holes")) return;
+        const next = new Map<number, any>();
+        for (const f of map.querySourceFeatures("holes")) {
+          const p = f.properties; if (!p?.cluster) continue;
+          const id = p.cluster_id as number; if (next.has(id)) continue;
+          let m = made.get(id);
+          if (!m) {
+            const el = donut(p, classesRef.current);
+            el.addEventListener("click", (e) => { e.stopPropagation(); map.getSource("holes").getClusterExpansionZoom(id, (err: any, z: number) => { if (!err) map.easeTo({ center: f.geometry.coordinates, zoom: Math.min(z + 0.3, 12), duration: 600 }); }); });
+            m = new mapboxgl.Marker({ element: el }).setLngLat(f.geometry.coordinates); made.set(id, m);
+          }
+          next.set(id, m); if (!shown.has(id)) m.addTo(map);
+        }
+        for (const [id, m] of shown) if (!next.has(id)) m.remove();
+        shown = next;
+      };
+      dropClustersRef.current = () => { for (const m of shown.values()) m.remove(); shown = new Map(); made.clear(); };
+      map.on("render", syncClusters);
       map.on("load", () => {
         addLayers();
         let hovered: string | null = null;
@@ -203,7 +273,10 @@ export function CoreMap({ holes, colour, card, selected, onSelect, padRight, pad
   useEffect(() => {
     holesRef.current = holes; colourRef.current = colour;
     const map = mapRef.current;
-    if (map && readyRef.current) map.getSource("holes")?.setData(features(holes, colour));
+    if (map && readyRef.current) {
+      const built = features(holes, colour); classesRef.current = built.classes; dropClustersRef.current();
+      map.getSource("holes")?.setData(built.fc); map.getSource("holes-waiting")?.setData(waiting(holes));
+    }
   }, [holes, colour]);
 
   useEffect(() => {
