@@ -2,10 +2,10 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, ArrowRight, ChevronLeft, ChevronRight, Download, FileDown, Loader2, Maximize2, Minimize2, Trash2, X } from "lucide-react";
+import { AlertTriangle, ArrowRight, ChevronLeft, ChevronRight, Download, ExternalLink, FileDown, Loader2, Maximize2, Minimize2, Trash2, X } from "lucide-react";
 import { downloadReportPdf } from "@/components/coretrace/pdf";
 import { PAGE_W, ReportDocument } from "@/components/coretrace/ReportDocument";
-import { ACTIVE, coreScan, surveyOf, type CoreModelInfo, type HoleDetail, type MetreView, type ModelView, type Tray } from "@/lib/coreScan";
+import { ACTIVE, coreScan, sourceLabel, surveyOf, type CoreModelInfo, type HoleDetail, type HoleReport, type MetreView, type ModelView, type Tray } from "@/lib/coreScan";
 import { ISSUE_LABEL, STATUS_LABEL, SERIES, coreTypeColor, fmt, groupColor, groupName, issueLabel, pct } from "@/components/coretrace/palette";
 import { LINE, SpectraChart } from "@/components/coretrace/SpectraChart";
 import { StripLegend, StripLog } from "@/components/coretrace/StripLog";
@@ -28,6 +28,28 @@ const Fact = ({ k, v, sub }: { k: string; v: React.ReactNode; sub?: string }) =>
 );
 const H3 = ({ children }: { children: React.ReactNode }) => <h3 className="pb-2 pt-1 font-display text-[15px] font-semibold text-slate-900">{children}</h3>;
 const Empty = ({ children }: { children: React.ReactNode }) => <div className="rounded-lg border border-dashed border-slate-200 px-3 py-6 text-center text-xs text-slate-500">{children}</div>;
+
+const kb = (b: number) => (b >= 1e6 ? `${(b / 1e6).toFixed(1)} MB` : `${Math.max(1, Math.round(b / 1e3))} KB`);
+
+/** The exploration report the hole was logged in: what the company wrote, one click from the scan.
+ * The abstract is folded to a few lines; the files are the mirror's downloads (PDF, drill logs, appendices). */
+function OriginalReport({ report, loading }: { report: HoleReport | undefined; loading: boolean }) {
+  const [open, setOpen] = useState(false);
+  if (loading) return <p className="text-[11px] text-slate-500">Looking up the report…</p>;
+  if (!report) return <p className="text-[11px] text-slate-500">The report is on the mirror but could not be listed right now.</p>;
+  return (
+    <div className="flex flex-col gap-2 text-xs text-slate-700">
+      <p className="text-[11px] text-slate-500">WAMEX {report.anumber}. The geologist&rsquo;s own account of this drilling, as lodged with GSWA.</p>
+      {report.abstract && <p className={cn("leading-relaxed", !open && "line-clamp-4")}>{report.abstract}</p>}
+      {report.abstract && report.abstract.length > 280 && <button type="button" onClick={() => setOpen((o) => !o)} className="self-start text-[11px] font-medium text-slate-700 underline-offset-2 hover:underline">{open ? "Less" : "Read the whole abstract"}</button>}
+      <ul className="flex flex-col gap-1">
+        {report.files.map((f) => (
+          <li key={f.name}><a href={f.download_url} target="_blank" rel="noopener" className="inline-flex max-w-full items-center gap-1 text-[11px] text-slate-700 underline-offset-2 hover:underline"><Download size={11} className="flex-none" /><span className="truncate">{f.name}</span><span className="flex-none text-slate-400">{kb(f.bytes)}</span></a></li>
+        ))}
+      </ul>
+    </div>
+  );
+}
 const th = "border-b border-slate-200 px-2 py-1.5 text-left text-[11px] font-medium text-slate-500";
 const td = "border-b border-slate-100 px-2 py-1.5 align-top text-xs text-slate-700";
 
@@ -259,6 +281,9 @@ export function HolePanel({ holeKey, tab: tabProp, onTab, models, run, onRun, me
     enabled: ready && wide && shown !== null && (!!useRun || displayOnly), staleTime: 5 * 60_000, retry: false, placeholderData: keepPreviousData });
   const sq = useQuery({ queryKey: ["core-similar", holeKey, metre, useRun], queryFn: () => coreScan.similar(holeKey, metre as number, useRun), enabled: ready && wide && tab === "similar" && metre !== null && !!useRun, staleTime: 5 * 60_000, retry: false });
   const mvw = mq.data; const trays = tq.data?.trays ?? [];
+  // the original report: only holes whose scan names a WAMEX report have one
+  const hasReport = !!hole?.meta.wamex;
+  const rq = useQuery({ queryKey: ["core-report", holeKey], queryFn: () => coreScan.report(holeKey), enabled: hasReport, staleTime: 60 * 60_000, retry: false });
   const typeName = useMemo(() => { const n = new Map((mvw?.core_types ?? []).map((c) => [c.k, c.name])); return (k: number) => n.get(k) ?? "—"; }, [mvw]);
   const res = hole?.results.find((r) => r.run === useRun);
   const jump = (m: number) => { onMetre(m); };
@@ -272,12 +297,13 @@ export function HolePanel({ holeKey, tab: tabProp, onTab, models, run, onRun, me
       <div className="min-w-0">
         <div className="flex items-center gap-2">
           <h2 className="truncate text-sm font-semibold text-slate-800">{hole?.name ?? holeKey}</h2>
-          {hole && <span className={cn("flex-none rounded-full px-2 py-0.5 text-[10px] font-medium", hole.source === "upload" ? "bg-orange/15 text-orange" : "bg-slate-100 text-slate-600")}>{hole.source === "upload" ? "Your scan" : `NVCL · ${hole.state || "WA"}`}</span>}
+          {hole && <span className={cn("flex-none rounded-full px-2 py-0.5 text-[10px] font-medium", hole.source === "upload" ? "bg-orange/15 text-orange" : "bg-slate-100 text-slate-600")} title={hole.source === "upload" ? "A scan you uploaded" : `${surveyOf(hole.state || "WA")} core library, through the National Virtual Core Library`}>{sourceLabel(hole)}</span>}
           {hole?.offshore && <span className="flex-none rounded-full bg-sky-50 px-2 py-0.5 text-[10px] font-medium text-sky-800" title="A petroleum well in offshore (Commonwealth) waters">Offshore</span>}
         </div>
         <p className="truncate text-xs text-slate-500">{hole ? [hole.operator, hole.project, hole.region].filter(Boolean).join(" · ") || "No collar details in the scan" : "Loading…"}</p>
       </div>
       <div className="flex flex-none items-center gap-1">
+        {hasReport && rq.data?.pdf_url && <a href={rq.data.pdf_url} target="_blank" rel="noopener" title={`Open the original exploration report (WAMEX ${rq.data.anumber})`} className="hidden h-8 items-center gap-1 rounded-lg px-2 text-[11px] font-medium text-slate-700 hover:bg-slate-100 sm:inline-flex"><ExternalLink size={13} />Original report</a>}
         {hole?.mine && <button type="button" onClick={del} aria-label="Delete this scan" title="Delete this scan" className="grid h-8 w-8 place-items-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-red-600"><Trash2 size={15} /></button>}
         {ready && <button type="button" onClick={() => onWide(!wide)} aria-label={wide ? "Back to the summary" : "Open the full log"} title={wide ? "Back to the summary" : "Open the full log"} className={cn("h-8 w-8 place-items-center rounded-lg text-slate-500 hover:bg-slate-100", wide ? "grid" : "hidden sm:grid")}>{wide ? <Minimize2 size={15} /> : <Maximize2 size={15} />}</button>}
         <button type="button" onClick={onClose} aria-label="Close" className="grid h-8 w-8 place-items-center rounded-lg text-slate-500 hover:bg-slate-100"><X size={16} /></button>
@@ -341,6 +367,7 @@ export function HolePanel({ holeKey, tab: tabProp, onTab, models, run, onRun, me
           <Fact k="Gold assays" v={hole.au_m ? `${hole.au_m} m` : "none in the scan"} sub={hole.au_m ? `${hole.au_pos_m} m at or above 0.1 ppm` : undefined} />
           <Fact k="Data quality" v={hole.n_issues ? `${hole.n_issues} ${hole.n_issues === 1 ? "issue" : "issues"}` : "nothing found"} sub={hole.issues[0] ? issueLabel(hole.issues[0].issue) : undefined} />
         </div>
+        {hasReport && <div><H3>Original report</H3><OriginalReport report={rq.data} loading={rq.isPending} /></div>}
         {modelPicker}
         <div>
           <H3>Down the hole</H3>

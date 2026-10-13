@@ -139,6 +139,8 @@ export function ReportDocument({ hole, mv, run, models, trays, nodeRef }: {
           {hole.instrument || "Instrument not recorded"} · {fmt(hole.depth_min, 1)}–{fmt(hole.depth_max, 1)} m scanned
           {hole.lat !== null && hole.lon !== null ? ` · ${Math.abs(hole.lat).toFixed(4)}° S, ${hole.lon.toFixed(4)}° E` : ""}
           {hole.source === "upload" ? " · uploaded scan" : ` · ${surveyOf(hole.state || "WA")} core library (NVCL)`}
+          {hole.processed_at ? ` · read ${new Date(hole.processed_at).toLocaleDateString("en-AU", { day: "numeric", month: "short", year: "numeric" })}` : ""}
+          {hole.meta.wamex ? ` · WAMEX report ${String(hole.meta.wamex)}` : ""}
         </p>
       </div>
 
