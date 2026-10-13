@@ -14,7 +14,7 @@ import { TrayPhoto } from "@/components/coretrace/TrayPhoto";
 import { LookAgain } from "@/components/coretrace/LookAgain";
 import { SimilarHoles } from "@/components/coretrace/SimilarHoles";
 import { Nearby } from "@/components/coretrace/Nearby";
-import { DepthLens, type Window } from "@/components/coretrace/DepthLens";
+import { DepthLens, type Window, WindowStart } from "@/components/coretrace/DepthLens";
 import { cn } from "@/lib/utils";
 
 export type Tab = "window" | "metre" | "again" | "log" | "gold" | "similar" | "quality" | "report";
@@ -470,7 +470,7 @@ export function HolePanel({ holeKey, tab: tabProp, onTab, models, run, onRun, me
           <div className="p-4 lg:min-h-0 lg:flex-1 lg:overflow-y-auto">
             {displayOnly && <p className="mb-4 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs leading-relaxed text-slate-700">{hole.message}</p>}
             {tab === "window" && (win ? <DepthLens hole={hole} mv={mvw} win={win} onWindow={(w) => onWindow?.(w)} trays={trays} metre={metre} onMetre={(m) => { jump(m); setTab("metre"); }} typeName={typeName} />
-              : <Empty>Zoom the log with the wheel, or pick 10 m / 1 m / 10 cm above it, to read a window of the hole at that scale.</Empty>)}
+              : <WindowStart hole={hole} mv={mvw} onWindow={(w) => onWindow?.(w)} />)}
             {tab === "metre" && <MetreTab hole={hole} metre={shown} previewing={peek !== null && peek !== metre} mv={eq.data} loading={eq.isLoading || eq.isPlaceholderData} trays={trays} onMetre={jump} typeName={typeName} />}
             {tab === "log" && (mvw ? (
               <div className="flex flex-col gap-3">

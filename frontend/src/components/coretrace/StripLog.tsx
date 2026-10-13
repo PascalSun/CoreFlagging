@@ -4,9 +4,11 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { Metres, ModelView } from "@/lib/coreScan";
 import { GRID, INK, MUTED, SERIES, coreTypeColor, fmt, groupColor, groupName, lithColor, pct } from "@/components/coretrace/palette";
 import { cn } from "@/lib/utils";
+import { DepthNav } from "@/components/coretrace/DepthNav";
+import { LEVELS, MIN_SPAN, fmtSpan, levelOf, windowAbout, windowAt } from "@/lib/depth";
 
 type Track = { id: string; label: string; w: number; kind: "cat" | "bar" };
-const AXIS_W = 44, GAP = 6, HEAD_H = 30;
+const AXIS_W = 44, GAP = 6, HEAD_H = 30, NAV_W = 30;
 
 /** The hole from top to bottom, one row per metre, drawn to depth. Categorical tracks say
  * what the core is (software minerals, logged rock, the model's core type); bar tracks say
@@ -25,20 +27,47 @@ export function StripLog({ metres, model, cursor, onCursor, onHover, hasLith, ha
   const [zoom, setZoom] = useState<"fit" | 4 | 12>("fit");
   const [hover, setHover] = useState<number | null>(null);
   const hole0 = metres.m[0] ?? 0, hole1 = (metres.m[metres.m.length - 1] ?? 0) + 1;
-  // zoom about the depth under the pointer; the span snaps between 30 cm and the whole hole
+
+  // What is drawn is `view`, which glides to `range` when the window jumps (a level button, a link, the
+  // minimap) and follows it at once when it moves a little (the wheel, a drag), so the eye keeps its place.
+  const target = useMemo<[number, number]>(() => range ?? [hole0, hole1], [range, hole0, hole1]);
+  const [view, setView] = useState<[number, number]>(target);
+  const viewRef = useRef(view); const anim = useRef(0);
+  useEffect(() => {
+    const from = viewRef.current, to = target;
+    if (from[0] === to[0] && from[1] === to[1]) return;
+    cancelAnimationFrame(anim.current);
+    const s0 = from[1] - from[0], s1 = to[1] - to[0], c0 = (from[0] + from[1]) / 2, c1 = (to[0] + to[1]) / 2;
+    const small = Math.abs(c1 - c0) < s0 * 0.6 && Math.max(s0, s1) / Math.min(s0, s1) < 1.6;
+    if (small || typeof requestAnimationFrame === "undefined") { viewRef.current = to; setView(to); return; }
+    const t0 = performance.now(), dur = 320;
+    const step = (now: number) => {
+      const p = Math.min(1, (now - t0) / dur), e = 1 - Math.pow(1 - p, 3);
+      const sp = Math.exp(Math.log(s0) + (Math.log(s1) - Math.log(s0)) * e), c = c0 + (c1 - c0) * e;   // even in log-span: a 100× zoom reads as a steady dive
+      const v: [number, number] = p >= 1 ? to : [c - sp / 2, c + sp / 2];
+      viewRef.current = v; setView(v);
+      if (p < 1) anim.current = requestAnimationFrame(step);
+    };
+    anim.current = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(anim.current);
+  }, [target]);
+
+  // the wheel and a pinch zoom about the depth under the pointer, smoothly; the window is told after a pause
+  const pending = useRef<ReturnType<typeof setTimeout> | null>(null);
   const zoomAt = (depth: number, factor: number) => {
     if (!onRange) return;
-    const [a, b] = range ?? [hole0, hole1]; const span = b - a; const ns = Math.max(0.3, Math.min(hole1 - hole0, span * factor));
-    if (ns >= hole1 - hole0) { onRange(null); return; }
+    const [a, b] = viewRef.current; const span = b - a; const ns = Math.max(MIN_SPAN, Math.min(hole1 - hole0, span * factor));
     const f = (depth - a) / span; let na = depth - f * ns; na = Math.max(hole0, Math.min(hole1 - ns, na));
-    onRange([Math.round(na * 10) / 10, Math.round((na + ns) * 10) / 10]);
+    const v: [number, number] = ns >= hole1 - hole0 - 1e-6 ? [hole0, hole1] : [na, na + ns];
+    viewRef.current = v; setView(v);
+    if (pending.current) clearTimeout(pending.current);
+    pending.current = setTimeout(() => { const [x, y] = viewRef.current; onRange(y - x >= hole1 - hole0 - 1e-6 ? null : [Math.round(x * 10) / 10, Math.round(y * 10) / 10]); }, 120);
   };
-  const toLevel = (span: number | null) => {
-    if (!onRange) return;
-    if (span === null) { onRange(null); return; }
-    const c = cursor !== null ? cursor + 0.5 : range ? (range[0] + range[1]) / 2 : (hole0 + hole1) / 2;
-    const na = Math.max(hole0, Math.min(hole1 - span, c - span / 2)); onRange([Math.round(na * 10) / 10, Math.round((na + span) * 10) / 10]);
-  };
+  const centre = cursor !== null && (cursor + 0.5 >= view[0] && cursor + 0.5 <= view[1]) ? cursor + 0.5 : (view[0] + view[1]) / 2;
+  const toLevel = (id: string) => onRange?.(windowAt(id, centre, hole0, hole1));
+  const stepLevel = (dir: -1 | 1) => { const i = LEVELS.findIndex((l) => l.id === levelOf(range ?? null)); const j = Math.max(0, Math.min(LEVELS.length - 1, i + dir)); if (j !== i) toLevel(LEVELS[j].id); };
+  const pan = (frac: number) => { if (!onRange || !range) return; const s = range[1] - range[0]; onRange(windowAbout((range[0] + range[1]) / 2 + s * frac, s, hole0, hole1)); };
+  const pinch = useRef<number | null>(null);
 
   const tracks = useMemo<Track[]>(() => [
     { id: "gs", label: "SWIR", w: 22, kind: "cat" }, { id: "gt", label: "TIR", w: 22, kind: "cat" },
@@ -50,7 +79,7 @@ export function StripLog({ metres, model, cursor, onCursor, onHover, hasLith, ha
   const width = AXIS_W + tracks.reduce((a, t) => a + t.w + GAP, 0);
 
   // a zoomed range runs from its start to its end; the whole hole from its first metre to its last (inclusive)
-  const m0 = range ? range[0] : metres.m[0] ?? 0, m1 = range ? range[1] - 1 : metres.m[metres.m.length - 1] ?? 0, span = m1 - m0 + 1;
+  const m0 = view[0], m1 = view[1] - 1, span = view[1] - view[0];
   const ppm = zoom === "fit" ? Math.max(0.6, (boxH - 8) / span) : zoom;
   const height = Math.ceil(span * ppm);
   const idx = useMemo(() => new Map(metres.m.map((m, i) => [m, i])), [metres.m]);
@@ -126,15 +155,14 @@ export function StripLog({ metres, model, cursor, onCursor, onHover, hasLith, ha
   return (
     // as wide as the log and no wider: the readout's single-line text would otherwise widen the column
     // to fit the metre under the pointer, and push the panel beside it sideways as you hover
-    <div className="flex h-full min-h-0 flex-col" style={{ width: Math.max(width, 236) }}>
+    <div className="flex h-full min-h-0 flex-col" style={{ width: Math.max(width + (onRange ? NAV_W : 0), 236) }}>
       <div className="flex items-center justify-between gap-2 pb-2">
         <span className="text-[11px] font-medium text-slate-500">Depth (m)</span>
         {onRange ? (
-          <div className="flex overflow-hidden rounded-md border border-slate-200 text-[11px]" role="group" aria-label="Depth window">
-            {([["Whole hole", null], ["10 m", 10], ["1 m", 1], ["10 cm", 0.3]] as const).map(([label, sp]) => {
-              const cur = range ? range[1] - range[0] : null; const on = sp === null ? !range : cur !== null && (sp === 0.3 ? cur <= 0.5 : sp === 1 ? cur > 0.5 && cur <= 2.5 : cur > 2.5 && cur <= 25);
-              return <button key={label} type="button" onClick={() => toLevel(sp)} className={cn("px-2 py-0.5", on ? "bg-slate-900 text-white" : "bg-white text-slate-600 hover:bg-slate-50")}>{label}</button>;
-            })}
+          <div className="flex items-center gap-1" role="group" aria-label="Depth window">
+            <button type="button" onClick={() => stepLevel(-1)} disabled={!range} aria-label="Zoom out a level" title="Zoom out (−)" className="grid h-6 w-6 place-items-center rounded-full border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-30">−</button>
+            <span className="min-w-[44px] text-center font-mono text-[11px] text-slate-700" title="The window">{range ? fmtSpan(range[1] - range[0]) : "all"}</span>
+            <button type="button" onClick={() => stepLevel(1)} disabled={levelOf(range ?? null) === "10cm"} aria-label="Zoom in a level" title="Zoom in (+)" className="grid h-6 w-6 place-items-center rounded-full border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-30">+</button>
           </div>
         ) : (
           <div className="flex overflow-hidden rounded-md border border-slate-200 text-[11px]" role="group" aria-label="Depth scale">
@@ -147,7 +175,13 @@ export function StripLog({ metres, model, cursor, onCursor, onHover, hasLith, ha
           </div>
         )}
       </div>
-      <div className="flex text-[10px] font-medium text-slate-500" style={{ height: HEAD_H, width }}>
+      {onRange && (
+        <div className="flex gap-1 pb-2" role="tablist" aria-label="Level">
+          {LEVELS.map((l) => { const on = l.id === "hole" ? !range : levelOf(range ?? null) === l.id; return (
+            <button key={l.id} type="button" role="tab" aria-selected={on} onClick={() => toLevel(l.id)} className={cn("flex-1 rounded-full px-1.5 py-1 text-[11px] font-medium ring-1 transition-colors", on ? "bg-slate-900 text-white ring-slate-900" : "bg-white text-slate-600 ring-slate-200 hover:ring-slate-400")}>{l.label}</button>); })}
+        </div>)}
+      <div className="flex text-[10px] font-medium text-slate-500" style={{ height: HEAD_H, width: width + (onRange ? NAV_W : 0) }}>
+        {onRange && <span style={{ width: NAV_W }} />}
         <span style={{ width: AXIS_W }} />
         {tracks.map((t) => (
           <span key={t.id} className="flex items-end justify-center overflow-visible whitespace-nowrap pb-1" style={{ width: t.w + GAP }}>
@@ -155,12 +189,23 @@ export function StripLog({ metres, model, cursor, onCursor, onHover, hasLith, ha
           </span>
         ))}
       </div>
-      <div ref={wrapRef} className="relative min-h-0 flex-1 overflow-y-auto overflow-x-hidden rounded-md">
+      <div className="flex min-h-0 flex-1 gap-0">
+      {onRange && <div className="flex-none pr-1" style={{ width: NAV_W }}><DepthNav metres={metres} model={model} view={view} hole0={hole0} hole1={hole1} onRange={onRange} typeName={typeName} height={boxH} /></div>}
+      <div ref={wrapRef} tabIndex={onRange ? 0 : undefined} className="relative min-h-0 flex-1 overflow-y-auto overflow-x-hidden rounded-md outline-none focus-visible:ring-2 focus-visible:ring-cyan/60"
+        onKeyDown={onRange ? (e) => {
+          if (e.key === "+" || e.key === "=") { e.preventDefault(); stepLevel(1); } else if (e.key === "-" || e.key === "_") { e.preventDefault(); stepLevel(-1); }
+          else if (e.key === "0" || e.key === "Escape") { e.preventDefault(); onRange(null); }
+          else if (e.key === "ArrowUp" || e.key === "PageUp") { e.preventDefault(); pan(e.key === "PageUp" ? -1 : -0.25); } else if (e.key === "ArrowDown" || e.key === "PageDown") { e.preventDefault(); pan(e.key === "PageDown" ? 1 : 0.25); }
+        } : undefined}>
         <div className="relative" style={{ width, height }}>
-          <canvas ref={canvasRef} style={{ width, height }} className="block cursor-crosshair"
+          <canvas ref={canvasRef} style={{ width, height, touchAction: onRange ? "pan-y" : undefined }} className="block cursor-crosshair"
             onMouseMove={(e) => { const m = at(e.clientY); setHover(m); onHover?.(m); }} onMouseLeave={() => { setHover(null); onHover?.(null); }}
             onClick={(e) => { const m = at(e.clientY); if (m !== null) onCursor(m); }}
-            onWheel={onRange ? (e) => { const cv = canvasRef.current; if (!cv) return; e.preventDefault(); const d = (e.clientY - cv.getBoundingClientRect().top) / ppm + m0; zoomAt(d, e.deltaY > 0 ? 1.25 : 0.8); } : undefined} />
+            onDoubleClick={onRange ? (e) => { const cv = canvasRef.current; if (!cv) return; e.preventDefault(); const d = (e.clientY - cv.getBoundingClientRect().top) / ppm + m0; const i = LEVELS.findIndex((l) => l.id === levelOf(range ?? null)); const j = e.shiftKey ? Math.max(0, i - 1) : Math.min(LEVELS.length - 1, i + 1); onRange(windowAt(LEVELS[j].id, d, hole0, hole1)); } : undefined}
+            onWheel={onRange ? (e) => { const cv = canvasRef.current; if (!cv) return; e.preventDefault(); const d = (e.clientY - cv.getBoundingClientRect().top) / ppm + m0; zoomAt(d, Math.exp(Math.max(-80, Math.min(80, e.deltaY)) * 0.004)); } : undefined}
+            onTouchStart={onRange ? (e) => { if (e.touches.length === 2) pinch.current = Math.abs(e.touches[0].clientY - e.touches[1].clientY); } : undefined}
+            onTouchMove={onRange ? (e) => { if (e.touches.length !== 2 || pinch.current === null) return; e.preventDefault(); const cv = canvasRef.current; if (!cv) return; const now = Math.abs(e.touches[0].clientY - e.touches[1].clientY); const mid = (e.touches[0].clientY + e.touches[1].clientY) / 2; zoomAt((mid - cv.getBoundingClientRect().top) / ppm + m0, pinch.current / Math.max(1, now)); pinch.current = now; } : undefined}
+            onTouchEnd={onRange ? () => { pinch.current = null; } : undefined} />
           {cursor !== null && cursor >= m0 && cursor <= m1 && (
             <div className="pointer-events-none absolute left-0 border-y border-cyan bg-cyan/20" style={{ top: (cursor - m0) * ppm - 1, height: Math.max(ppm, 2) + 2, width }} />
           )}
@@ -168,6 +213,7 @@ export function StripLog({ metres, model, cursor, onCursor, onHover, hasLith, ha
             <div className="pointer-events-none absolute left-0 border-t border-slate-900/60" style={{ top: (tipM - m0) * ppm, width }} />
           )}
         </div>
+      </div>
       </div>
       {/* the readout sits below the log, not over it, so it never hides the rows it describes */}
       {/* fixed height and one line per fact: text that wrapped differently from metre to metre changed the
@@ -184,7 +230,7 @@ export function StripLog({ metres, model, cursor, onCursor, onHover, hasLith, ha
               </>
             ) : metres.au[ti] !== null ? <div>Au {fmt(metres.au[ti], 2)} ppm</div> : null}
           </>
-        ) : <div className="text-slate-400"><span className="[@media(pointer:coarse)]:hidden">Move over the log to preview a metre on the right. Click to keep it.</span><span className="hidden [@media(pointer:coarse)]:inline">Tap the log to open a metre.</span></div>}
+        ) : <div className="text-slate-400"><span className="[@media(pointer:coarse)]:hidden">{onRange ? "Hover reads a metre, click keeps it. Wheel or double-click to zoom; drag the box at the left to move the window." : "Move over the log to preview a metre on the right. Click to keep it."}</span><span className="hidden [@media(pointer:coarse)]:inline">Tap the log to open a metre.</span></div>}
       </div>
     </div>
   );
