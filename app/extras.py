@@ -55,23 +55,47 @@ def metre_why(eng: Engine, key: str) -> list[list[dict]]:
     return out
 
 
-def similar(eng: Engine, x: np.ndarray, hole: str = "", lat: float | None = None, lon: float | None = None, k: int = 10) -> list[dict]:
-    """Intervals of the State library closest to fingerprint `x`. Leaves out the hole itself and every hole within
-    5 km of it, and returns at most one interval per hole (as engine.similar)."""
+def _km(L: dict, lat: float, lon: float) -> np.ndarray:
+    p = np.pi / 180
+    a = np.sin((L["lat"] - lat) * p / 2) ** 2 + np.cos(lat * p) * np.cos(L["lat"] * p) * np.sin((L["lon"] - lon) * p / 2) ** 2
+    return np.nan_to_num(6371 * 2 * np.arcsin(np.sqrt(a)), nan=1e9)
+
+
+def similar(eng: Engine, x: np.ndarray, hole: str = "", lat: float | None = None, lon: float | None = None, k: int = 10,
+            scope: str = "state", radius_km: float = 10.0, region: str = "") -> list[dict]:
+    """Intervals of the library closest to fingerprint `x`, within a scope:
+
+    * "state": every other hole, leaving out this one and every hole within 5 km of it (so a match is not just
+      the next hole on the same section), one interval per hole;
+    * "nearby": only holes within `radius_km` of this one, this one left out, one interval per hole;
+    * "region": only holes of the given tectonic region (this one left out), one interval per hole;
+    * "hole": this hole only, every interval (where else in this hole is core like this), no 5 km rule.
+    """
     L = eng.L; x = np.asarray(x, "f4")
     if x.shape != (L["Z"].shape[1],):
         raise ValueError(f"fingerprint has {x.shape[0] if x.ndim == 1 else x.shape} numbers, this model's library has {L['Z'].shape[1]}")
     s = L["Z"] @ x
-    if hole:
-        s[np.char.lower(L["hole"].astype(str)) == hole.lower()] = -np.inf
-    if lat is not None and lon is not None:
-        p = np.pi / 180
-        a = np.sin((L["lat"] - lat) * p / 2) ** 2 + np.cos(lat * p) * np.cos(L["lat"] * p) * np.sin((L["lon"] - lon) * p / 2) ** 2
-        s[np.nan_to_num(6371 * 2 * np.arcsin(np.sqrt(a)), nan=1e9) < 5] = -np.inf
-    top = np.argpartition(-s, 400)[:400]; top = top[np.argsort(-s[top])]; seen, res = set(), []
+    own = np.char.lower(L["hole"].astype(str)) == hole.lower() if hole else np.zeros(len(s), bool)
+    if scope == "hole":
+        s[~own] = -np.inf
+    else:
+        s[own] = -np.inf
+        if scope == "nearby":
+            if lat is None or lon is None:
+                raise ValueError("the hole has no collar position, so there is no 'nearby'")
+            s[_km(L, lat, lon) > radius_km] = -np.inf
+        elif scope == "region":
+            want = (region or "").strip().lower()
+            keep = np.array([((eng.store.ref_for(str(h)) or {}).get("region") or "").strip().lower() == want for h in L["hole"]]) if want else np.ones(len(s), bool)
+            s[~keep] = -np.inf
+        elif lat is not None and lon is not None:
+            s[_km(L, lat, lon) < 5] = -np.inf
+    per_hole = scope != "hole"
+    n_top = min(400, len(s) - 1)
+    top = np.argpartition(-s, n_top)[:n_top]; top = top[np.argsort(-s[top])]; seen, res = set(), []
     for j in top:
         h = str(L["hole"][j])
-        if h in seen or not np.isfinite(s[j]):
+        if (per_hole and h in seen) or not np.isfinite(s[j]):
             continue
         seen.add(h); c = eng.col_by.get(h)
         res.append({"hole": h, "from_m": round(float(L["d0"][j]), 1), "to_m": round(float(L["d1"][j]), 1), "sim": round(float(s[j]), 3), "gs": str(L["gs"][j]), "gt": str(L["gt"][j]),

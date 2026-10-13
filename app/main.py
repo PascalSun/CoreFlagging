@@ -70,6 +70,9 @@ class Similar(BaseModel):
     lat: float | None = None
     lon: float | None = None
     k: int = 10
+    scope: str = "state"          # state | nearby | region | hole
+    radius_km: float = 10.0       # for "nearby"
+    region: str = ""              # for "region"
 
 
 @app.post("/api/v1/similar")
@@ -79,7 +82,10 @@ def similar(body: Similar):
     except KeyError:
         raise HTTPException(404, f"no model '{body.model}'")
     try:
-        res = extras.similar(eng, np.array(body.fp, "f4"), body.hole, body.lat, body.lon, max(1, min(body.k, 50)))
+        if body.scope not in ("state", "nearby", "region", "hole"):
+            raise ValueError(f"unknown scope '{body.scope}'")
+        res = extras.similar(eng, np.array(body.fp, "f4"), body.hole, body.lat, body.lon, max(1, min(body.k, 50)),
+                             scope=body.scope, radius_km=max(1.0, min(body.radius_km, 200.0)), region=body.region)
     except ValueError as e:
         raise HTTPException(400, str(e))
     return {"model": eng.run, "library": {"intervals": int(len(eng.L["hole"])), "holes": int(len(set(eng.L["hole"].tolist())))}, "results": res}
