@@ -6,18 +6,19 @@ import { AlertTriangle, ArrowRight, ChevronLeft, ChevronRight, Download, Externa
 import { downloadReportPdf } from "@/components/coretrace/pdf";
 import { PAGE_W, ReportDocument } from "@/components/coretrace/ReportDocument";
 import { ACTIVE, abstractParts, commodityName, coreScan, readDate, reportFileKind, sourceLabel, surveyOf, type CoreModelInfo, type HoleDetail, type HoleReport, type MetreView, type ModelView, type Tray } from "@/lib/coreScan";
-import { ISSUE_LABEL, STATUS_LABEL, SERIES, coreTypeColor, fmt, groupColor, groupName, issueLabel, pct } from "@/components/coretrace/palette";
+import { ISSUE_LABEL, STATUS_LABEL, SERIES, coreTypeColor, fmt, groupColor, groupName, issueLabel, mineralName, pct } from "@/components/coretrace/palette";
 import { LINE, SpectraChart } from "@/components/coretrace/SpectraChart";
 import { StripLegend, StripLog } from "@/components/coretrace/StripLog";
 import { TrayViewer } from "@/components/coretrace/DeepZoom";
 import { TrayPhoto } from "@/components/coretrace/TrayPhoto";
 import { LookAgain } from "@/components/coretrace/LookAgain";
 import { Nearby } from "@/components/coretrace/Nearby";
+import { DepthLens, type Window } from "@/components/coretrace/DepthLens";
 import { cn } from "@/lib/utils";
 
-export type Tab = "metre" | "again" | "log" | "gold" | "similar" | "quality" | "report";
+export type Tab = "window" | "metre" | "again" | "log" | "gold" | "similar" | "quality" | "report";
 const TABS: { id: Tab; label: string }[] = [
-  { id: "metre", label: "This metre" }, { id: "again", label: "Look again" }, { id: "log", label: "Auto log" }, { id: "gold", label: "Gold" },
+  { id: "window", label: "Window" }, { id: "metre", label: "This metre" }, { id: "again", label: "Look again" }, { id: "log", label: "Auto log" }, { id: "gold", label: "Gold" },
   { id: "similar", label: "Similar core" }, { id: "quality", label: "Data quality" }, { id: "report", label: "Report" },
 ];
 
@@ -86,7 +87,6 @@ function save(blob: Blob, name: string) {
 }
 const csv = (rows: (string | number | null)[][]) => new Blob(["﻿" + rows.map((r) => r.map((c) => `"${String(c ?? "").replace(/"/g, '""')}"`).join(",")).join("\n")], { type: "text/csv" });
 /** A TSG mineral ("Chlorite-FeMg", "Aspectral") or group ("WHITE-MICA") as a reader would write it. */
-const mineralName = (k: string) => (k === "Aspectral" ? "No SWIR response" : k === k.toUpperCase() ? groupName(k) : k.replace(/([a-z])([A-Z])/g, "$1 $2"));
 const safe = (s: string) => s.replace(/[^A-Za-z0-9_.-]+/g, "_");
 
 /** The TSG software's SWIR mineral group down the hole, for a hole no model has read. */
@@ -280,11 +280,13 @@ function Report({ hole, models, mvw, run, trays }: { hole: HoleDetail; models: C
   );
 }
 
-export function HolePanel({ holeKey, tab: tabProp, onTab, models, run, onRun, metre, onMetre, wide, onWide, onClose, onOpenHole, onDeleted, onRing }: {
+export function HolePanel({ holeKey, tab: tabProp, onTab, models, run, onRun, metre, onMetre, wide, onWide, onClose, onOpenHole, onDeleted, onRing, win = null, onWindow }: {
   holeKey: string; tab: string; onTab: (t: Tab) => void; models: CoreModelInfo[]; run: string; onRun: (r: string) => void; metre: number | null; onMetre: (m: number | null) => void;
   wide: boolean; onWide: (w: boolean) => void; onClose: () => void; onOpenHole: (key: string, m?: number) => void; onDeleted: () => void;
   /** draw (or clear) a ring of this many km around the hole on the map */
   onRing?: (km: number | null) => void;
+  /** the depth window the reader has zoomed to, and how to change it */
+  win?: Window | null; onWindow?: (w: Window | null) => void;
 }) {
   const qc = useQueryClient();
   // the open tab lives in the address, so a link (or the assistant) can open a hole on any tab
@@ -435,7 +437,7 @@ export function HolePanel({ holeKey, tab: tabProp, onTab, models, run, onRun, me
       // page as one, with the log a fixed height at the top and the tabs held at the top of the screen as you read
       <div className="flex flex-col lg:min-h-0 lg:flex-1 lg:flex-row">
         <div className="flex h-[min(380px,52vh)] flex-none flex-col items-center border-b border-slate-200/70 p-3 lg:h-auto lg:min-h-0 lg:items-stretch lg:border-r lg:border-b-0">
-          <StripLog metres={hole.metres} model={mvw} cursor={metre} onHover={tab === "metre" ? setPeekRaw : undefined} onCursor={(m) => { setPeekRaw(null); jump(m); if (tab === "report" || tab === "quality") setTab("metre"); }} hasLith={hole.has_lith} hasAu={hole.au_m > 0} />
+          <StripLog range={win ?? undefined} onRange={onWindow} metres={hole.metres} model={mvw} cursor={metre} onHover={tab === "metre" ? setPeekRaw : undefined} onCursor={(m) => { setPeekRaw(null); jump(m); if (tab === "report" || tab === "quality") setTab("metre"); }} hasLith={hole.has_lith} hasAu={hole.au_m > 0} />
         </div>
         <div className="@container flex min-w-0 flex-col lg:min-h-0 lg:flex-1">
           {/* on a phone the model line scrolls away; only the tabs stay */}
@@ -461,6 +463,8 @@ export function HolePanel({ holeKey, tab: tabProp, onTab, models, run, onRun, me
           </div>
           <div className="p-4 lg:min-h-0 lg:flex-1 lg:overflow-y-auto">
             {displayOnly && <p className="mb-4 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs leading-relaxed text-slate-700">{hole.message}</p>}
+            {tab === "window" && (win ? <DepthLens hole={hole} mv={mvw} win={win} onWindow={(w) => onWindow?.(w)} trays={trays} metre={metre} onMetre={(m) => { jump(m); setTab("metre"); }} typeName={typeName} />
+              : <Empty>Zoom the log with the wheel, or pick 10 m / 1 m / 10 cm above it, to read a window of the hole at that scale.</Empty>)}
             {tab === "metre" && <MetreTab hole={hole} metre={shown} previewing={peek !== null && peek !== metre} mv={eq.data} loading={eq.isLoading || eq.isPlaceholderData} trays={trays} onMetre={jump} typeName={typeName} />}
             {tab === "log" && (mvw ? (
               <div className="flex flex-col gap-3">
@@ -475,7 +479,7 @@ export function HolePanel({ holeKey, tab: tabProp, onTab, models, run, onRun, me
                       <td className={td}>{s.tir_groups.slice(0, 2).map(([c, , p]) => `${groupName(c)} ${pct(p)}`).join(", ") || "—"}</td></tr>); })}</tbody>
                 </table>
               </div>) : <Empty>Loading…</Empty>)}
-            {tab === "again" && (mvw ? <LookAgain hole={hole} mv={mvw} run={useRun} metre={metre} onJump={(m) => { jump(m); }} /> : <Empty>Loading…</Empty>)}
+            {tab === "again" && (mvw ? <LookAgain hole={hole} mv={mvw} run={useRun} metre={metre} onJump={(m, to) => { jump(m); if (to !== undefined && onWindow) onWindow([m, to]); }} /> : <Empty>Loading…</Empty>)}
             {tab === "gold" && (mvw ? (
               <div className="flex flex-col gap-3">
                 <p className="text-xs leading-relaxed text-slate-600">The likelihood comes from a probe fitted on assayed training holes; it reads the spectra only. {hole.au_m ? `This hole has ${hole.au_m} assayed metres (${hole.au_pos_m} at or above 0.1 ppm)${mvw.gold_summary.auc !== null ? `; the model ranks them with AUC ${fmt(mvw.gold_summary.auc)}` : ""}${mvw.gold_summary.top10_share !== undefined ? `, and ${pct(mvw.gold_summary.top10_share)} of its top tenth carry gold against ${pct(mvw.gold_summary.base_share)} overall` : ""}.` : "This scan carries no assays, so the ranking cannot be checked here."}</p>

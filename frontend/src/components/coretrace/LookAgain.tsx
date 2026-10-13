@@ -52,7 +52,7 @@ function Minerals({ v }: { v: number | null }) {
 /** The "Look again" list: the two kinds of suggestion the model makes about a hole, each a row a geologist can
  * check and answer. Disagreements with the log follow the one rule validated against chemistry (the ultramafic
  * rule); the flagged metres are the anomaly detector's. Both export as one sheet. */
-export function LookAgain({ hole, mv, run, metre, onJump }: { hole: HoleDetail; mv: ModelView; run: string; metre: number | null; onJump: (m: number) => void }) {
+export function LookAgain({ hole, mv, run, metre, onJump }: { hole: HoleDetail; mv: ModelView; run: string; metre: number | null; onJump: (m: number, to?: number) => void }) {
   const ds = useMemo(() => mv.summary.again?.intervals ?? [], [mv]);
   const flags = mv.anomaly.runs;
   const canVote = isVerified();
@@ -81,7 +81,7 @@ export function LookAgain({ hole, mv, run, metre, onJump }: { hole: HoleDetail; 
             <table className="w-full border-collapse">
               <thead><tr>{["Interval (m)", "The log says", "The model reads", "Talc, serpentine, Mg-chlorite", pkg ? "Chemistry (WAMEX)" : "Gold assays", "Your verdict"].map((h) => <th key={h} className={th}>{h}</th>)}</tr></thead>
               <tbody>{ds.map((d: AgainInterval) => (
-                <tr key={`${d.from_m}-${d.to_m}`} onClick={() => onJump(d.from_m)} className={cn("cursor-pointer hover:bg-slate-50", on(d) && "bg-cyan/10")}>
+                <tr key={`${d.from_m}-${d.to_m}`} onClick={() => onJump(d.from_m, d.to_m)} className={cn("cursor-pointer hover:bg-slate-50", on(d) && "bg-cyan/10")}>
                   <td className={cn(td, "font-mono whitespace-nowrap")}>{d.from_m}–{d.to_m}<div className="text-[10px] text-slate-400">{d.length_m} m</div></td>
                   <td className={td}><span className="font-medium text-slate-900">{d.logged || d.logged_class}</span>{d.logged && d.logged !== d.logged_class && <div className="text-[10px] text-slate-500">{d.logged_class}</div>}
                     {(() => { const l = loggedOver(pkg, d.from_m, d.to_m); return l.length ? <div className="mt-0.5 text-[10px] leading-snug text-slate-500" title="The company's own log for this depth, from the WAMEX report">WAMEX log: {l.join("; ")}</div> : null; })()}</td>
@@ -106,7 +106,7 @@ export function LookAgain({ hole, mv, run, metre, onJump }: { hole: HoleDetail; 
           <table className="w-full border-collapse">
             <thead><tr>{["Interval (m)", "Most unusual at", "Contrast with surroundings", "State percentile", "Your verdict"].map((h) => <th key={h} className={th}>{h}</th>)}</tr></thead>
             <tbody>{flags.map((r) => (
-              <tr key={r.from_m} onClick={() => onJump(r.peak_m)} className={cn("cursor-pointer hover:bg-slate-50", on(r) && "bg-cyan/10")}>
+              <tr key={r.from_m} onClick={() => onJump(r.peak_m, r.to_m + 1)} className={cn("cursor-pointer hover:bg-slate-50", on(r) && "bg-cyan/10")}>
                 <td className={cn(td, "font-mono")}>{r.from_m}–{r.to_m}</td><td className={cn(td, "font-mono")}>{r.peak_m} m</td>
                 <td className={td}><span className="flex items-center gap-2"><span className="h-2 rounded-r-[4px]" style={{ width: `${Math.min(100, (r.raw / (flags[0].raw || 1)) * 100) * 0.6}%`, background: SERIES.orange }} /><span className="font-mono">{r.raw.toFixed(2)}</span></span></td>
                 <td className={cn(td, "font-mono")}>{pct(r.peak, 1)}</td>

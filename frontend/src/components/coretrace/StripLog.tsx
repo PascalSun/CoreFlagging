@@ -12,16 +12,33 @@ const AXIS_W = 44, GAP = 6, HEAD_H = 30;
  * what the core is (software minerals, logged rock, the model's core type); bar tracks say
  * how much (how unusual, how likely gold, the assay). Each track has its own scale — they
  * sit side by side, never on a shared axis. Hover reads a metre, click selects it. */
-export function StripLog({ metres, model, cursor, onCursor, onHover, hasLith, hasAu, range }: {
+export function StripLog({ metres, model, cursor, onCursor, onHover, hasLith, hasAu, range, onRange }: {
   metres: Metres; model: ModelView | undefined; cursor: number | null; onCursor: (m: number) => void; onHover?: (m: number | null) => void; hasLith: boolean; hasAu: boolean;
-  /** draw to this depth range instead of the hole's own, so two logs side by side share one axis */
+  /** draw to this depth range instead of the hole's own: two logs side by side share one axis, or the reader has zoomed in */
   range?: [number, number];
+  /** when set, the log can be zoomed: the wheel over it and the level buttons change the range (null = whole hole) */
+  onRange?: (r: [number, number] | null) => void;
 }) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [boxH, setBoxH] = useState(480);
   const [zoom, setZoom] = useState<"fit" | 4 | 12>("fit");
   const [hover, setHover] = useState<number | null>(null);
+  const hole0 = metres.m[0] ?? 0, hole1 = (metres.m[metres.m.length - 1] ?? 0) + 1;
+  // zoom about the depth under the pointer; the span snaps between 30 cm and the whole hole
+  const zoomAt = (depth: number, factor: number) => {
+    if (!onRange) return;
+    const [a, b] = range ?? [hole0, hole1]; const span = b - a; const ns = Math.max(0.3, Math.min(hole1 - hole0, span * factor));
+    if (ns >= hole1 - hole0) { onRange(null); return; }
+    const f = (depth - a) / span; let na = depth - f * ns; na = Math.max(hole0, Math.min(hole1 - ns, na));
+    onRange([Math.round(na * 10) / 10, Math.round((na + ns) * 10) / 10]);
+  };
+  const toLevel = (span: number | null) => {
+    if (!onRange) return;
+    if (span === null) { onRange(null); return; }
+    const c = cursor !== null ? cursor + 0.5 : range ? (range[0] + range[1]) / 2 : (hole0 + hole1) / 2;
+    const na = Math.max(hole0, Math.min(hole1 - span, c - span / 2)); onRange([Math.round(na * 10) / 10, Math.round((na + span) * 10) / 10]);
+  };
 
   const tracks = useMemo<Track[]>(() => [
     { id: "gs", label: "SWIR", w: 22, kind: "cat" }, { id: "gt", label: "TIR", w: 22, kind: "cat" },
@@ -32,7 +49,8 @@ export function StripLog({ metres, model, cursor, onCursor, onHover, hasLith, ha
   ], [hasLith, hasAu, model]);
   const width = AXIS_W + tracks.reduce((a, t) => a + t.w + GAP, 0);
 
-  const m0 = range ? range[0] : metres.m[0] ?? 0, m1 = range ? range[1] : metres.m[metres.m.length - 1] ?? 0, span = m1 - m0 + 1;
+  // a zoomed range runs from its start to its end; the whole hole from its first metre to its last (inclusive)
+  const m0 = range ? range[0] : metres.m[0] ?? 0, m1 = range ? range[1] - 1 : metres.m[metres.m.length - 1] ?? 0, span = m1 - m0 + 1;
   const ppm = zoom === "fit" ? Math.max(0.6, (boxH - 8) / span) : zoom;
   const height = Math.ceil(span * ppm);
   const idx = useMemo(() => new Map(metres.m.map((m, i) => [m, i])), [metres.m]);
@@ -111,14 +129,23 @@ export function StripLog({ metres, model, cursor, onCursor, onHover, hasLith, ha
     <div className="flex h-full min-h-0 flex-col" style={{ width: Math.max(width, 236) }}>
       <div className="flex items-center justify-between gap-2 pb-2">
         <span className="text-[11px] font-medium text-slate-500">Depth (m)</span>
-        <div className="flex overflow-hidden rounded-md border border-slate-200 text-[11px]" role="group" aria-label="Depth scale">
-          {(["fit", 4, 12] as const).map((z) => (
-            <button key={String(z)} type="button" onClick={() => setZoom(z)}
-              className={cn("px-2 py-0.5", zoom === z ? "bg-slate-900 text-white" : "bg-white text-slate-600 hover:bg-slate-50")}>
-              {z === "fit" ? "Whole hole" : z === 4 ? "4 px/m" : "12 px/m"}
-            </button>
-          ))}
-        </div>
+        {onRange ? (
+          <div className="flex overflow-hidden rounded-md border border-slate-200 text-[11px]" role="group" aria-label="Depth window">
+            {([["Whole hole", null], ["10 m", 10], ["1 m", 1], ["10 cm", 0.3]] as const).map(([label, sp]) => {
+              const cur = range ? range[1] - range[0] : null; const on = sp === null ? !range : cur !== null && (sp === 0.3 ? cur <= 0.5 : sp === 1 ? cur > 0.5 && cur <= 2.5 : cur > 2.5 && cur <= 25);
+              return <button key={label} type="button" onClick={() => toLevel(sp)} className={cn("px-2 py-0.5", on ? "bg-slate-900 text-white" : "bg-white text-slate-600 hover:bg-slate-50")}>{label}</button>;
+            })}
+          </div>
+        ) : (
+          <div className="flex overflow-hidden rounded-md border border-slate-200 text-[11px]" role="group" aria-label="Depth scale">
+            {(["fit", 4, 12] as const).map((z) => (
+              <button key={String(z)} type="button" onClick={() => setZoom(z)}
+                className={cn("px-2 py-0.5", zoom === z ? "bg-slate-900 text-white" : "bg-white text-slate-600 hover:bg-slate-50")}>
+                {z === "fit" ? "Whole hole" : z === 4 ? "4 px/m" : "12 px/m"}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
       <div className="flex text-[10px] font-medium text-slate-500" style={{ height: HEAD_H, width }}>
         <span style={{ width: AXIS_W }} />
@@ -132,7 +159,8 @@ export function StripLog({ metres, model, cursor, onCursor, onHover, hasLith, ha
         <div className="relative" style={{ width, height }}>
           <canvas ref={canvasRef} style={{ width, height }} className="block cursor-crosshair"
             onMouseMove={(e) => { const m = at(e.clientY); setHover(m); onHover?.(m); }} onMouseLeave={() => { setHover(null); onHover?.(null); }}
-            onClick={(e) => { const m = at(e.clientY); if (m !== null) onCursor(m); }} />
+            onClick={(e) => { const m = at(e.clientY); if (m !== null) onCursor(m); }}
+            onWheel={onRange ? (e) => { const cv = canvasRef.current; if (!cv) return; e.preventDefault(); const d = (e.clientY - cv.getBoundingClientRect().top) / ppm + m0; zoomAt(d, e.deltaY > 0 ? 1.25 : 0.8); } : undefined} />
           {cursor !== null && cursor >= m0 && cursor <= m1 && (
             <div className="pointer-events-none absolute left-0 border-y border-cyan bg-cyan/20" style={{ top: (cursor - m0) * ppm - 1, height: Math.max(ppm, 2) + 2, width }} />
           )}

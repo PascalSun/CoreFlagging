@@ -45,6 +45,8 @@ export function CoreTraceMap() {
   // two tabs, as in the platform's workspace: the map, and every hole as a table
   const view = sp.get("view") === "holes" ? "holes" : "map";
   const metre = sp.get("m") !== null && /^\d+$/.test(sp.get("m") as string) ? Number(sp.get("m")) : null;
+  // the depth window the reader has zoomed to, "from-to" in metres
+  const win = useMemo<[number, number] | null>(() => { const w = sp.get("w"); if (!w) return null; const [a, b] = w.split("-").map(Number); return Number.isFinite(a) && Number.isFinite(b) && b > a ? [a, b] : null; }, [sp]);
   // the assistant is a column on the right, as in the platform's map workspace; open by default on a wide screen
   const [chatOpen, setChatOpen] = useState(true);
   // the chat column's width: dragged at its left edge, remembered on this browser
@@ -329,7 +331,7 @@ export function CoreTraceMap() {
       {holeKey && !mobile && (
         <aside className="absolute z-30 overflow-hidden rounded-2xl border border-white/60 bg-white/90 shadow-glass backdrop-blur-xl" style={{ top: 68, bottom: 12, width: panelW, right: chatW + 12 }}>
           <HolePanel key={holeKey} holeKey={holeKey} tab={tab} onTab={(t) => set({ tab: t === "metre" ? null : t })} models={models} run={run} onRun={(r) => set({ model: r })} metre={metre} onMetre={(m) => set({ m: m === null ? null : String(m) })}
-            wide={wide} onWide={(w) => set({ full: w ? "1" : null })} onClose={() => set({ hole: null, m: null, full: null, tab: null })}
+            wide={wide} onWide={(w) => set({ full: w ? "1" : null })} onClose={() => set({ hole: null, m: null, full: null, tab: null, w: null })} win={win} onWindow={(r) => set({ w: r ? `${r[0]}-${r[1]}` : null, full: r ? "1" : null, tab: r ? "window" : null })}
             onOpenHole={(k, m) => set({ hole: k, m: m === undefined ? null : String(m), full: "1" })}
             onDeleted={() => set({ hole: null, m: null, full: null })} onRing={setRingKm} />
         </aside>
@@ -337,7 +339,7 @@ export function CoreTraceMap() {
       {holeKey && mobile && (
         <HoleSheet full={wide || sheetFull} onFull={(f) => { setSheetFull(f); if (!f && wide) set({ full: null }); }} onClose={() => set({ hole: null, m: null, full: null, tab: null })}>
           <HolePanel key={holeKey} holeKey={holeKey} tab={tab} onTab={(t) => set({ tab: t === "metre" ? null : t })} models={models} run={run} onRun={(r) => set({ model: r })} metre={metre} onMetre={(m) => set({ m: m === null ? null : String(m) })}
-            wide={wide} onWide={(w) => set({ full: w ? "1" : null })} onClose={() => set({ hole: null, m: null, full: null, tab: null })}
+            wide={wide} onWide={(w) => set({ full: w ? "1" : null })} onClose={() => set({ hole: null, m: null, full: null, tab: null, w: null })} win={win} onWindow={(r) => set({ w: r ? `${r[0]}-${r[1]}` : null, full: r ? "1" : null, tab: r ? "window" : null })}
             onOpenHole={(k, m) => set({ hole: k, m: m === undefined ? null : String(m), full: "1" })}
             onDeleted={() => set({ hole: null, m: null, full: null })} onRing={setRingKm} />
         </HoleSheet>
