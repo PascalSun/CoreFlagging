@@ -38,6 +38,9 @@ export type Review = { run: string; kind: ReviewKind; from_m: number; to_m: numb
 export type ReviewKind = "log" | "flag" | "domain" | "unit";
 export type ReviewBody = { run: string; kind: ReviewKind; from_m: number; to_m: number; verdict: "agree" | "disagree"; note?: string };
 
+export type Sample = { i: number; depth: number; tray: string; section: number | null; x_mm: number; mineral: string; group: string; weight: number | null; height_mm: number | null; swir?: number[] };
+export type SampleView = { dataset: string; from_m: number; to_m: number; n: number; step_mm: number | null; samples: Sample[]; swir_wl?: number[] };
+
 export type TracePoint = { m: number; e: number; n: number; u: number; lon: number; lat: number; z: number | null; k: number | null };
 export type Trace = { key: string; name: string; source: "survey" | "header" | "vertical"; stations: number; collar: { lon: number; lat: number; rl: number | null }; depth_min: number; depth_max: number; points: TracePoint[]; km?: number; n_again?: number; target?: string };
 export type TraceView = { hole: Trace; nearby: Trace[]; again: { from_m: number; to_m: number }[]; flags: { from_m: number; to_m: number }[]; core_types: { k: number; name: string }[] };
@@ -159,6 +162,10 @@ export const coreScan = {
   holes: () => json<{ holes: HoleRow[]; n: number; core_types: { k: number; name: string }[] }>("/holes/"),
   hole: (key: string) => json<HoleDetail>(`/holes/${enc(key)}/`),
   package: (key: string) => json<HolePackage>(`/holes/${enc(key)}/package/`),
+  /** Every ~8 mm sample of a window (up to 20 m), from the mirrored package; 404 for an upload, 503 when the service is away. */
+  samples: (key: string, from: number, to: number, spectra = false) => json<SampleView>(`/holes/${enc(key)}/samples/?from=${from}&to=${to}${spectra ? "&spectra=1" : ""}`),
+  /** The full-resolution line-scan photograph of a window (up to 5 m), as an image URL. */
+  linescanUrl: (key: string, from: number, to: number, width = 600) => `${CORE_BASE}/holes/${enc(key)}/linescan.jpg?from=${from}&to=${to}&width=${width}`,
   /** The hole as a line in space, with the holes within `km` and what to highlight. */
   trace: (key: string, km = 0) => json<TraceView>(`/holes/${enc(key)}/trace/?km=${km}`),
   standout: (key: string, run: string) => json<Standout>(`/holes/${enc(key)}/standout/?model=${enc(run)}`),

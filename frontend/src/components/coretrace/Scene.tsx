@@ -71,7 +71,7 @@ export function Scene() {
       const layout = {
         margin: { l: 0, r: 0, t: 0, b: 0 }, paper_bgcolor: "rgba(0,0,0,0)", showlegend: false,
         scene: { aspectmode: "data", xaxis: { title: { text: "east (m)" }, gridcolor: "#e2e8f0", zerolinecolor: "#cbd5e1" }, yaxis: { title: { text: "north (m)" }, gridcolor: "#e2e8f0", zerolinecolor: "#cbd5e1" },
-          zaxis: { title: { text: c0.rl !== null ? "up (m, from this collar)" : "up (m)" }, gridcolor: "#e2e8f0", zerolinecolor: "#cbd5e1" }, camera: { eye: { x: 1.1, y: -1.3, z: 0.7 } }, bgcolor: "#f8fafc" },
+          zaxis: { title: { text: c0.rl !== null ? "up (m, from this collar)" : "up (m)" }, gridcolor: "#e2e8f0", zerolinecolor: "#cbd5e1" }, camera: { eye: { x: 0.75, y: -0.9, z: 0.45 } }, bgcolor: "#f8fafc" },
       };
       await Plotly.react(el, traces, layout, { displaylogo: false, responsive: true, modeBarButtonsToRemove: ["toImage"] });
       (el as any).on?.("plotly_click", (ev: any) => {
