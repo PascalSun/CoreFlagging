@@ -18,17 +18,20 @@ export const COLOUR_MODES: { id: ColourMode; label: string; short: string; hint:
 
 const WAIT = "#94a3b8", PLAIN = "#475569";
 /** `ring` set = drawn as a hollow ring of that colour (holes the models have nothing to say about) */
-export type Class = { label: string; color: string; order: number; ring?: string; wait?: boolean };
+/** `glyph` set = the mark carries letters (a commodity's chemical symbol), drawn as a badge when zoomed in */
+export type Class = { label: string; color: string; order: number; ring?: string; wait?: boolean; glyph?: string };
 
 const FAMILY: [string, string][] = [
   ["chlorite", "Chlorite"], ["white mica", "White mica"], ["kaolin", "Kaolin"], ["amphibole", "Amphibole"], ["carbonate", "Carbonate"],
   ["smectite", "Smectite"], ["dark mica", "Dark mica"],
 ];
-// the targets with enough holes to earn a colour of their own; the rest are "Other"
-const TARGET_COLOUR: [string, string, string][] = [
-  ["gold", "Gold", SERIES.yellow], ["copper", "Copper", SERIES.orange], ["nickel", "Nickel", SERIES.aqua], ["base metals", "Base metals", SERIES.blue],
-  ["iron", "Iron", "#b91c1c"], ["uranium", "Uranium", SERIES.green], ["rare earth elements", "Rare earths", SERIES.magenta], ["lithium", "Lithium", SERIES.violet],
-  ["petroleum", "Petroleum", "#44403c"], ["zinc", "Zinc", "#0e7490"], ["lead", "Lead", "#4b5563"], ["coal", "Coal", "#1c1917"],
+// the targets with enough holes to earn a colour and a symbol of their own; the rest are "Other"
+const TARGET_COLOUR: [string, string, string, string][] = [
+  ["gold", "Gold", SERIES.yellow, "Au"], ["copper", "Copper", SERIES.orange, "Cu"], ["nickel", "Nickel", SERIES.aqua, "Ni"], ["base metals", "Base metals", SERIES.blue, "BM"],
+  ["iron", "Iron", "#b91c1c", "Fe"], ["uranium", "Uranium", SERIES.green, "U"], ["rare earth elements", "Rare earths", SERIES.magenta, "REE"], ["lithium", "Lithium", SERIES.violet, "Li"],
+  ["petroleum", "Petroleum", "#44403c", "Oil"], ["zinc", "Zinc", "#0e7490", "Zn"], ["lead", "Lead", "#4b5563", "Pb"], ["coal", "Coal", "#1c1917", "C"],
+  ["cobalt", "Cobalt", "#1d4ed8", "Co"], ["platinum group elements", "PGE", "#7c3aed", "PGE"], ["silver", "Silver", "#64748b", "Ag"], ["manganese", "Manganese", "#9f1239", "Mn"],
+  ["tin", "Tin", "#0f766e", "Sn"], ["tungsten", "Tungsten", "#4338ca", "W"], ["vanadium", "Vanadium", "#b45309", "V"], ["diamonds", "Diamonds", "#0ea5e9", "Dia"],
 ];
 const STATE_COLOUR: Record<string, string> = {
   WA: SERIES.orange, NSW: SERIES.blue, QLD: SERIES.magenta, SA: SERIES.green, NT: SERIES.yellow, TAS: SERIES.violet, VIC: SERIES.aqua, CSIRO: PLAIN,
@@ -54,7 +57,7 @@ export function classify(h: HoleRow, mode: ColourMode, typeName: Map<number, str
   if (mode === "target") {
     if (!h.target) return { label: h.state && h.state !== "WA" ? "No target (other States)" : "No target on record", color: "#cbd5e1", order: 99 };   // a quiet dot, not a ring: the rings mean "no model reading"
     const i = TARGET_COLOUR.findIndex(([k]) => k === h.target);
-    return i >= 0 ? { label: TARGET_COLOUR[i][1], color: TARGET_COLOUR[i][2], order: i } : { label: "Other", color: "#94a3b8", order: 50 };
+    return i >= 0 ? { label: TARGET_COLOUR[i][1], color: TARGET_COLOUR[i][2], order: i, glyph: TARGET_COLOUR[i][3] } : { label: "Other", color: "#94a3b8", order: 50, glyph: "?" };
   }
   if (mode === "again") {
     if (!modelled) return { label: "No model reading", color: "#ffffff", ring: PLAIN, order: 5 };

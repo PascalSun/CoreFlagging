@@ -9,7 +9,7 @@ import { Mark, type Shape } from "@/components/coretrace/shapes";
 import { STATUS_LABEL } from "@/components/coretrace/palette";
 import { cn } from "@/lib/utils";
 
-type Look = { color: string; label: string; ring?: string; wait?: boolean; shape?: Shape; shapeLabel?: string };
+type Look = { color: string; label: string; ring?: string; wait?: boolean; shape?: Shape; shapeLabel?: string; glyph?: string };
 type Key = "name" | "state" | "target" | "depth" | "again" | "gold" | "issues";
 const PAGE = 100;
 
@@ -84,7 +84,7 @@ export function HoleTable({ holes, q, onQ, look, typeName, onOpen, onAsk, loadin
               <li key={h.key}>
                 <button type="button" onClick={() => onOpen(h.key)} className="flex w-full flex-col gap-1 px-4 py-2.5 text-left active:bg-cyan/5">
                   <span className="flex items-center gap-2 text-sm">
-                    {c.wait ? <i className="inline-block size-1.5 flex-none rounded-full bg-slate-400/70" /> : <Mark shape={c.shape} color={c.color} ring={c.ring} size={11} />}
+                    {c.wait ? <i className="inline-block size-1.5 flex-none rounded-full bg-slate-400/70" /> : <Mark shape={c.shape} color={c.color} ring={c.ring} glyph={c.glyph} size={11} />}
                     <span className="font-medium text-slate-900">{h.name}</span><span className="text-[11px] text-slate-400">{h.state}</span>
                     <span className="ml-auto font-mono text-[11px] text-slate-500">{h.depth_max !== null ? `${fmt(h.depth_max, 0)} m` : ""}</span>
                   </span>
@@ -114,7 +114,7 @@ export function HoleTable({ holes, q, onQ, look, typeName, onOpen, onAsk, loadin
                 <tr key={h.key} onClick={() => onOpen(h.key)} className="cursor-pointer border-b border-slate-100 hover:bg-cyan/5">
                   <td className="px-3 py-2">
                     <span className="flex items-center gap-2">
-                      {c.wait ? <i className="inline-block size-1.5 flex-none rounded-full bg-slate-400/70" title={c.label} /> : <Mark shape={c.shape} color={c.color} ring={c.ring} size={11} title={[c.label, c.shapeLabel].filter(Boolean).join(" · ")} />}
+                      {c.wait ? <i className="inline-block size-1.5 flex-none rounded-full bg-slate-400/70" title={c.label} /> : <Mark shape={c.shape} color={c.color} ring={c.ring} glyph={c.glyph} size={11} title={[c.label, c.shapeLabel].filter(Boolean).join(" · ")} />}
                       <span className="font-medium text-slate-900">{h.name}</span>
                       {h.offshore && <span className="rounded bg-sky-50 px-1 text-[10px] text-sky-800">Offshore</span>}
                       {h.status === "ready" && h.message && <span className="rounded bg-slate-100 px-1 text-[10px] text-slate-600">No models</span>}

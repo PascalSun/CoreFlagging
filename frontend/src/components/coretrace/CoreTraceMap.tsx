@@ -163,10 +163,10 @@ export function CoreTraceMap() {
   }, [onMap, shapeMode]);
   // the legend counts what is on the map, so it changes with the State picked
   const legend = useMemo(() => {
-    const c = new Map<string, { color: string; n: number; order: number; ring?: string; wait?: boolean }>();
+    const c = new Map<string, { color: string; n: number; order: number; ring?: string; wait?: boolean; glyph?: string }>();
     for (const h of onMap) {
       if (h.lat === null) continue;
-      const k = classify(h, mode, typeName); const e = c.get(k.label) ?? { color: k.color, n: 0, order: k.order, ring: k.ring, wait: k.wait }; e.n++; c.set(k.label, e);
+      const k = classify(h, mode, typeName); const e = c.get(k.label) ?? { color: k.color, n: 0, order: k.order, ring: k.ring, wait: k.wait, glyph: k.glyph }; e.n++; c.set(k.label, e);
     }
     return [...c.entries()].sort((a, b) => a[1].order - b[1].order || b[1].n - a[1].n);
   }, [onMap, mode, typeName]);
@@ -222,7 +222,7 @@ export function CoreTraceMap() {
             </div>
             {legendOpen && (
               <div className="border-t border-white/70 px-2 pb-2 pt-1.5">
-                <div className="grid grid-cols-2 gap-x-1">{shown.map(([label, e]) => row(label, <Mark color={e.color} ring={e.ring} size={11} />, e.n))}</div>
+                <div className="grid grid-cols-2 gap-x-1">{shown.map(([label, e]) => row(label, <Mark color={e.color} ring={e.ring} glyph={e.glyph} size={11} />, e.n))}</div>
                 {shapes.length > 0 && <div className="mt-1 grid grid-cols-2 gap-x-1 border-t border-white/70 pt-1">{shapes.map(([label, e]) => row(label, <Mark shape={e.shape} color="#64748b" size={11} />, e.n))}</div>}
                 <div className="mt-1 border-t border-white/70 pt-1.5">
                   <p className="px-1 text-[10.5px] font-medium text-slate-500">Also show</p>
