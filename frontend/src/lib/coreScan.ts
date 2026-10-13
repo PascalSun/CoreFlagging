@@ -211,6 +211,17 @@ export const readDate = (h: { processed_at: string | null }, long = false) =>
 export const sourceLabel = (h: { source: string; state: string; processed_at: string | null }) =>
   [h.source === "upload" ? "Your scan" : `NVCL ${h.state || "WA"}`, readDate(h)].filter(Boolean).join(" · ");
 
+/** A WAMEX abstract is one run of "Location: … Geology: … Work done: … Results: …"; split it into its labelled parts.
+ * An abstract without labels comes back as one unlabelled part. */
+export function abstractParts(abstract: string): { label: string; text: string }[] {
+  const clean = abstract.replace(/&nbsp;|&amp;/g, (m) => (m === "&amp;" ? "&" : " ")).replace(/\s+/g, " ").trim();
+  const re = /(Location|Geology|Work done|Results|Conclusions(?: (?:&|and) Recommendations)?|Recommendations|Prospects|Assays|Tenements?)\s*:\s*/gi;
+  const parts: { label: string; text: string }[] = []; let m: RegExpExecArray | null; let last: { label: string; at: number } | null = null;
+  while ((m = re.exec(clean))) { if (last) parts.push({ label: last.label, text: clean.slice(last.at, m.index).trim() }); last = { label: m[1], at: m.index + m[0].length }; }
+  if (last) parts.push({ label: last.label, text: clean.slice(last.at).trim() }); else if (clean) parts.push({ label: "", text: clean });
+  return parts.filter((p) => p.text);
+}
+
 /** What a mirrored report file is, from its name: the OCR'd report, drill data, GIS, a 3D model, appendices. */
 export function reportFileKind(name: string): string {
   const n = name.toLowerCase();

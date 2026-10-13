@@ -2,10 +2,10 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, ArrowRight, ChevronLeft, ChevronRight, Download, ExternalLink, FileDown, Loader2, Maximize2, Minimize2, Trash2, X } from "lucide-react";
+import { AlertTriangle, ArrowRight, ChevronLeft, ChevronRight, Download, ExternalLink, FileDown, FileText, Loader2, Maximize2, Minimize2, Trash2, X } from "lucide-react";
 import { downloadReportPdf } from "@/components/coretrace/pdf";
 import { PAGE_W, ReportDocument } from "@/components/coretrace/ReportDocument";
-import { ACTIVE, coreScan, readDate, reportFileKind, sourceLabel, surveyOf, type CoreModelInfo, type HoleDetail, type HoleReport, type MetreView, type ModelView, type Tray } from "@/lib/coreScan";
+import { ACTIVE, abstractParts, coreScan, readDate, reportFileKind, sourceLabel, surveyOf, type CoreModelInfo, type HoleDetail, type HoleReport, type MetreView, type ModelView, type Tray } from "@/lib/coreScan";
 import { ISSUE_LABEL, STATUS_LABEL, SERIES, coreTypeColor, fmt, groupColor, groupName, issueLabel, pct } from "@/components/coretrace/palette";
 import { LINE, SpectraChart } from "@/components/coretrace/SpectraChart";
 import { StripLegend, StripLog } from "@/components/coretrace/StripLog";
@@ -32,22 +32,47 @@ const Empty = ({ children }: { children: React.ReactNode }) => <div className="r
 const kb = (b: number) => (b >= 1e6 ? `${(b / 1e6).toFixed(1)} MB` : `${Math.max(1, Math.round(b / 1e3))} KB`);
 
 /** The exploration report the hole was logged in: what the company wrote, one click from the scan.
- * The abstract is folded to a few lines; the files are the mirror's downloads (PDF, drill logs, appendices). */
+ * A document card: the abstract's labelled parts (Location, Geology, Work done, Results…), the first two
+ * shown and the rest a click away, the PDF button, and the mirror's other files as chips. */
 function OriginalReport({ report, loading }: { report: HoleReport | undefined; loading: boolean }) {
   const [open, setOpen] = useState(false);
+  const parts = useMemo(() => (report?.abstract ? abstractParts(report.abstract) : []), [report]);
+  const shown = open ? parts : parts.slice(0, 2);
+  const others = report?.files.filter((f) => f.download_url !== report.pdf_url) ?? [];
   if (loading) return <p className="text-[11px] text-slate-500">Looking up the report…</p>;
   if (!report) return <p className="text-[11px] text-slate-500">The report is on the mirror but could not be listed right now.</p>;
   return (
-    <div className="flex flex-col gap-2 text-xs text-slate-700">
-      <p className="text-[11px] text-slate-500">WAMEX {report.anumber}: the geologist&rsquo;s own account of this drilling, as lodged with GSWA.</p>
-      {report.abstract && <p className={cn("leading-relaxed", !open && "line-clamp-4")}>{report.abstract}</p>}
-      {report.abstract && report.abstract.length > 280 && <button type="button" onClick={() => setOpen((o) => !o)} className="self-start text-[11px] font-medium text-slate-700 underline-offset-2 hover:underline">{open ? "Less" : "Read the whole abstract"}</button>}
-      {report.pdf_url && <a href={report.pdf_url} target="_blank" rel="noopener" className="inline-flex items-center gap-1.5 self-start rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-800 hover:bg-slate-50"><ExternalLink size={13} />Open the report (PDF)</a>}
-      <ul className="flex flex-col gap-1">
-        {report.files.map((f) => (
-          <li key={f.name}><a href={f.download_url} target="_blank" rel="noopener" title={f.name} className="inline-flex max-w-full items-center gap-1.5 text-[11px] text-slate-700 underline-offset-2 hover:underline"><Download size={11} className="flex-none" /><span className="truncate">{reportFileKind(f.name)}</span><span className="flex-none text-slate-400">{kb(f.bytes)}</span></a></li>
-        ))}
-      </ul>
+    <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+      <div className="flex items-center gap-3 border-b border-slate-100 bg-slate-50/70 px-3.5 py-2.5">
+        <span className="grid h-9 w-9 flex-none place-items-center rounded-lg bg-white text-slate-700 shadow-sm ring-1 ring-slate-200"><FileText size={18} strokeWidth={1.6} /></span>
+        <div className="min-w-0">
+          <div className="truncate text-sm font-semibold text-slate-900">Exploration report {report.anumber}</div>
+          <div className="text-[11px] text-slate-500">The geologist&rsquo;s own account, lodged with GSWA (WAMEX)</div>
+        </div>
+      </div>
+      {parts.length > 0 && (
+        <dl className="flex flex-col gap-2 px-3.5 py-3 text-xs">
+          {shown.map((p, i) => (
+            <div key={i} className="grid grid-cols-[5.2rem_1fr] gap-x-2">
+              <dt className="pt-px text-[11px] font-medium text-slate-500">{p.label || "Abstract"}</dt>
+              <dd className={cn("leading-relaxed text-slate-700", !open && "line-clamp-3")}>{p.text}</dd>
+            </div>
+          ))}
+          {parts.length > 2 || parts.some((p) => p.text.length > 200) ? (
+            <button type="button" onClick={() => setOpen((o) => !o)} className="self-start text-[11px] font-medium text-slate-700 underline-offset-2 hover:underline">{open ? "Show less" : parts.length > 2 ? `Show all ${parts.length} parts` : "Read in full"}</button>
+          ) : null}
+        </dl>
+      )}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-slate-100 px-3.5 py-3">
+        {report.pdf_url && <a href={report.pdf_url} target="_blank" rel="noopener" className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-800"><ExternalLink size={13} />Open the report</a>}
+        {others.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1.5">
+            {others.map((f) => (
+              <a key={f.name} href={f.download_url} target="_blank" rel="noopener" title={`${f.name} · ${kb(f.bytes)}`} className="inline-flex items-center gap-1 rounded-full border border-slate-200 px-2 py-0.5 text-[11px] text-slate-600 hover:border-slate-400 hover:text-slate-900"><Download size={10} />{reportFileKind(f.name)}</a>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
