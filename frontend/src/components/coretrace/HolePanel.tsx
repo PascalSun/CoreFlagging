@@ -12,6 +12,7 @@ import { StripLegend, StripLog } from "@/components/coretrace/StripLog";
 import { TrayViewer } from "@/components/coretrace/DeepZoom";
 import { TrayPhoto } from "@/components/coretrace/TrayPhoto";
 import { LookAgain } from "@/components/coretrace/LookAgain";
+import { SimilarHoles } from "@/components/coretrace/SimilarHoles";
 import { Nearby } from "@/components/coretrace/Nearby";
 import { DepthLens, type Window } from "@/components/coretrace/DepthLens";
 import { cn } from "@/lib/utils";
@@ -313,6 +314,7 @@ export function HolePanel({ holeKey, tab: tabProp, onTab, models, run, onRun, me
     enabled: ready && wide && shown !== null && (!!useRun || displayOnly), staleTime: 5 * 60_000, retry: false, placeholderData: keepPreviousData });
   // what the similar-core search asks about: the zoomed window when there is one (up to 50 m), else the 2 m at the metre
   const [simScope, setSimScope] = useState<SimilarScope>("state");
+  const [simWhole, setSimWhole] = useState(false);     // a stretch of the hole, or the whole hole
   const simAt = win && win[1] - win[0] <= 50 ? { from: win[0], to: win[1] } : metre !== null ? { m: metre } : null;
   const sq = useQuery({ queryKey: ["core-similar", holeKey, simAt, useRun, simScope], queryFn: () => coreScan.similar(holeKey, simAt as { m: number }, useRun, simScope), enabled: ready && wide && tab === "similar" && simAt !== null && !!useRun, staleTime: 5 * 60_000, retry: false });
   const mvw = mq.data; const trays = tq.data?.trays ?? [];
@@ -501,8 +503,15 @@ export function HolePanel({ holeKey, tab: tabProp, onTab, models, run, onRun, me
                 { id: "hole", label: "This hole", hint: "Where else in this hole is core like this" }, { id: "nearby", label: "Within 10 km", hint: "The neighbouring holes" },
                 { id: "region", label: hole.region ? `Region: ${hole.region}` : "Region", hint: "Holes of the same tectonic region" }, { id: "state", label: "Whole State", hint: "Every other hole, none within 5 km" }];
               const what = simAt === null ? null : "from" in simAt ? `${fmt(simAt.from, 1)}–${fmt(simAt.to, 1)} m (the window)` : `the 2 m from ${simAt.m} m`;
+              const asking = (
+                <div className="flex flex-wrap items-center gap-1.5" role="tablist" aria-label="What to compare">
+                  <span className="text-[11px] text-slate-500">Compare</span>
+                  {([false, true] as const).map((w) => <button key={String(w)} type="button" role="tab" aria-selected={simWhole === w} onClick={() => setSimWhole(w)} className={cn("rounded-full px-2.5 py-0.5 text-[11px] font-medium ring-1", simWhole === w ? "bg-slate-900 text-white ring-slate-900" : "bg-white text-slate-700 ring-slate-200 hover:ring-slate-400")}>{w ? "The whole hole" : "A stretch of core"}</button>)}
+                </div>);
+              if (simWhole) return <div className="flex flex-col gap-3">{asking}{useRun ? <SimilarHoles hole={hole} run={useRun} onOpenHole={(k) => onOpenHole(k)} /> : <Empty>Loading…</Empty>}</div>;
               return (
                 <div className="flex flex-col gap-3">
+                  {asking}
                   <div className="flex flex-wrap items-center gap-1.5" role="tablist" aria-label="Where to look">
                     <span className="text-[11px] text-slate-500">Look in</span>
                     {scopes.filter((sc) => sc.id !== "region" || hole.region).map((sc) => <button key={sc.id} type="button" role="tab" aria-selected={simScope === sc.id} title={sc.hint} onClick={() => setSimScope(sc.id)} className={cn("rounded-full px-2.5 py-0.5 text-[11px] font-medium ring-1", simScope === sc.id ? "bg-slate-900 text-white ring-slate-900" : "bg-white text-slate-700 ring-slate-200 hover:ring-slate-400")}>{sc.label}</button>)}
