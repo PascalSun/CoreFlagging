@@ -27,7 +27,7 @@ export function Nearby({ hole, onOpen, onRing }: { hole: HoleDetail; onOpen: (ke
         ))}
         {km !== null && !q.isPending && <span className="text-[11px] text-slate-500">{rows.length ? `${rows.length} ${rows.length === 1 ? "hole" : "holes"}` : "no other scanned hole"}</span>}
       </div>
-      {km === null && <p className="text-[11px] leading-relaxed text-slate-500">Pick a ring to list the scanned holes around this one and draw it on the map.</p>}
+      {km === null && <p className="text-[11px] leading-relaxed text-slate-500">Pick a ring to list the scanned holes around this one and draw it on the map, or <Link href={`/scene?hole=${encodeURIComponent(hole.key)}`} className="font-medium text-slate-700 underline-offset-2 hover:underline">see them in 3D</Link>.</p>}
       {km !== null && q.isPending && <p className="text-[11px] text-slate-500">Looking around…</p>}
       {rows.length > 0 && (
         <ul className="divide-y divide-slate-100 rounded-lg border border-slate-200 bg-white">

@@ -38,6 +38,10 @@ export type Review = { run: string; kind: ReviewKind; from_m: number; to_m: numb
 export type ReviewKind = "log" | "flag" | "domain" | "unit";
 export type ReviewBody = { run: string; kind: ReviewKind; from_m: number; to_m: number; verdict: "agree" | "disagree"; note?: string };
 
+export type TracePoint = { m: number; e: number; n: number; u: number; lon: number; lat: number; z: number | null; k: number | null };
+export type Trace = { key: string; name: string; source: "survey" | "header" | "vertical"; stations: number; collar: { lon: number; lat: number; rl: number | null }; depth_min: number; depth_max: number; points: TracePoint[]; km?: number; n_again?: number; target?: string };
+export type TraceView = { hole: Trace; nearby: Trace[]; again: { from_m: number; to_m: number }[]; flags: { from_m: number; to_m: number }[]; core_types: { k: number; name: string }[] };
+
 /** What stands out about a hole above the metre: against its region, and its domains against the rest of it. */
 export type Standout = {
   run: string;
@@ -155,6 +159,8 @@ export const coreScan = {
   holes: () => json<{ holes: HoleRow[]; n: number; core_types: { k: number; name: string }[] }>("/holes/"),
   hole: (key: string) => json<HoleDetail>(`/holes/${enc(key)}/`),
   package: (key: string) => json<HolePackage>(`/holes/${enc(key)}/package/`),
+  /** The hole as a line in space, with the holes within `km` and what to highlight. */
+  trace: (key: string, km = 0) => json<TraceView>(`/holes/${enc(key)}/trace/?km=${km}`),
   standout: (key: string, run: string) => json<Standout>(`/holes/${enc(key)}/standout/?model=${enc(run)}`),
   /** The 10 cm bins of a depth window (up to 50 m): the scanner's reading of each. */
   bins: (key: string, from: number, to: number) => json<{ from_m: number; to_m: number; bins: Bin[] }>(`/holes/${enc(key)}/bins/?from=${from}&to=${to}`),
