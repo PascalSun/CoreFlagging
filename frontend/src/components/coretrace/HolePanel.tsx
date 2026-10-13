@@ -11,11 +11,13 @@ import { LINE, SpectraChart } from "@/components/coretrace/SpectraChart";
 import { StripLegend, StripLog } from "@/components/coretrace/StripLog";
 import { TrayViewer } from "@/components/coretrace/DeepZoom";
 import { TrayPhoto } from "@/components/coretrace/TrayPhoto";
+import { LookAgain } from "@/components/coretrace/LookAgain";
+import { disagreements } from "@/lib/lookAgain";
 import { cn } from "@/lib/utils";
 
-export type Tab = "metre" | "log" | "unusual" | "gold" | "similar" | "quality" | "report";
+export type Tab = "metre" | "again" | "log" | "gold" | "similar" | "quality" | "report";
 const TABS: { id: Tab; label: string }[] = [
-  { id: "metre", label: "This metre" }, { id: "log", label: "Auto log" }, { id: "unusual", label: "Unusual" }, { id: "gold", label: "Gold" },
+  { id: "metre", label: "This metre" }, { id: "again", label: "Look again" }, { id: "log", label: "Auto log" }, { id: "gold", label: "Gold" },
   { id: "similar", label: "Similar core" }, { id: "quality", label: "Data quality" }, { id: "report", label: "Report" },
 ];
 
@@ -284,7 +286,7 @@ export function HolePanel({ holeKey, tab: tabProp, onTab, models, run, onRun, me
 }) {
   const qc = useQueryClient();
   // the open tab lives in the address, so a link (or the assistant) can open a hole on any tab
-  const tab: Tab = TABS.some((t) => t.id === tabProp) ? (tabProp as Tab) : "metre";
+  const tab: Tab = tabProp === "unusual" ? "again" : TABS.some((t) => t.id === tabProp) ? (tabProp as Tab) : "metre";   // "unusual" was the tab's old name
   const setTab = onTab;
   const hq = useQuery({ queryKey: ["core-hole", holeKey], queryFn: () => coreScan.hole(holeKey), refetchInterval: (q) => (q.state.data && ACTIVE.includes(q.state.data.status) ? 2500 : false),
     refetchIntervalInBackground: true });   // an upload is left to run in another tab; it should be done when the reader comes back
@@ -406,6 +408,7 @@ export function HolePanel({ holeKey, tab: tabProp, onTab, models, run, onRun, me
             <H3>What the model found</H3>
             <ul className="flex flex-col gap-1.5 text-xs leading-relaxed text-slate-700">
               <li><b className="font-semibold text-slate-900">{res.summary.n_segments} segments</b> in the auto log, over {res.summary.metres} m of core.</li>
+              {mvw && hole.has_lith && (() => { const n = disagreements(hole, mvw).length; return <li><b className="font-semibold text-slate-900">{n ? `${n} ${n === 1 ? "interval" : "intervals"}` : "No interval"}</b> where the model&rsquo;s reading disagrees with the log, by the ultramafic rule.{n ? <> <button type="button" className="font-medium text-slate-900 underline decoration-slate-300 underline-offset-2 hover:decoration-slate-900" onClick={() => { setTab("again"); onWide(true); }}>Look again</button></> : null}</li>; })()}
               <li><b className="font-semibold text-slate-900">{res.anomaly.n_flag_m} unusual {res.anomaly.n_flag_m === 1 ? "metre" : "metres"}</b> flagged against the core around them.</li>
               {res.summary.gold_top !== null && <li>Highest gold likelihood at <button type="button" className="font-semibold text-slate-900 underline decoration-slate-300 underline-offset-2 hover:decoration-slate-900" onClick={() => { onMetre(res.summary.gold_top as number); onWide(true); }}>{res.summary.gold_top} m</button>{res.gold.auc !== null ? <>; against this hole&rsquo;s assays the ranking scores AUC {fmt(res.gold.auc)}</> : null}.</li>}
               {res.tir.measured && res.tir.acc !== null && <li>TIR mineral group filled in from SWIR alone agrees with the measured TIR in <b className="font-semibold text-slate-900">{pct(res.tir.acc)}</b> of bins.</li>}
@@ -418,11 +421,11 @@ export function HolePanel({ holeKey, tab: tabProp, onTab, models, run, onRun, me
         </button>
         <p className="text-[11px] leading-relaxed text-slate-500">{displayOnly
           ? "Metre by metre: tray photographs, spectra, the TSG software's minerals, logged rock and assays, the data-quality checks, and a printable report."
-          : "Metre by metre: tray photographs, spectra, the auto log, unusual intervals, gold likelihood, similar core across the State, and a printable report."}</p>
+          : "Metre by metre: tray photographs, spectra, where to look again, the auto log, gold likelihood, similar core across the State, and a printable report."}</p>
       </div>
     );
   } else {
-    const flaggedRuns = mvw?.anomaly.runs ?? []; const goldTop = mvw?.gold_summary.top ?? [];
+    const goldTop = mvw?.gold_summary.top ?? [];
     body = (
       // a wide screen keeps the log and the reading side by side, each scrolling on its own; a phone scrolls the whole
       // page as one, with the log a fixed height at the top and the tabs held at the top of the screen as you read
@@ -468,19 +471,7 @@ export function HolePanel({ holeKey, tab: tabProp, onTab, models, run, onRun, me
                       <td className={td}>{s.tir_groups.slice(0, 2).map(([c, , p]) => `${groupName(c)} ${pct(p)}`).join(", ") || "—"}</td></tr>); })}</tbody>
                 </table>
               </div>) : <Empty>Loading…</Empty>)}
-            {tab === "unusual" && (mvw ? (
-              <div className="flex flex-col gap-3">
-                <p className="text-xs leading-relaxed text-slate-600">A metre is flagged when it differs from the 15 m either side of it more than {pct(1 - mvw.anomaly.top_share)} of this hole does, and more than {pct(mvw.anomaly.flag_at, 1)} of the State&rsquo;s training core. {mvw.anomaly.n_flag_m} of {mvw.m.length} metres are flagged. Unusual is not the same as mineralised{mvw.anomaly.auc_gold !== null ? `: against this hole's assays the score ranks gold metres with AUC ${fmt(mvw.anomaly.auc_gold)}` : ""}.</p>
-                {flaggedRuns.length ? (
-                  <table className="w-full border-collapse">
-                    <thead><tr>{["Interval (m)", "Most unusual at", "Contrast with surroundings", "State percentile"].map((h) => <th key={h} className={th}>{h}</th>)}</tr></thead>
-                    <tbody>{flaggedRuns.map((r) => (
-                      <tr key={r.from_m} onClick={() => { jump(r.peak_m); setTab("metre"); }} className="cursor-pointer hover:bg-slate-50">
-                        <td className={cn(td, "font-mono")}>{r.from_m}–{r.to_m}</td><td className={cn(td, "font-mono")}>{r.peak_m} m</td>
-                        <td className={td}><span className="flex items-center gap-2"><span className="h-2 rounded-r-[4px]" style={{ width: `${Math.min(100, (r.raw / (flaggedRuns[0].raw || 1)) * 100) * 0.6}%`, background: SERIES.orange }} /><span className="font-mono">{r.raw.toFixed(2)}</span></span></td>
-                        <td className={cn(td, "font-mono")}>{pct(r.peak, 1)}</td></tr>))}</tbody>
-                  </table>) : <Empty>Nothing in this hole stands out from its surroundings enough to flag.</Empty>}
-              </div>) : <Empty>Loading…</Empty>)}
+            {tab === "again" && (mvw ? <LookAgain hole={hole} mv={mvw} run={useRun} metre={metre} onJump={(m) => { jump(m); }} /> : <Empty>Loading…</Empty>)}
             {tab === "gold" && (mvw ? (
               <div className="flex flex-col gap-3">
                 <p className="text-xs leading-relaxed text-slate-600">The likelihood comes from a probe fitted on assayed training holes; it reads the spectra only. {hole.au_m ? `This hole has ${hole.au_m} assayed metres (${hole.au_pos_m} at or above 0.1 ppm)${mvw.gold_summary.auc !== null ? `; the model ranks them with AUC ${fmt(mvw.gold_summary.auc)}` : ""}${mvw.gold_summary.top10_share !== undefined ? `, and ${pct(mvw.gold_summary.top10_share)} of its top tenth carry gold against ${pct(mvw.gold_summary.base_share)} overall` : ""}.` : "This scan carries no assays, so the ranking cannot be checked here."}</p>
