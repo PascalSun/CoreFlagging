@@ -129,7 +129,7 @@ export function DepthLens({ hole, mv, win, onWindow, trays, metre, onMetre, type
               </div>
             )}
           </section>
-          {trayMetres(trays, metres).map((m) => <TrayPhoto key={m} holeKey={hole.key} trays={trays} metre={m} onMetre={onMetre} />)}
+          {trayMetres(trays, metres).map((m) => <TrayPhoto key={m} holeKey={hole.key} trays={trays} metre={m} onMetre={onMetre} range={span <= 2.5 ? [Math.max(from, m), Math.min(to, m + 4)] : undefined} />)}
         </>
       )}
     </div>
