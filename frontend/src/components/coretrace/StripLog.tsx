@@ -75,12 +75,12 @@ export function StripLog({ metres, model, cursor, onCursor, onHover, hasLith, ha
     g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, width, height);
     const rowH = Math.max(ppm, 1 / dpr);
     // depth axis: a tick every 10 / 50 / 100 m, whichever leaves room for the label
-    const step = [10, 20, 50, 100, 200, 500].find((s) => s * ppm >= 34) ?? 500;
+    const step = [0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 50, 100, 200, 500].find((s) => s * ppm >= 34) ?? 500;
     g.font = "10px var(--font-geist-mono), ui-monospace, monospace"; g.textAlign = "right"; g.textBaseline = "middle";
     for (let d = Math.ceil(m0 / step) * step; d <= m1 + 1; d += step) {
       const y = (d - m0) * ppm;
       g.fillStyle = GRID; g.fillRect(AXIS_W - 4, Math.round(y), width - AXIS_W + 4, 1);
-      g.fillStyle = MUTED; g.fillText(String(d), AXIS_W - 8, Math.min(Math.max(y, 6), height - 6));
+      g.fillStyle = MUTED; g.fillText(step < 1 ? d.toFixed(1) : String(Math.round(d)), AXIS_W - 8, Math.min(Math.max(y, 6), height - 6));
     }
     let x = AXIS_W;
     for (const t of tracks) {

@@ -95,7 +95,7 @@ export function DepthLens({ hole, mv, win, onWindow, trays, metre, onMetre, type
                 <li key={r.from_m}><button type="button" onClick={() => onWindow([r.from_m - 0.5, r.to_m + 0.5])} className="rounded-full border border-orange/50 bg-orange/10 px-2 py-0.5 font-mono text-[11px] text-slate-800 hover:border-orange">{r.from_m}–{r.to_m} m · {r.raw.toFixed(2)}</button></li>))}</ul>
             </section>
           )}
-          {metres.length <= 12 && metres.map((m) => <TrayPhoto key={m} holeKey={hole.key} trays={trays} metre={m} onMetre={onMetre} />)}
+          {metres.length <= 12 && trayMetres(trays, metres).map((m) => <TrayPhoto key={m} holeKey={hole.key} trays={trays} metre={m} onMetre={onMetre} />)}
           {metres.length > 12 && <p className="text-[11px] text-slate-500">Zoom to 10 m or closer to see the photographs of each metre.</p>}
         </>
       ) : (
@@ -129,7 +129,7 @@ export function DepthLens({ hole, mv, win, onWindow, trays, metre, onMetre, type
               </div>
             )}
           </section>
-          {metres.map((m) => <TrayPhoto key={m} holeKey={hole.key} trays={trays} metre={m} onMetre={onMetre} />)}
+          {trayMetres(trays, metres).map((m) => <TrayPhoto key={m} holeKey={hole.key} trays={trays} metre={m} onMetre={onMetre} />)}
         </>
       )}
     </div>
@@ -137,6 +137,17 @@ export function DepthLens({ hole, mv, win, onWindow, trays, metre, onMetre, type
 }
 
 const round1 = (v: number) => Math.round(v * 10) / 10;
+
+/** One photograph per tray the window touches: the first metre of the window on each tray (a tray holds ~3.5 m). */
+function trayMetres(trays: Tray[], metres: number[]): number[] {
+  const seen = new Set<number>(); const out: number[] = [];
+  for (const m of metres) {
+    const k = trays.findIndex((t) => t.from_m <= m + 0.5 && m + 0.5 <= t.to_m + 0.05);
+    if (k < 0 || seen.has(k)) continue;
+    seen.add(k); out.push(m);
+  }
+  return out;
+}
 
 /** The 10 cm bins of a window as two coloured rows (SWIR group over TIR group), to scale, with a depth rule. */
 function BinStrip({ bins, from, to, pick, hover, onHover, onPick, onZoom }: {
