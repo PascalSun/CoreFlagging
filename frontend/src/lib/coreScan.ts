@@ -22,6 +22,10 @@ export type HoleRow = {
   n_issues: number; split: string; is_public: boolean; mine: boolean; updated: string; processed_at: string | null; strip?: number[];
 };
 
+/** A geologist's verdict on one of the model's suggestions. Notes come back only for the reader's own. */
+export type Review = { run: string; kind: "log" | "flag"; from_m: number; to_m: number; verdict: "agree" | "disagree"; note: string; mine: boolean; at: string };
+export type ReviewBody = { run: string; kind: "log" | "flag"; from_m: number; to_m: number; verdict: "agree" | "disagree"; note?: string };
+
 /** The exploration report a hole was logged in: the mirror's files (the OCR'd PDF first) and the abstract. */
 export type HoleReport = {
   anumber: string; abstract: string | null; pdf_url: string | null;
@@ -117,6 +121,10 @@ export const coreScan = {
   models: () => json<CoreModelInfo[]>("/models/"),
   holes: () => json<{ holes: HoleRow[]; n: number; core_types: { k: number; name: string }[] }>("/holes/"),
   hole: (key: string) => json<HoleDetail>(`/holes/${enc(key)}/`),
+  reviews: (key: string) => json<{ reviews: Review[] }>(`/holes/${enc(key)}/reviews/`),
+  /** Records the signed-in person's verdict, replacing an earlier one on the same suggestion. */
+  review: (key: string, body: ReviewBody) => json<{ verdict: string; note: string; at: string }>(`/holes/${enc(key)}/reviews/`, { method: "POST", body: JSON.stringify(body), headers: { "Content-Type": "application/json" } }),
+  unreview: (key: string, body: Omit<ReviewBody, "verdict">) => json<void>(`/holes/${enc(key)}/reviews/`, { method: "DELETE", body: JSON.stringify(body), headers: { "Content-Type": "application/json" } }),
   /** 404 when the scan names no report. */
   report: (key: string) => json<HoleReport>(`/holes/${enc(key)}/report/`),
   model: (key: string, run: string) => json<ModelView>(`/holes/${enc(key)}/models/${enc(run)}/`),
