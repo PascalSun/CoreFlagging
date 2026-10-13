@@ -3,8 +3,8 @@
 import { useMemo } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, Download, X } from "lucide-react";
-import { coreScan, type HoleDetail, type ModelView, type Review, type ReviewBody } from "@/lib/coreScan";
-import { csvRows, disagreements, type Disagreement } from "@/lib/lookAgain";
+import { coreScan, type AgainInterval, type HoleDetail, type ModelView, type Review, type ReviewBody } from "@/lib/coreScan";
+import { csvRows } from "@/lib/lookAgain";
 import { coreTypeColor, fmt, pct, SERIES } from "@/components/coretrace/palette";
 import { isVerified } from "@/lib/auth";
 import { cn } from "@/lib/utils";
@@ -52,7 +52,7 @@ function Minerals({ v }: { v: number | null }) {
  * check and answer. Disagreements with the log follow the one rule validated against chemistry (the ultramafic
  * rule); the flagged metres are the anomaly detector's. Both export as one sheet. */
 export function LookAgain({ hole, mv, run, metre, onJump }: { hole: HoleDetail; mv: ModelView; run: string; metre: number | null; onJump: (m: number) => void }) {
-  const ds = useMemo(() => disagreements(hole, mv), [hole, mv]);
+  const ds = useMemo(() => mv.summary.again?.intervals ?? [], [mv]);
   const flags = mv.anomaly.runs;
   const canVote = isVerified();
   const rq = useQuery({ queryKey: ["core-reviews", hole.key], queryFn: () => coreScan.reviews(hole.key), staleTime: 30_000 });
@@ -76,7 +76,7 @@ export function LookAgain({ hole, mv, run, metre, onJump }: { hole: HoleDetail; 
           : (
             <table className="w-full border-collapse">
               <thead><tr>{["Interval (m)", "The log says", "The model reads", "Talc, serpentine, Mg-chlorite", "Gold assays", "Your verdict"].map((h) => <th key={h} className={th}>{h}</th>)}</tr></thead>
-              <tbody>{ds.map((d: Disagreement) => (
+              <tbody>{ds.map((d: AgainInterval) => (
                 <tr key={`${d.from_m}-${d.to_m}`} onClick={() => onJump(d.from_m)} className={cn("cursor-pointer hover:bg-slate-50", on(d) && "bg-cyan/10")}>
                   <td className={cn(td, "font-mono whitespace-nowrap")}>{d.from_m}–{d.to_m}<div className="text-[10px] text-slate-400">{d.length_m} m</div></td>
                   <td className={td}><span className="font-medium text-slate-900">{d.logged || d.logged_class}</span>{d.logged && d.logged !== d.logged_class && <div className="text-[10px] text-slate-500">{d.logged_class}</div>}</td>

@@ -19,8 +19,19 @@ export type HoleRow = {
   key: string; name: string; source: "nvcl" | "upload"; status: HoleStatus; message: string; progress: number;
   lon: number | null; lat: number | null; state: string; offshore: boolean; operator: string; project: string; region: string; instrument: string;
   depth_min: number | null; depth_max: number | null; tir: string; has_lith: boolean; au_m: number; au_pos_m: number;
-  n_issues: number; split: string; is_public: boolean; mine: boolean; updated: string; processed_at: string | null; strip?: number[];
+  n_issues: number; n_again: number; again_m: number; split: string; is_public: boolean; mine: boolean; updated: string; processed_at: string | null; strip?: number[];
 };
+
+/** An interval where the model's reading disagrees with the log, by the ultramafic rule (computed on the platform, `core_scan/look_again.py`). */
+export type AgainInterval = {
+  from_m: number; to_m: number; length_m: number; direction: "model_ultramafic" | "log_ultramafic";
+  logged: string; logged_class: string; reads: string; share: number; um_minerals: number | null;
+  assays: { n: number; max: number | null; pos: number }; flagged: number;
+};
+export type Again = { n: number; metres: number; intervals: AgainInterval[] };
+/** One row of the cross-hole sheet: an interval with its hole. */
+export type AgainRow = AgainInterval & { hole: string; key: string; state: string; operator: string; project: string; region: string; au_m: number; au_pos_m: number };
+export type AgainSheet = { model: string; n_holes: number; holes_listed: number; metres: number; rows: AgainRow[] };
 
 /** A geologist's verdict on one of the model's suggestions. Notes come back only for the reader's own. */
 export type Review = { run: string; kind: "log" | "flag"; from_m: number; to_m: number; verdict: "agree" | "disagree"; note: string; mine: boolean; at: string };
@@ -41,7 +52,7 @@ export type DatasetRow = {
 
 export type ResultSummary = {
   run: string; seconds: number | null; model: { run: string; name: string; step?: number | null; description?: string };
-  summary: { strip: number[]; n_segments: number; metres: number; main_types: [string, number][]; n_flag: number; gold_top: number | null;
+  summary: { strip: number[]; n_segments: number; metres: number; main_types: [string, number][]; n_flag: number; gold_top: number | null; again?: Again;
     tir_acc: number | null; tir_r2: number | null; gold_auc: number | null; anom_auc: number | null; gold_top10?: number | null; gold_base?: number | null };
   tir: { r2: number | null; acc: number | null; measured: boolean };
   anomaly: { n_flag_m: number; share_flag: number; flag_raw: number; median_raw: number; auc_gold: number | null; au_m: number; au_pos: number };
@@ -121,6 +132,8 @@ export const coreScan = {
   models: () => json<CoreModelInfo[]>("/models/"),
   holes: () => json<{ holes: HoleRow[]; n: number; core_types: { k: number; name: string }[] }>("/holes/"),
   hole: (key: string) => json<HoleDetail>(`/holes/${enc(key)}/`),
+  /** Every interval where the model disagrees with the log, across the holes the caller may see. */
+  lookAgain: (state = "", q = "", limit = 2000) => json<AgainSheet>(`/look-again/?state=${enc(state)}&q=${enc(q)}&limit=${limit}`),
   reviews: (key: string) => json<{ reviews: Review[] }>(`/holes/${enc(key)}/reviews/`),
   /** Records the signed-in person's verdict, replacing an earlier one on the same suggestion. */
   review: (key: string, body: ReviewBody) => json<{ verdict: string; note: string; at: string }>(`/holes/${enc(key)}/reviews/`, { method: "POST", body: JSON.stringify(body), headers: { "Content-Type": "application/json" } }),
