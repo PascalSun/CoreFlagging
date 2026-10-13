@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { AlertTriangle, ArrowDown, ArrowUp, Download, Loader2, MessageCircle, Search, X } from "lucide-react";
-import { coreScan, type HoleRow } from "@/lib/coreScan";
+import { commodityName, coreScan, type HoleRow } from "@/lib/coreScan";
 import { csvSheet } from "@/lib/lookAgain";
 import { NONE, coreTypeColor, fmt } from "@/components/coretrace/palette";
 import { Mark, type Shape } from "@/components/coretrace/shapes";
@@ -10,7 +10,7 @@ import { STATUS_LABEL } from "@/components/coretrace/palette";
 import { cn } from "@/lib/utils";
 
 type Look = { color: string; label: string; ring?: string; wait?: boolean; shape?: Shape; shapeLabel?: string };
-type Key = "name" | "state" | "depth" | "again" | "gold" | "issues";
+type Key = "name" | "state" | "target" | "depth" | "again" | "gold" | "issues";
 const PAGE = 100;
 
 // the strips colour each core type by its leading mineral; one example name per colour gives the key
@@ -42,7 +42,7 @@ export function HoleTable({ holes, q, onQ, look, typeName, onOpen, onAsk, loadin
     } finally { setExporting(false); }
   };
   const rows = useMemo(() => {
-    const v = (h: HoleRow): number | string => sort.k === "name" ? h.name.toLowerCase() : sort.k === "state" ? h.state : sort.k === "depth" ? h.depth_max ?? -1 : sort.k === "again" ? h.again_m : sort.k === "gold" ? h.au_pos_m * 1e6 + h.au_m : h.n_issues;
+    const v = (h: HoleRow): number | string => sort.k === "name" ? h.name.toLowerCase() : sort.k === "state" ? h.state : sort.k === "target" ? h.target || "~" : sort.k === "depth" ? h.depth_max ?? -1 : sort.k === "again" ? h.again_m : sort.k === "gold" ? h.au_pos_m * 1e6 + h.au_m : h.n_issues;
     return [...holes].sort((a, b) => Number(b.mine) - Number(a.mine) || Number(b.status === "ready") - Number(a.status === "ready")
       || (v(a) < v(b) ? -1 : v(a) > v(b) ? 1 : 0) * (sort.desc ? -1 : 1));
   }, [holes, sort]);
@@ -88,7 +88,7 @@ export function HoleTable({ holes, q, onQ, look, typeName, onOpen, onAsk, loadin
                     <span className="font-medium text-slate-900">{h.name}</span><span className="text-[11px] text-slate-400">{h.state}</span>
                     <span className="ml-auto font-mono text-[11px] text-slate-500">{h.depth_max !== null ? `${fmt(h.depth_max, 0)} m` : ""}</span>
                   </span>
-                  <span className="truncate text-[11px] text-slate-500">{h.status !== "ready" ? STATUS_LABEL[h.status] : [h.operator, h.project].filter(Boolean).join(" · ") || "—"}{h.n_again > 0 ? ` · look again: ${fmt(h.again_m, 0)} m` : ""}{h.au_pos_m > 0 ? ` · gold ${h.au_pos_m} m ≥ 0.1 ppm` : ""}</span>
+                  <span className="truncate text-[11px] text-slate-500">{h.status !== "ready" ? STATUS_LABEL[h.status] : [h.operator, h.project].filter(Boolean).join(" · ") || "—"}{h.target ? ` · ${commodityName(h.target)}` : ""}{h.n_again > 0 ? ` · look again: ${fmt(h.again_m, 0)} m` : ""}{h.au_pos_m > 0 ? ` · gold ${h.au_pos_m} m ≥ 0.1 ppm` : ""}</span>
                   <span className="flex h-1.5 w-full overflow-hidden rounded-full" aria-hidden>
                     {h.strip?.length ? h.strip.map((k, i) => <i key={i} className="h-full flex-1" style={{ background: coreTypeColor(typeName.get(k)) }} />) : <i className="h-full flex-1" style={{ background: NONE }} />}
                   </span>
@@ -102,6 +102,7 @@ export function HoleTable({ holes, q, onQ, look, typeName, onOpen, onAsk, loadin
             <tr className="border-b border-slate-200">
               {head("name", "Hole")}{head("state", "State", "w-16")}
               <th scope="col" className="sticky top-0 z-10 bg-white/95 px-3 py-2 font-medium backdrop-blur">Company · project · region</th>
+              {head("target", "Drilled for", "w-28")}
               <th scope="col" className="sticky top-0 z-10 w-44 bg-white/95 px-3 py-2 font-medium backdrop-blur">Core types down the hole</th>
               {head("depth", "Depth", "w-20 text-right")}{head("again", "Look again", "w-28")}{head("gold", "Gold assays", "w-28")}{head("issues", "Issues", "w-16 text-right")}
             </tr>
@@ -121,6 +122,7 @@ export function HoleTable({ holes, q, onQ, look, typeName, onOpen, onAsk, loadin
                   </td>
                   <td className="px-3 py-2 text-slate-600">{h.state || "Upload"}</td>
                   <td className="max-w-[22rem] truncate px-3 py-2 text-slate-600">{h.status !== "ready" ? <span className="text-slate-400">{STATUS_LABEL[h.status]}</span> : [h.operator, h.project, h.region].filter(Boolean).join(" · ") || "—"}</td>
+                  <td className="px-3 py-2 text-slate-600" title={h.commodities.length > 1 ? h.commodities.map(commodityName).join(", ") : undefined}>{h.target ? <>{commodityName(h.target)}{h.commodities.length > 1 && <span className="text-slate-400"> +{h.commodities.length - 1}</span>}</> : <span className="text-slate-300">—</span>}</td>
                   <td className="px-3 py-2">
                     <span className="flex h-1.5 w-40 overflow-hidden rounded-full" aria-hidden>
                       {h.strip?.length ? h.strip.map((k, i) => <i key={i} className="h-full flex-1" style={{ background: coreTypeColor(typeName.get(k)) }} />) : <i className="h-full flex-1" style={{ background: NONE }} />}

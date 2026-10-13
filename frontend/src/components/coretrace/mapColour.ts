@@ -6,8 +6,9 @@ import type { HoleRow } from "@/lib/coreScan";
 import { SERIES, coreTypeColor } from "@/components/coretrace/palette";
 import type { Shape } from "@/components/coretrace/shapes";
 
-export type ColourMode = "again" | "type" | "gold" | "data" | "state";
+export type ColourMode = "target" | "again" | "type" | "gold" | "data" | "state";
 export const COLOUR_MODES: { id: ColourMode; label: string; short: string; hint: string }[] = [
+  { id: "target", short: "Target", label: "Target commodity", hint: "What the hole was drilled for, from the report (DMIRS HyLogger package)." },
   { id: "again", short: "Look again", label: "Worth a second look", hint: "Intervals where the model's reading disagrees with the geologist's log (the ultramafic rule), by metres." },
   { id: "type", short: "Core type", label: "Core type", hint: "The core type the model reads most often down the hole, by its leading mineral." },
   { id: "gold", short: "Gold", label: "Gold assays", hint: "Whether the scan carries gold assays, and whether any reach 0.1 ppm." },
@@ -22,6 +23,12 @@ export type Class = { label: string; color: string; order: number; ring?: string
 const FAMILY: [string, string][] = [
   ["chlorite", "Chlorite"], ["white mica", "White mica"], ["kaolin", "Kaolin"], ["amphibole", "Amphibole"], ["carbonate", "Carbonate"],
   ["smectite", "Smectite"], ["dark mica", "Dark mica"],
+];
+// the targets with enough holes to earn a colour of their own; the rest are "Other"
+const TARGET_COLOUR: [string, string, string][] = [
+  ["gold", "Gold", SERIES.yellow], ["copper", "Copper", SERIES.orange], ["nickel", "Nickel", SERIES.aqua], ["base metals", "Base metals", SERIES.blue],
+  ["iron", "Iron", "#b91c1c"], ["uranium", "Uranium", SERIES.green], ["rare earth elements", "Rare earths", SERIES.magenta], ["lithium", "Lithium", SERIES.violet],
+  ["petroleum", "Petroleum", "#44403c"], ["zinc", "Zinc", "#0e7490"], ["lead", "Lead", "#4b5563"], ["coal", "Coal", "#1c1917"],
 ];
 const STATE_COLOUR: Record<string, string> = {
   WA: SERIES.orange, NSW: SERIES.blue, QLD: SERIES.magenta, SA: SERIES.green, NT: SERIES.yellow, TAS: SERIES.violet, VIC: SERIES.aqua, CSIRO: PLAIN,
@@ -43,6 +50,11 @@ export function classify(h: HoleRow, mode: ColourMode, typeName: Map<number, str
     if (h.au_pos_m > 0) return { label: "Gold ≥ 0.1 ppm", color: SERIES.yellow, order: 0 };
     if (h.au_m > 0) return { label: "Assayed, below 0.1", color: SERIES.blue, order: 1 };
     return { label: "No assays", color: "#94a3b8", order: 2 };
+  }
+  if (mode === "target") {
+    if (!h.target) return { label: "Not recorded", color: "#ffffff", ring: PLAIN, order: 99 };
+    const i = TARGET_COLOUR.findIndex(([k]) => k === h.target);
+    return i >= 0 ? { label: TARGET_COLOUR[i][1], color: TARGET_COLOUR[i][2], order: i } : { label: "Other", color: "#94a3b8", order: 50 };
   }
   if (mode === "again") {
     if (!modelled) return { label: "No model reading", color: "#ffffff", ring: PLAIN, order: 5 };
