@@ -34,8 +34,16 @@ export type AgainRow = AgainInterval & { hole: string; key: string; state: strin
 export type AgainSheet = { model: string; n_holes: number; holes_listed: number; metres: number; rows: AgainRow[] };
 
 /** A geologist's verdict on one of the model's suggestions. Notes come back only for the reader's own. */
-export type Review = { run: string; kind: "log" | "flag"; from_m: number; to_m: number; verdict: "agree" | "disagree"; note: string; mine: boolean; at: string };
-export type ReviewBody = { run: string; kind: "log" | "flag"; from_m: number; to_m: number; verdict: "agree" | "disagree"; note?: string };
+export type Review = { run: string; kind: ReviewKind; from_m: number; to_m: number; verdict: "agree" | "disagree"; note: string; mine: boolean; at: string };
+export type ReviewKind = "log" | "flag" | "domain" | "unit";
+export type ReviewBody = { run: string; kind: ReviewKind; from_m: number; to_m: number; verdict: "agree" | "disagree"; note?: string };
+
+/** What stands out about a hole above the metre: against its region, and its domains against the rest of it. */
+export type Standout = {
+  run: string;
+  hole_vs_region: { region: string; n_holes: number; note: string | null; items: { k: number; name: string; hole_share: number; region_share: number; ratio: number | null; region_holes_with: number }[] };
+  domains: { from_m: number; to_m: number; length_m: number; type: string; why: { kind: "rare_type" | "mineral"; text: string; mineral?: string }[] }[];
+};
 
 export type Bin = { bin: number; from_m: number; n_swir: number; n_tir: number; gs: string; ms: string; gt: string };
 export type BinSpectra = Bin & { swir_wl: number[]; swir: number[]; tir_wl: number[]; tir: number[] | null };
@@ -110,7 +118,9 @@ export type SimilarHit = {
   hole: string; key: string | null; from_m: number; to_m: number; sim: number; gs: string; gt: string; gs_en: string; gt_en: string;
   rock: string; au: number | null; lat: number | null; lon: number | null; region: string; split: string;
 };
-export type SimilarView = { model: string; library: { intervals: number; holes: number }; results: SimilarHit[]; query: { from_m: number; to_m: number; gs: string; gt: string; rock: string } };
+export type SimilarScope = "state" | "nearby" | "region" | "hole";
+export type SimilarView = { model: string; library: { intervals: number; holes: number }; results: SimilarHit[];
+  query: { from_m: number; to_m: number; metres?: number; scope?: SimilarScope; km?: number | null; region?: string | null; gs: string; gt: string; rock: string } };
 
 /** `box`: the row's band in the photograph, as fractions; `xmm`: where along the scan its first and last samples lie (mm). */
 export type TrayRow = { from_m: number; to_m: number; box?: [number, number, number, number]; xmm?: [number, number] };
@@ -145,6 +155,7 @@ export const coreScan = {
   holes: () => json<{ holes: HoleRow[]; n: number; core_types: { k: number; name: string }[] }>("/holes/"),
   hole: (key: string) => json<HoleDetail>(`/holes/${enc(key)}/`),
   package: (key: string) => json<HolePackage>(`/holes/${enc(key)}/package/`),
+  standout: (key: string, run: string) => json<Standout>(`/holes/${enc(key)}/standout/?model=${enc(run)}`),
   /** The 10 cm bins of a depth window (up to 50 m): the scanner's reading of each. */
   bins: (key: string, from: number, to: number) => json<{ from_m: number; to_m: number; bins: Bin[] }>(`/holes/${enc(key)}/bins/?from=${from}&to=${to}`),
   /** One bin's own mean spectra. */
@@ -161,7 +172,9 @@ export const coreScan = {
   report: (key: string) => json<HoleReport>(`/holes/${enc(key)}/report/`),
   model: (key: string, run: string) => json<ModelView>(`/holes/${enc(key)}/models/${enc(run)}/`),
   metre: (key: string, m: number, run: string) => json<MetreView>(`/holes/${enc(key)}/metres/${m}/?model=${enc(run)}`),
-  similar: (key: string, m: number, run: string) => json<SimilarView>(`/holes/${enc(key)}/similar/?m=${m}&model=${enc(run)}`),
+  /** Core like a stretch of this hole: the 2 m at a metre, or a window; where to look is the scope. */
+  similar: (key: string, at: { m: number } | { from: number; to: number }, run: string, scope: SimilarScope = "state", km = 10) =>
+    json<SimilarView>(`/holes/${enc(key)}/similar/?${"m" in at ? `m=${at.m}` : `from=${at.from}&to=${at.to}`}&model=${enc(run)}&scope=${scope}&km=${km}`),
   trays: (key: string) => json<{ trays: Tray[] }>(`/holes/${enc(key)}/trays/`),
   /** The original of a tray photograph as a deep-zoom pyramid; 404 for an upload (no original kept). */
   trayZoom: (key: string, id: string) => json<{ width: number; height: number; tile: number; overlap: number; format: string }>(`/holes/${enc(key)}/trays/${id}/zoom/`),
