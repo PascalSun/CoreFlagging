@@ -58,27 +58,30 @@ function waiting(holes: HoleRow[]) {
     type: "Feature" as const, geometry: { type: "Point" as const, coordinates: [h.lon as number, h.lat as number] }, properties: { key: h.key, name: h.name, wait: 1, dim: 0 } })) };
 }
 
-/** A cluster as a donut: one arc per class in the order of the key, the count in the middle, sized by the count.
- * The shape is the same at every size, so clusters read as one family of marks. */
+/** A cluster as a donut on a disc of frosted glass: one thin arc per class in the order of the key, the count
+ * in the middle, sized by the count. The shape is the same at every size, so clusters read as one family. */
 function donut(props: Record<string, number>, classes: ClusterClass[]): HTMLElement {
   const n = props.point_count as number;
   const parts = classes.map((c, i) => [i, props[`c${i}`] ?? 0] as const).filter(([, v]) => v > 0);
-  const r = Math.round(15 + Math.min(17, Math.sqrt(n) * 1.1)), w = Math.max(5, Math.round(r * 0.32)), S = r * 2 + 6, c = S / 2;
+  const r = Math.round(16 + Math.min(18, Math.sqrt(n) * 1.15)), w = Math.max(4, Math.round(r * 0.2)), S = r * 2 + w + 8, c = S / 2;
   const arc = (a0: number, a1: number) => {
     const big = a1 - a0 > Math.PI ? 1 : 0, x0 = c + r * Math.cos(a0), y0 = c + r * Math.sin(a0), x1 = c + r * Math.cos(a1), y1 = c + r * Math.sin(a1);
-    return `M${x0} ${y0}A${r} ${r} 0 ${big} 1 ${x1} ${y1}`;
+    return `M${x0.toFixed(2)} ${y0.toFixed(2)}A${r} ${r} 0 ${big} 1 ${x1.toFixed(2)} ${y1.toFixed(2)}`;
   };
+  // a small gap between arcs, rounded ends; a class too thin for a gap is drawn as a dot of its colour
+  const gap = parts.length > 1 ? Math.min(0.12, (Math.PI * 2) / (parts.length * 6)) : 0;
   let a = -Math.PI / 2; const paths: string[] = [];
   for (const [i, v] of parts) {
-    const a1 = a + (v / n) * Math.PI * 2 - (parts.length > 1 ? 0.035 : 0);     // a hair of white between arcs
-    paths.push(`<path d="${arc(a, Math.max(a + 0.02, a1))}" stroke="${classes[i].color}" stroke-width="${w}" fill="none" stroke-linecap="butt"/>`);
-    a += (v / n) * Math.PI * 2;
+    const sweep = (v / n) * Math.PI * 2, a1 = a + sweep - gap;
+    paths.push(a1 - a > 0.001 ? `<path d="${arc(a, a1)}" stroke="${classes[i].color}" stroke-width="${w}" fill="none" stroke-linecap="round"/>`
+      : `<circle cx="${(c + r * Math.cos(a + sweep / 2)).toFixed(2)}" cy="${(c + r * Math.sin(a + sweep / 2)).toFixed(2)}" r="${w / 2}" fill="${classes[i].color}"/>`);
+    a += sweep;
   }
   const dim = (props.dimn ?? 0) >= n;
   const el = document.createElement("div");
-  el.className = "ct-cluster"; el.style.width = el.style.height = `${S}px`; el.style.opacity = dim ? "0.25" : "1";
-  const fs = n >= 1000 ? 11 : n >= 100 ? 12 : 13;
-  el.innerHTML = `<svg width="${S}" height="${S}" viewBox="0 0 ${S} ${S}"><circle cx="${c}" cy="${c}" r="${r + w / 2 + 1.5}" fill="rgba(255,255,255,.96)"/><circle cx="${c}" cy="${c}" r="${r}" stroke="#e2e8f0" stroke-width="${w}" fill="none"/>${paths.join("")}<circle cx="${c}" cy="${c}" r="${r - w / 2 - 0.5}" fill="#fff"/><text x="${c}" y="${c + 0.5}" text-anchor="middle" dominant-baseline="central" font-size="${fs}" font-weight="700" fill="#0f172a" font-family="ui-sans-serif, system-ui, sans-serif">${n.toLocaleString()}</text></svg>`;
+  el.className = "ct-cluster"; el.style.width = el.style.height = `${S}px`; el.style.opacity = dim ? "0.3" : "1";
+  const fs = n >= 1000 ? Math.max(10, r * 0.46) : n >= 100 ? Math.max(11, r * 0.52) : Math.max(12, r * 0.6);
+  el.innerHTML = `<div class="ct-cluster-glass"></div><svg width="${S}" height="${S}" viewBox="0 0 ${S} ${S}"><circle cx="${c}" cy="${c}" r="${r}" stroke="rgba(15,23,42,.08)" stroke-width="${w}" fill="none"/>${paths.join("")}<text x="${c}" y="${c + 0.5}" text-anchor="middle" dominant-baseline="central" font-size="${fs.toFixed(1)}" font-weight="600" fill="#0f172a" letter-spacing="-0.02em" style="font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',ui-sans-serif,system-ui,sans-serif;font-variant-numeric:tabular-nums">${n.toLocaleString()}</text></svg>`;
   el.title = `${n.toLocaleString()} holes · ` + parts.sort((x, y) => y[1] - x[1]).slice(0, 4).map(([i, v]) => `${classes[i].label} ${v}`).join(", ");
   return el;
 }
@@ -143,9 +146,10 @@ export function CoreMap({ holes, colour, card, selected, onSelect, padRight, pad
       // are added again each time a style has loaded (the click and hover handlers, bound by layer id, carry over)
       const addLayers = () => {
         if (map.getSource("holes")) return;
-          // holes cluster through zoom 5 (the country, a State); from 6 each is its own mark
+          // holes that crowd cluster through zoom 7 (the country, a State, a field); from 8 each is its own mark, and
+          // a hole on its own is a mark at any zoom
           const built = features(holesRef.current, colourRef.current); classesRef.current = built.classes;
-          map.addSource("holes", { type: "geojson", data: built.fc, promoteId: "key", cluster: true, clusterRadius: 54, clusterMaxZoom: 5, clusterProperties: CLUSTER_PROPS });
+          map.addSource("holes", { type: "geojson", data: built.fc, promoteId: "key", cluster: true, clusterRadius: 44, clusterMaxZoom: 7, clusterProperties: CLUSTER_PROPS });
           map.addSource("holes-waiting", { type: "geojson", data: waiting(holesRef.current), promoteId: "key" });
           map.addSource("picked", { type: "geojson", data: pickedRef.current });
           // context layers under the holes: hidden until toggled, so they cost nothing by default
@@ -325,7 +329,7 @@ export function CoreMap({ holes, colour, card, selected, onSelect, padRight, pad
       pickedRef.current = { type: "FeatureCollection", features: lon !== null && lat !== null
         ? [{ type: "Feature", geometry: { type: "Point", coordinates: [lon, lat] }, properties: {} }] : [] };
       map.getSource("picked")?.setData(pickedRef.current);
-      if (lon !== null && lat !== null) map.easeTo({ center: [lon, lat], zoom: Math.max(map.getZoom(), 7.5), padding: { right: padRight, left: 0, top: padBottom ? 60 : 0, bottom: padBottom }, duration: 900 });
+      if (lon !== null && lat !== null) map.easeTo({ center: [lon, lat], zoom: Math.max(map.getZoom(), 8.2), padding: { right: padRight, left: 0, top: padBottom ? 60 : 0, bottom: padBottom }, duration: 900 });   // past the last clustered zoom, so the hole is its own mark
     };
     if (readyRef.current) apply(); else map.once("load", apply);
   }, [key, lon, lat, padRight, padBottom]);

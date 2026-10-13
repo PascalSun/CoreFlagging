@@ -34,17 +34,20 @@ export function drawIcon(id: string): { width: number; height: number; data: Uin
   const n = (glyph ? BADGE : SIZE) * PX, cv = document.createElement("canvas"); cv.width = cv.height = n;
   const ctx = cv.getContext("2d"); if (!ctx) return null;
   if (glyph) {
-    // a badge: a solid disc with a white rim and a soft shadow, the symbol in black or white on it, and a
-    // small dot at the shoulder for the shape attribute (gold assay, assayed, offshore)
+    // a badge: a disc with a faint sheen from the top, a hairline white rim and a soft shadow; the symbol in
+    // black or white on it; a small dot at the shoulder for the shape attribute (gold assay, assayed, offshore)
     const c = n / 2, r = 10 * PX;
-    ctx.save(); ctx.shadowColor = "rgba(2,6,23,0.45)"; ctx.shadowBlur = 4 * PX; ctx.shadowOffsetY = 1 * PX;
-    ctx.beginPath(); ctx.arc(c, c, r + 1.5 * PX, 0, Math.PI * 2); ctx.fillStyle = edge === "#111111" ? "#111111" : "#ffffff"; ctx.fill(); ctx.restore();
+    ctx.save(); ctx.shadowColor = "rgba(2,6,23,0.38)"; ctx.shadowBlur = 5 * PX; ctx.shadowOffsetY = 1.5 * PX;
+    ctx.beginPath(); ctx.arc(c, c, r + 1.25 * PX, 0, Math.PI * 2); ctx.fillStyle = edge === "#111111" ? "#111111" : "rgba(255,255,255,0.96)"; ctx.fill(); ctx.restore();
     ctx.beginPath(); ctx.arc(c, c, r, 0, Math.PI * 2); ctx.fillStyle = fill; ctx.fill();
-    const px = (glyph.length >= 3 ? 8 : glyph.length === 2 ? 10.5 : 12) * PX;
-    ctx.font = `700 ${px}px ui-sans-serif, system-ui, -apple-system, "Segoe UI", Helvetica, sans-serif`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    const sheen = ctx.createLinearGradient(0, c - r, 0, c + r); sheen.addColorStop(0, "rgba(255,255,255,0.28)"); sheen.addColorStop(0.55, "rgba(255,255,255,0)"); sheen.addColorStop(1, "rgba(2,6,23,0.12)");
+    ctx.beginPath(); ctx.arc(c, c, r, 0, Math.PI * 2); ctx.fillStyle = sheen; ctx.fill();
+    ctx.beginPath(); ctx.arc(c, c, r - 0.6 * PX, 0, Math.PI * 2); ctx.lineWidth = 1.2 * PX; ctx.strokeStyle = "rgba(255,255,255,0.35)"; ctx.stroke();   // an inner hairline, as glass has
+    const px = (glyph.length >= 3 ? 7.6 : glyph.length === 2 ? 10 : 11.5) * PX;
+    ctx.font = `600 ${px}px -apple-system, BlinkMacSystemFont, "SF Pro Text", ui-sans-serif, system-ui, "Segoe UI", Helvetica, sans-serif`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
     ctx.fillStyle = inkOn(fill); ctx.fillText(glyph, c, c + 0.6 * PX);
     const acc = ACCENT[shape as Shape];
-    if (acc) { const ax = c + r * 0.72, ay = c - r * 0.72; ctx.beginPath(); ctx.arc(ax, ay, 3.6 * PX, 0, Math.PI * 2); ctx.fillStyle = "#ffffff"; ctx.fill(); ctx.beginPath(); ctx.arc(ax, ay, 2.4 * PX, 0, Math.PI * 2); ctx.fillStyle = acc; ctx.fill(); }
+    if (acc) { const ax = c + r * 0.74, ay = c - r * 0.74; ctx.beginPath(); ctx.arc(ax, ay, 3.4 * PX, 0, Math.PI * 2); ctx.fillStyle = "#ffffff"; ctx.fill(); ctx.beginPath(); ctx.arc(ax, ay, 2.2 * PX, 0, Math.PI * 2); ctx.fillStyle = acc; ctx.fill(); }
     return { width: n, height: n, data: ctx.getImageData(0, 0, n, n).data };
   }
   const lw = Number(w) * PX, r = 6 * PX - lw;
