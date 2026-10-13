@@ -13,28 +13,38 @@ function path(ctx: CanvasRenderingContext2D | Path2D, shape: Shape, c: number, r
   const h = r * 1.15; ctx.moveTo(c, c - h); ctx.lineTo(c + h * 0.95, c + h * 0.62); ctx.lineTo(c - h * 0.95, c + h * 0.62); ctx.closePath();
 }
 
-/** The image id the map asks for: "ct|<shape>|<fill>|<edge>|<edge width>". */
-export const iconId = (shape: Shape, fill: string, edge: string, w: number) => `ct|${shape}|${fill}|${edge}|${w}`;
+/** The image id the map asks for: "ct|<shape>|<fill>|<edge>|<edge width>|<glyph>". */
+export const iconId = (shape: Shape, fill: string, edge: string, w: number, glyph = "") => `ct|${shape}|${fill}|${edge}|${w}|${glyph}`;
+const BADGE = 26;      // css px across for a mark that carries letters
 
 /** Draw the icon a map image id names, or null if the id is not one of ours. */
 export function drawIcon(id: string): { width: number; height: number; data: Uint8ClampedArray } | null {
-  const [tag, shape, fill, edge, w] = id.split("|");
+  const [tag, shape, fill, edge, w, glyph = ""] = id.split("|");
   if (tag !== "ct" || typeof document === "undefined") return null;
-  const n = SIZE * PX, cv = document.createElement("canvas"); cv.width = cv.height = n;
+  const n = (glyph ? BADGE : SIZE) * PX, cv = document.createElement("canvas"); cv.width = cv.height = n;
   const ctx = cv.getContext("2d"); if (!ctx) return null;
-  const lw = Number(w) * PX, r = 6 * PX - lw;
+  const lw = Number(w) * PX, r = (glyph ? 10.5 : 6) * PX - lw;
   // a soft dark shadow lifts the mark off the imagery, as the halo does for the dots
   ctx.save(); ctx.shadowColor = "rgba(2,6,23,0.55)"; ctx.shadowBlur = 3 * PX;
   ctx.beginPath(); path(ctx, shape as Shape, n / 2, r);
   ctx.fillStyle = fill; ctx.fill(); ctx.restore();
   ctx.beginPath(); path(ctx, shape as Shape, n / 2, r);
   if (lw > 0) { ctx.lineJoin = "round"; ctx.lineWidth = lw; ctx.strokeStyle = edge; ctx.stroke(); }
+  if (glyph) {
+    // the letters in white, with a thin dark edge so they read on the pale fills too; a triangle's text sits lower
+    const px = (glyph.length >= 3 ? 7.5 : glyph.length === 2 ? 9.5 : 11) * PX;
+    ctx.font = `700 ${px}px ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    const y = n / 2 + (shape === "triangle" ? 2.5 * PX : 0.5 * PX);
+    ctx.lineJoin = "round"; ctx.lineWidth = 2.2 * PX; ctx.strokeStyle = "rgba(2,6,23,0.55)"; ctx.strokeText(glyph, n / 2, y);
+    ctx.fillStyle = "#ffffff"; ctx.fillText(glyph, n / 2, y);
+  }
   return { width: n, height: n, data: ctx.getImageData(0, 0, n, n).data };
 }
 export const ICON_PIXEL_RATIO = PX;
 
 /** The same mark as a small inline SVG, for the legend and the list. */
-export function Mark({ shape = "circle", color, ring, size = 12, title }: { shape?: Shape; color: string; ring?: string; size?: number; title?: string }) {
+export function Mark({ shape = "circle", color, ring, size = 12, title, glyph }: { shape?: Shape; color: string; ring?: string; size?: number; title?: string; glyph?: string }) {
+  if (glyph) size = Math.max(size, 18);
   const c = size / 2, r = size / 2 - 1.5;
   const d = shape === "circle" ? undefined
     : shape === "square" ? `M${c - r * 0.86} ${c - r * 0.86}h${r * 1.72}v${r * 1.72}h${-r * 1.72}z`
@@ -45,6 +55,7 @@ export function Mark({ shape = "circle", color, ring, size = 12, title }: { shap
     <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="flex-none" role={title ? "img" : undefined} aria-label={title} aria-hidden={title ? undefined : true}>
       {title && <title>{title}</title>}
       {d ? <path d={d} style={style} /> : <circle cx={c} cy={c} r={r} style={style} />}
+      {glyph && <text x={c} y={c + (shape === "triangle" ? size * 0.12 : size * 0.02)} textAnchor="middle" dominantBaseline="central" fontSize={glyph.length >= 3 ? size * 0.36 : glyph.length === 2 ? size * 0.46 : size * 0.54} fontWeight={700} fill="#fff" stroke="rgba(2,6,23,.5)" strokeWidth={0.8} paintOrder="stroke" style={{ fontFamily: "ui-sans-serif, system-ui, sans-serif" }}>{glyph}</text>}
     </svg>
   );
 }

@@ -6,7 +6,7 @@ import { Layers, X } from "lucide-react";
 import { Mark, type Shape } from "@/components/coretrace/shapes";
 import { cn } from "@/lib/utils";
 
-type Entry = { color: string; n: number; ring?: string; wait?: boolean };
+type Entry = { color: string; n: number; ring?: string; wait?: boolean; glyph?: string };
 type ShapeEntry = { shape: Shape; n: number };
 
 /** The legend on a phone: one small bar over the map, opening a bottom sheet with the basemap, what colour and
@@ -69,7 +69,7 @@ export function LegendSheet<C extends string, S extends string, B extends string
               <section>
                 <p className="mb-2 text-xs font-semibold text-slate-500">Colour the holes by</p>
                 <div className="flex flex-wrap gap-1.5">{p.modes.map((m) => <button key={m.id} type="button" onClick={() => { p.onMode(m.id); p.onFocus(null); }} className={chip(p.mode === m.id)}>{m.label}</button>)}</div>
-                <div className="mt-2.5 grid grid-cols-2 gap-x-1">{shown.map(([l, e]) => row(l, <Mark color={e.color} ring={e.ring} size={12} />, e.n))}</div>
+                <div className="mt-2.5 grid grid-cols-2 gap-x-1">{shown.map(([l, e]) => row(l, <Mark color={e.color} ring={e.ring} glyph={e.glyph} size={12} />, e.n))}</div>
               </section>
               <section>
                 <p className="mb-2 text-xs font-semibold text-slate-500">Shape the holes by</p>

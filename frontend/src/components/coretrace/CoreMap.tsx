@@ -19,7 +19,8 @@ const STYLES: Record<Basemap, string> = { satellite: "mapbox://styles/mapbox/sat
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-type Look = { color: string; label: string; ring?: string; wait?: boolean; dim?: boolean; shape?: Shape; shapeLabel?: string };
+type Look = { color: string; label: string; ring?: string; wait?: boolean; dim?: boolean; shape?: Shape; shapeLabel?: string; glyph?: string };
+const BADGE_FROM = 5.5;      // zoom from which a mark with letters is drawn as a badge; further out it is a dot like the rest
 
 // the rarer marks draw over the common ones, so a gold triangle is not buried under the circles around it
 const RANK: Record<Shape, number> = { circle: 1, square: 2, diamond: 3, triangle: 4 };
@@ -29,9 +30,10 @@ function features(holes: HoleRow[], colour: (h: HoleRow) => Look) {
     type: "FeatureCollection" as const,
     features: holes.filter((h) => h.lon !== null && h.lat !== null).map((h) => ({
       type: "Feature" as const, geometry: { type: "Point" as const, coordinates: [h.lon as number, h.lat as number] },
-      properties: { key: h.key, name: h.name, mine: h.mine ? 1 : 0, ready: h.status === "ready" ? 1 : 0, issues: h.n_issues, ...(({ color, label, ring, wait, dim, shape, shapeLabel }) => ({
-        color, cls: [label, shapeLabel].filter(Boolean).join(" · "), ring: ring ?? "", wait: wait ? 1 : 0, dim: dim ? 1 : 0, z: dim ? 0 : RANK[shape ?? "circle"], shape: shape ?? "circle",
-        icon: iconId(shape ?? "circle", ring ? "#ffffff" : color, h.mine ? "#111111" : ring ?? "rgba(255,255,255,0.9)", ring || h.mine ? 1.6 : 1) }))(colour(h)) },
+      properties: { key: h.key, name: h.name, mine: h.mine ? 1 : 0, ready: h.status === "ready" ? 1 : 0, issues: h.n_issues, ...(({ color, label, ring, wait, dim, shape, shapeLabel, glyph }) => ({
+        color, cls: [label, shapeLabel].filter(Boolean).join(" · "), ring: ring ?? "", wait: wait ? 1 : 0, dim: dim ? 1 : 0, z: dim ? 0 : RANK[shape ?? "circle"], shape: shape ?? "circle", glyph: glyph ?? "",
+        icon: iconId(shape ?? "circle", ring ? "#ffffff" : color, h.mine ? "#111111" : ring ?? "rgba(255,255,255,0.9)", ring || h.mine ? 1.6 : 1),
+        badge: glyph ? iconId(shape ?? "circle", ring ? "#ffffff" : color, h.mine ? "#111111" : ring ?? "rgba(255,255,255,0.9)", ring || h.mine ? 1.6 : 1, glyph) : "" }))(colour(h)) },
     })),
   };
 }
@@ -124,7 +126,21 @@ export function CoreMap({ holes, colour, card, selected, onSelect, padRight, pad
           map.addLayer({ id: "holes-halo", type: "circle", source: "holes", filter: ["==", ["get", "wait"], 0], paint: {
             "circle-radius": ["interpolate", ["linear"], ["zoom"], 3, 5, 6, 6.5, 9, 9, 12, 12],
             "circle-color": "#020617", "circle-blur": 0.9, "circle-opacity": ["case", D, 0.03, 0.4] } });
-          map.addLayer({ id: "holes-pt", type: "circle", source: "holes", filter: ["all", ["==", ["get", "wait"], 0], ["==", ["get", "shape"], "circle"]],
+          // a mark with letters is a dot or its shape until BADGE_FROM, a badge from there on
+          const G = ["!=", ["get", "glyph"], ""];
+          map.addLayer({ id: "holes-badge", type: "symbol", source: "holes", minzoom: BADGE_FROM, filter: ["all", ["==", ["get", "wait"], 0], G], layout: {
+            "icon-image": ["get", "badge"], "icon-allow-overlap": true, "icon-ignore-placement": true, "symbol-sort-key": ["get", "z"],
+            "icon-size": ["interpolate", ["linear"], ["zoom"], 5.5, 0.62, 8, 0.8, 11, 1, 14, 1.2] },
+            paint: { "icon-opacity": ["case", D, 0.12, 1] } });
+          map.addLayer({ id: "holes-pt", type: "circle", source: "holes", maxzoom: BADGE_FROM, filter: ["all", ["==", ["get", "wait"], 0], G, ["==", ["get", "shape"], "circle"]],
+            layout: { "circle-sort-key": ["get", "z"] }, paint: {
+              "circle-radius": size(1.45), "circle-color": ["case", R, "#ffffff", ["get", "color"]], "circle-opacity": ["case", D, 0.12, 1],
+              "circle-stroke-width": ["case", R, 1.6, ["==", ["get", "mine"], 1], 1.8, 1], "circle-stroke-color": ["case", ["==", ["get", "mine"], 1], "#111111", R, ["get", "ring"], "#ffffff"],
+              "circle-stroke-opacity": ["case", D, 0.08, R, 1, 0.9] } });
+          map.addLayer({ id: "holes-sym-far", type: "symbol", source: "holes", maxzoom: BADGE_FROM, filter: ["all", ["==", ["get", "wait"], 0], G, ["!=", ["get", "shape"], "circle"]], layout: {
+            "icon-image": ["get", "icon"], "icon-allow-overlap": true, "icon-ignore-placement": true, "symbol-sort-key": ["get", "z"],
+            "icon-size": ["interpolate", ["linear"], ["zoom"], 3, 0.72, 6, 0.95] }, paint: { "icon-opacity": ["case", D, 0.12, 1] } });
+          map.addLayer({ id: "holes-pt-plain", type: "circle", source: "holes", filter: ["all", ["==", ["get", "wait"], 0], ["==", ["get", "glyph"], ""], ["==", ["get", "shape"], "circle"]],
             layout: { "circle-sort-key": ["get", "z"] }, paint: {
               "circle-radius": size(1.45),
               "circle-color": ["case", R, "#ffffff", ["get", "color"]],
@@ -133,7 +149,7 @@ export function CoreMap({ holes, colour, card, selected, onSelect, padRight, pad
               "circle-stroke-color": ["case", ["==", ["get", "mine"], 1], "#111111", R, ["get", "ring"], "#ffffff"],
               "circle-stroke-opacity": ["case", D, 0.08, R, 1, 0.9],
               "circle-radius-transition": { duration: 120 } } });
-          map.addLayer({ id: "holes-sym", type: "symbol", source: "holes", filter: ["all", ["==", ["get", "wait"], 0], ["!=", ["get", "shape"], "circle"]], layout: {
+          map.addLayer({ id: "holes-sym", type: "symbol", source: "holes", filter: ["all", ["==", ["get", "wait"], 0], ["==", ["get", "glyph"], ""], ["!=", ["get", "shape"], "circle"]], layout: {
             "icon-image": ["get", "icon"], "icon-allow-overlap": true, "icon-ignore-placement": true, "symbol-sort-key": ["get", "z"],
             "icon-size": ["interpolate", ["linear"], ["zoom"], 3, 0.72, 6, 0.95, 9, 1.3, 12, 1.7] },
             paint: { "icon-opacity": ["case", D, 0.12, 1] } });
@@ -150,7 +166,7 @@ export function CoreMap({ holes, colour, card, selected, onSelect, padRight, pad
           if (hovered) map.setFeatureState({ source: "holes", id: hovered }, { hover: false });
           hovered = k; if (k) map.setFeatureState({ source: "holes", id: k }, { hover: true });
         };
-        const LAYERS = ["holes-sym", "holes-pt", "holes-wait"];
+        const LAYERS = ["holes-badge", "holes-sym", "holes-sym-far", "holes-pt", "holes-pt-plain", "holes-wait"];
         map.on("click", LAYERS, (e: any) => { const k = e.features?.[0]?.properties?.key; if (k) selectRef.current(k); });
         map.on("mouseenter", LAYERS, () => { map.getCanvas().style.cursor = "pointer"; });
         map.on("mousemove", LAYERS, (e: any) => {
