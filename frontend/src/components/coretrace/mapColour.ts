@@ -52,7 +52,7 @@ export function classify(h: HoleRow, mode: ColourMode, typeName: Map<number, str
     return { label: "No assays", color: "#94a3b8", order: 2 };
   }
   if (mode === "target") {
-    if (!h.target) return { label: "Not recorded", color: "#ffffff", ring: PLAIN, order: 99 };
+    if (!h.target) return { label: h.state && h.state !== "WA" ? "No target (other States)" : "No target on record", color: "#cbd5e1", order: 99 };   // a quiet dot, not a ring: the rings mean "no model reading"
     const i = TARGET_COLOUR.findIndex(([k]) => k === h.target);
     return i >= 0 ? { label: TARGET_COLOUR[i][1], color: TARGET_COLOUR[i][2], order: i } : { label: "Other", color: "#94a3b8", order: 50 };
   }
