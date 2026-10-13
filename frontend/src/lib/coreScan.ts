@@ -19,7 +19,7 @@ export type HoleRow = {
   key: string; name: string; source: "nvcl" | "upload"; status: HoleStatus; message: string; progress: number;
   lon: number | null; lat: number | null; state: string; offshore: boolean; operator: string; project: string; region: string; instrument: string;
   depth_min: number | null; depth_max: number | null; tir: string; has_lith: boolean; au_m: number; au_pos_m: number;
-  n_issues: number; n_again: number; again_m: number; split: string; is_public: boolean; mine: boolean; updated: string; processed_at: string | null; strip?: number[];
+  n_issues: number; n_again: number; again_m: number; target: string; commodities: string[]; split: string; is_public: boolean; mine: boolean; updated: string; processed_at: string | null; strip?: number[];
 };
 
 /** An interval where the model's reading disagrees with the log, by the ultramafic rule (computed on the platform, `core_scan/look_again.py`). */
@@ -237,6 +237,8 @@ export const STATES: { id: string; name: string; survey: string }[] = [
   { id: "VIC", name: "Victoria", survey: "Geological Survey of Victoria" },
   { id: "CSIRO", name: "CSIRO", survey: "CSIRO" },
 ];
+/** "Gold", "Platinum group elements": a commodity as the site writes it. */
+export const commodityName = (c: string) => (c ? c[0].toUpperCase() + c.slice(1) : "");
 /** "8 Oct 2026": when the platform last read the scan, or "" when it has not. */
 export const readDate = (h: { processed_at: string | null }, long = false) =>
   h.processed_at ? new Date(h.processed_at).toLocaleDateString("en-AU", { day: "numeric", month: long ? "long" : "short", year: "numeric" }) : "";
