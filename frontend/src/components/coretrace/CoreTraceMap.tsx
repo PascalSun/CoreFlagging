@@ -68,7 +68,8 @@ export function CoreTraceMap() {
   // on a phone the column would cover the map: start closed there
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { if (mobile) setChatOpen(false); }, [mobile]);
-  const [q, setQ] = useState(""); const [filter, setFilter] = useState<Filter>("all"); const [state, setState] = useState("");
+  // a search can be linked to (the regions page does)
+  const [q, setQ] = useState(sp.get("q") ?? ""); const [filter, setFilter] = useState<Filter>("all"); const [state, setState] = useState("");
   const [upload, setUpload] = useState(false); const [verify, setVerify] = useState(false);
   const [authed, setAuthed] = useState(false);
   // the session lives in localStorage, which the server render cannot see

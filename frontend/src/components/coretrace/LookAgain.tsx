@@ -52,8 +52,8 @@ function Minerals({ v }: { v: number | null }) {
 /** The "Look again" list: the two kinds of suggestion the model makes about a hole, each a row a geologist can
  * check and answer. Disagreements with the log follow the one rule validated against chemistry (the ultramafic
  * rule); the flagged metres are the anomaly detector's. Both export as one sheet. */
-type Scale = "all" | "unit" | "domain" | "metre" | "log";
-const SCALES: { id: Scale; label: string }[] = [{ id: "all", label: "All" }, { id: "unit", label: "Hole vs region" }, { id: "domain", label: "Domains" }, { id: "metre", label: "Metres" }, { id: "log", label: "Vs the log" }];
+type Scale = "all" | "unit" | "domain" | "metre" | "log" | "gap";
+const SCALES: { id: Scale; label: string }[] = [{ id: "all", label: "All" }, { id: "unit", label: "Hole vs region" }, { id: "domain", label: "Domains" }, { id: "metre", label: "Metres" }, { id: "log", label: "Vs the log" }, { id: "gap", label: "Not logged" }];
 
 export function LookAgain({ hole, mv, run, metre, onJump, onSimilar }: { hole: HoleDetail; mv: ModelView; run: string; metre: number | null; onJump: (m: number, to?: number) => void;
   /** open the similar-core search at this metre ("find more like this") */
@@ -106,7 +106,18 @@ export function LookAgain({ hole, mv, run, metre, onJump, onSimilar }: { hole: H
                   <span className="ml-auto flex items-center gap-2">{more(holeFrom, holeTo)}<Verdict holeKey={hole.key} body={{ run, kind: "unit", from_m: holeFrom, to_m: holeTo }} reviews={reviews} canVote={canVote} /></span>
                 </li>))}</ul>
             )}
-          {st && !st.hole_vs_region.note && <p className="text-[11px] leading-relaxed text-slate-500">The region&rsquo;s profile is the average share of each core type over its {st.hole_vs_region.n_holes} scanned holes ({st.hole_vs_region.region}); a type is listed when it is at least a tenth of this hole and three times that average.</p>}
+          {st && !st.hole_vs_region.note && <p className="text-[11px] leading-relaxed text-slate-500">The region&rsquo;s profile is the average share of each core type over its {st.hole_vs_region.n_holes} scanned holes ({st.hole_vs_region.region}); a type is listed when it is at least a tenth of this hole and three times that average. <a href="/regions" className="font-medium text-slate-700 underline-offset-2 hover:underline">Every region&rsquo;s profile</a>.</p>}
+        </section>
+      )}
+
+      {show("gap") && hole.has_lith && (
+        <section className="flex flex-col gap-2">
+          <H n={st?.unlogged.length ?? 0}>Where the log has nothing</H>
+          {!st ? <p className="text-[11px] text-slate-500">{stq.isPending ? "Reading…" : "Not available for this hole."}</p>
+            : st.unlogged.length === 0 ? <Empty>The log covers every metre the model read.</Empty>
+            : <ul className="flex flex-col gap-1 text-xs text-slate-700">{st.unlogged.map((u) => (
+                <li key={u.from_m}><button type="button" onClick={() => onJump(u.from_m, u.to_m)} className="text-left hover:underline"><span className="font-mono">{u.from_m}–{u.to_m} m</span> ({u.length_m} m) · no logged rock · the model reads <b className="font-medium text-slate-900">{u.reads}</b> {u.share >= 0.995 ? "all the way through" : `over ${pct(u.share)} of it`}</button></li>))}</ul>}
+          {st && st.unlogged.length > 0 && <p className="text-[11px] leading-relaxed text-slate-500">Gaps of 2 m or more with no logged rock. Not a disagreement: a place the scan can fill in where nobody wrote anything.</p>}
         </section>
       )}
 

@@ -50,7 +50,10 @@ export type Standout = {
   run: string;
   hole_vs_region: { region: string; n_holes: number; note: string | null; items: { k: number; name: string; hole_share: number; region_share: number; ratio: number | null; region_holes_with: number }[] };
   domains: { from_m: number; to_m: number; length_m: number; type: string; why: { kind: "rare_type" | "mineral"; text: string; mineral?: string }[] }[];
+  unlogged: { from_m: number; to_m: number; length_m: number; reads: string; share: number }[];
 };
+/** Every tectonic region with enough scanned WA holes and its core-type profile. */
+export type RegionsView = { run: string; core_types: { k: number; name: string }[]; regions: { region: string; n_holes: number; metres: number; types: { k: number; share: number; holes: number }[] }[] };
 
 export type Bin = { bin: number; from_m: number; n_swir: number; n_tir: number; gs: string; ms: string; gt: string };
 export type BinSpectra = Bin & { swir_wl: number[]; swir: number[]; tir_wl: number[]; tir: number[] | null };
@@ -168,6 +171,7 @@ export const coreScan = {
   linescanUrl: (key: string, from: number, to: number, width = 600) => `${CORE_BASE}/holes/${enc(key)}/linescan.jpg?from=${from}&to=${to}&width=${width}`,
   /** The hole as a line in space, with the holes within `km` and what to highlight. */
   trace: (key: string, km = 0) => json<TraceView>(`/holes/${enc(key)}/trace/?km=${km}`),
+  regions: () => json<RegionsView>(`/regions/`),
   standout: (key: string, run: string) => json<Standout>(`/holes/${enc(key)}/standout/?model=${enc(run)}`),
   /** The 10 cm bins of a depth window (up to 50 m): the scanner's reading of each. */
   bins: (key: string, from: number, to: number) => json<{ from_m: number; to_m: number; bins: Bin[] }>(`/holes/${enc(key)}/bins/?from=${from}&to=${to}`),
