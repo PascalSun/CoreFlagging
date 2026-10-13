@@ -1,15 +1,16 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { AlertTriangle, ArrowDown, ArrowUp, MessageCircle, Search, X } from "lucide-react";
-import type { HoleRow } from "@/lib/coreScan";
+import { AlertTriangle, ArrowDown, ArrowUp, Download, Loader2, MessageCircle, Search, X } from "lucide-react";
+import { coreScan, type HoleRow } from "@/lib/coreScan";
+import { csvSheet } from "@/lib/lookAgain";
 import { NONE, coreTypeColor, fmt } from "@/components/coretrace/palette";
 import { Mark, type Shape } from "@/components/coretrace/shapes";
 import { STATUS_LABEL } from "@/components/coretrace/palette";
 import { cn } from "@/lib/utils";
 
 type Look = { color: string; label: string; ring?: string; wait?: boolean; shape?: Shape; shapeLabel?: string };
-type Key = "name" | "state" | "depth" | "gold" | "issues";
+type Key = "name" | "state" | "depth" | "again" | "gold" | "issues";
 const PAGE = 100;
 
 // the strips colour each core type by its leading mineral; one example name per colour gives the key
@@ -20,14 +21,28 @@ const KEY: [string, string][] = [
 ];
 
 /** Every hole on the map as a table, its own tab beside the map: search, sort, open. */
-export function HoleTable({ holes, q, onQ, look, typeName, onOpen, onAsk, loading }: {
+export function HoleTable({ holes, q, onQ, look, typeName, onOpen, onAsk, loading, sheet }: {
   holes: HoleRow[]; q: string; onQ: (q: string) => void; look: (h: HoleRow) => Look; typeName: Map<number, string>;
   onOpen: (key: string) => void; onAsk?: () => void; loading: boolean;
+  /** the State and search the "worth a second look" sheet is exported for */
+  sheet?: { state: string; q: string };
 }) {
   const [sort, setSort] = useState<{ k: Key; desc: boolean }>({ k: "name", desc: false });
   const [shown, setShown] = useState(PAGE);
+  const [exporting, setExporting] = useState(false);
+  const againHoles = holes.filter((h) => h.n_again > 0).length;
+  // the cross-hole sheet: every disagreement in the State (and search) shown, holes with the most metres first
+  const exportSheet = async () => {
+    setExporting(true);
+    try {
+      const got = await coreScan.lookAgain(sheet?.state ?? "", sheet?.q ?? "");
+      const blob = new Blob([csvSheet(got.model, got.rows)], { type: "text/csv" });
+      const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
+      a.download = `CoreTrace_look_again_${sheet?.state || "all"}${sheet?.q ? "_" + sheet.q.replace(/[^A-Za-z0-9]+/g, "_") : ""}.csv`; a.click(); URL.revokeObjectURL(a.href);
+    } finally { setExporting(false); }
+  };
   const rows = useMemo(() => {
-    const v = (h: HoleRow): number | string => sort.k === "name" ? h.name.toLowerCase() : sort.k === "state" ? h.state : sort.k === "depth" ? h.depth_max ?? -1 : sort.k === "gold" ? h.au_pos_m * 1e6 + h.au_m : h.n_issues;
+    const v = (h: HoleRow): number | string => sort.k === "name" ? h.name.toLowerCase() : sort.k === "state" ? h.state : sort.k === "depth" ? h.depth_max ?? -1 : sort.k === "again" ? h.again_m : sort.k === "gold" ? h.au_pos_m * 1e6 + h.au_m : h.n_issues;
     return [...holes].sort((a, b) => Number(b.mine) - Number(a.mine) || Number(b.status === "ready") - Number(a.status === "ready")
       || (v(a) < v(b) ? -1 : v(a) > v(b) ? 1 : 0) * (sort.desc ? -1 : 1));
   }, [holes, sort]);
@@ -48,7 +63,8 @@ export function HoleTable({ holes, q, onQ, look, typeName, onOpen, onAsk, loadin
             onKeyDown={(e) => { if (e.key === "Enter" && rows[0]) onOpen(rows[0].key); }} className="w-full bg-transparent text-sm outline-none placeholder:text-slate-400" />
           {q && <button type="button" onClick={() => onQ("")} aria-label="Clear the search" className="text-slate-400 hover:text-slate-700"><X size={14} /></button>}
         </label>
-        <span className="text-xs text-slate-500">{loading ? "Loading holes…" : `${rows.length.toLocaleString()} holes`}</span>
+        <span className="text-xs text-slate-500">{loading ? "Loading holes…" : `${rows.length.toLocaleString()} holes`}{!loading && againHoles > 0 && <span className="text-slate-400"> · {againHoles.toLocaleString()} worth a second look</span>}</span>
+        {againHoles > 0 && <button type="button" onClick={exportSheet} disabled={exporting} title="Every interval where the model disagrees with the log, for the holes shown, as a CSV" className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-800 hover:bg-slate-50 disabled:opacity-60">{exporting ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />}Export the second-look sheet</button>}
         {onAsk && <button type="button" onClick={onAsk} className="ml-auto flex items-center gap-1.5 text-xs font-medium text-slate-600 hover:text-slate-900"><MessageCircle size={13} />Or ask: &ldquo;holes with gold in NSW&rdquo;</button>}
       </div>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-slate-200/70 px-4 py-2 text-[11px] text-slate-600">
@@ -72,7 +88,7 @@ export function HoleTable({ holes, q, onQ, look, typeName, onOpen, onAsk, loadin
                     <span className="font-medium text-slate-900">{h.name}</span><span className="text-[11px] text-slate-400">{h.state}</span>
                     <span className="ml-auto font-mono text-[11px] text-slate-500">{h.depth_max !== null ? `${fmt(h.depth_max, 0)} m` : ""}</span>
                   </span>
-                  <span className="truncate text-[11px] text-slate-500">{h.status !== "ready" ? STATUS_LABEL[h.status] : [h.operator, h.project].filter(Boolean).join(" · ") || "—"}{h.au_pos_m > 0 ? ` · gold ${h.au_pos_m} m ≥ 0.1 ppm` : ""}</span>
+                  <span className="truncate text-[11px] text-slate-500">{h.status !== "ready" ? STATUS_LABEL[h.status] : [h.operator, h.project].filter(Boolean).join(" · ") || "—"}{h.n_again > 0 ? ` · look again: ${fmt(h.again_m, 0)} m` : ""}{h.au_pos_m > 0 ? ` · gold ${h.au_pos_m} m ≥ 0.1 ppm` : ""}</span>
                   <span className="flex h-1.5 w-full overflow-hidden rounded-full" aria-hidden>
                     {h.strip?.length ? h.strip.map((k, i) => <i key={i} className="h-full flex-1" style={{ background: coreTypeColor(typeName.get(k)) }} />) : <i className="h-full flex-1" style={{ background: NONE }} />}
                   </span>
@@ -87,7 +103,7 @@ export function HoleTable({ holes, q, onQ, look, typeName, onOpen, onAsk, loadin
               {head("name", "Hole")}{head("state", "State", "w-16")}
               <th scope="col" className="sticky top-0 z-10 bg-white/95 px-3 py-2 font-medium backdrop-blur">Company · project · region</th>
               <th scope="col" className="sticky top-0 z-10 w-44 bg-white/95 px-3 py-2 font-medium backdrop-blur">Core types down the hole</th>
-              {head("depth", "Depth", "w-20 text-right")}{head("gold", "Gold assays", "w-28")}{head("issues", "Issues", "w-16 text-right")}
+              {head("depth", "Depth", "w-20 text-right")}{head("again", "Look again", "w-28")}{head("gold", "Gold assays", "w-28")}{head("issues", "Issues", "w-16 text-right")}
             </tr>
           </thead>
           <tbody>
@@ -111,6 +127,7 @@ export function HoleTable({ holes, q, onQ, look, typeName, onOpen, onAsk, loadin
                     </span>
                   </td>
                   <td className="px-3 py-2 text-right font-mono text-slate-600">{h.depth_max !== null ? `${fmt(h.depth_max, 0)} m` : "—"}</td>
+                  <td className="px-3 py-2 text-slate-600">{h.n_again > 0 ? <span className="font-medium text-slate-900">{fmt(h.again_m, 0)} m<span className="font-normal text-slate-500"> · {h.n_again}</span></span> : h.has_lith && h.status === "ready" && !h.message ? <span className="text-slate-400">agree</span> : <span className="text-slate-300">—</span>}</td>
                   <td className="px-3 py-2 text-slate-600">{h.au_pos_m > 0 ? <span className="font-medium text-slate-900">{h.au_pos_m} m ≥ 0.1 ppm</span> : h.au_m > 0 ? `${h.au_m} m assayed` : <span className="text-slate-400">none</span>}</td>
                   <td className="px-3 py-2 text-right text-slate-600">{h.n_issues > 0 ? <span className="inline-flex items-center gap-0.5"><AlertTriangle size={10} />{h.n_issues}</span> : ""}</td>
                 </tr>

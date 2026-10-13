@@ -26,9 +26,9 @@ import { coretraceBase } from "@/lib/sites";
 import { useIsMobile } from "@/lib/useIsMobile";
 import { cn } from "@/lib/utils";
 
-type Filter = "all" | "mine" | "issues" | "notir" | "assays";
+type Filter = "all" | "mine" | "again" | "issues" | "notir" | "assays";
 const FILTERS: { id: Filter; label: string }[] = [
-  { id: "all", label: "All" }, { id: "mine", label: "My scans" }, { id: "assays", label: "With assays" }, { id: "issues", label: "With issues" }, { id: "notir", label: "No TIR" },
+  { id: "all", label: "All" }, { id: "mine", label: "My scans" }, { id: "again", label: "Worth a second look" }, { id: "assays", label: "With assays" }, { id: "issues", label: "With issues" }, { id: "notir", label: "No TIR" },
 ];
 const glass = "rounded-2xl border border-white/60 bg-white/80 shadow-glass backdrop-blur-xl";
 
@@ -104,6 +104,7 @@ export function CoreTraceMap() {
   const onMap = useMemo(() => holes.filter((h) => {
     if (state && h.state !== state && !h.mine) return false;
     if (filter === "mine" && !h.mine) return false;
+    if (filter === "again" && !h.n_again) return false;
     if (filter === "issues" && !h.n_issues) return false;
     if (filter === "notir" && (h.status !== "ready" || h.tir === "ok")) return false;
     if (filter === "assays" && !h.au_m) return false;
@@ -114,6 +115,7 @@ export function CoreTraceMap() {
     return onMap.filter((h) => !s || h.name.toLowerCase().includes(s) || h.key.toLowerCase().includes(s) || h.operator.toLowerCase().includes(s) || h.project.toLowerCase().includes(s) || h.region.toLowerCase().includes(s))
       .sort((a, b) => Number(b.mine) - Number(a.mine) || Number(b.status === "ready") - Number(a.status === "ready") || a.name.localeCompare(b.name));
   }, [onMap, q]);
+  // core type by default: only a tenth of the holes carry a log, so "worth a second look" is a view to switch to, not the first picture
   const [mode, setMode] = useState<ColourMode>("type"); const [focus, setFocus] = useState<string | null>(null);
   const [shapeMode, setShapeMode] = useState<ShapeMode>("gold"); const [filtersOpen, setFiltersOpen] = useState(false); const [legendOpen, setLegendOpen] = useState(true);
   // on a phone the legend starts folded to its one line of pickers, so the map keeps the screen
@@ -130,7 +132,7 @@ export function CoreTraceMap() {
   useEffect(() => { if (!mobile && !holeKey && hq.data && !tourSeen()) setTouring(true); }, [hq.data]);   // eslint-disable-line react-hooks/exhaustive-deps
   const tour: TourStep[] = [
     { title: "Welcome to CoreTrace", body: `Every HyLogger-scanned drillhole in Australia's core libraries, ${holes.length ? holes.length.toLocaleString() + " of them, " : ""}read metre by metre by a model trained on scanned drill core. Five quick steps.` },
-    { target: "legend", title: "Each point is a drillhole", body: "Colour is the core type the model reads most often down the hole; shape is whether its assays found gold. Switch either here, and click a row to show only those holes." },
+    { target: "legend", title: "Each point is a drillhole", body: "Colour is the core type the model reads most often down the hole; shape is whether its assays found gold. Switch the colour to \u201cLook again\u201d to see where the model's reading differs from the geologist's log. Click a row to show only those holes." },
     { target: "tabs", title: "Map, or every hole as a table", body: "The Holes tab lists every hole: search by name, company or region and sort by depth or gold. The State and filter beside it apply to both." },
     ...(chatOpen && !mobile ? [{ target: "chat", title: "Ask in plain words", body: "\u201cHoles with gold in NSW\u201d, \u201cwhat is unusual in MND036?\u201d. The assistant answers from the same data, and opens the holes it talks about on the map." }] : []),
     { target: "upload", title: "Bring your own scan", body: "Upload a TSG package from a HyLogger: it gets the same checks, log and model reading as the library holes, and stays private to you." },
@@ -301,7 +303,7 @@ export function CoreTraceMap() {
       {/* the holes tab: every hole on the map as a table */}
       {view === "holes" && (
         <div className={cn(glass, "absolute top-[68px] bottom-3 left-3 z-20 overflow-hidden bg-white/92")} style={{ right: chatW + 12 }}>
-          <HoleTable holes={list} q={q} onQ={setQ} look={colour} typeName={typeName} loading={hq.isLoading} onOpen={(k) => set({ hole: k, m: null, full: null, view: null })}
+          <HoleTable holes={list} q={q} onQ={setQ} look={colour} typeName={typeName} loading={hq.isLoading} sheet={{ state, q }} onOpen={(k) => set({ hole: k, m: null, full: null, view: null })}
             onAsk={chatOpen ? undefined : () => setChatOpen(true)} />
         </div>
       )}

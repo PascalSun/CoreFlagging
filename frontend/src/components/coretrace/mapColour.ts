@@ -6,8 +6,9 @@ import type { HoleRow } from "@/lib/coreScan";
 import { SERIES, coreTypeColor } from "@/components/coretrace/palette";
 import type { Shape } from "@/components/coretrace/shapes";
 
-export type ColourMode = "type" | "gold" | "data" | "state";
+export type ColourMode = "again" | "type" | "gold" | "data" | "state";
 export const COLOUR_MODES: { id: ColourMode; label: string; short: string; hint: string }[] = [
+  { id: "again", short: "Look again", label: "Worth a second look", hint: "Intervals where the model's reading disagrees with the geologist's log (the ultramafic rule), by metres." },
   { id: "type", short: "Core type", label: "Core type", hint: "The core type the model reads most often down the hole, by its leading mineral." },
   { id: "gold", short: "Gold", label: "Gold assays", hint: "Whether the scan carries gold assays, and whether any reach 0.1 ppm." },
   { id: "data", short: "Models", label: "Read by the model", hint: "Whether the models read the hole, or it is shown from the scan alone." },
@@ -42,6 +43,14 @@ export function classify(h: HoleRow, mode: ColourMode, typeName: Map<number, str
     if (h.au_pos_m > 0) return { label: "Gold ≥ 0.1 ppm", color: SERIES.yellow, order: 0 };
     if (h.au_m > 0) return { label: "Assayed, below 0.1", color: SERIES.blue, order: 1 };
     return { label: "No assays", color: "#94a3b8", order: 2 };
+  }
+  if (mode === "again") {
+    if (!modelled) return { label: "No model reading", color: "#ffffff", ring: PLAIN, order: 5 };
+    if (!h.has_lith) return { label: "No log to compare", color: "#e2e8f0", order: 4 };
+    if (h.again_m >= 50) return { label: "50 m or more", color: SERIES.orange, order: 0 };
+    if (h.again_m >= 10) return { label: "10–50 m", color: SERIES.yellow, order: 1 };
+    if (h.n_again > 0) return { label: "Under 10 m", color: "#c4b5fd", order: 2 };
+    return { label: "Log and model agree", color: "#94a3b8", order: 3 };
   }
   if (mode === "state") return { label: h.state || "Upload", color: STATE_COLOUR[h.state] ?? SERIES.orange, order: 0 };
   const k = mainType(h.strip);
