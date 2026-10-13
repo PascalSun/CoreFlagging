@@ -39,6 +39,7 @@ export function coretraceChrome(base: string): Chrome {
       { label: "Home", href: home },
       { label: "What it does", href: `${home}#what` },
       { label: "Findings", href: `${base}/findings` },
+      { label: "By region", href: `${base}/regions` },
       { label: "Read with care", href: `${home}#notes` },
       { label: "Team", href: `${home}#team` },
     ],
@@ -47,6 +48,7 @@ export function coretraceChrome(base: string): Chrome {
     sitemap: [
       { label: "Map", href: `${base}/map` },
       { label: "Findings", href: `${base}/findings` },
+      { label: "By region", href: `${base}/regions` },
       { label: "Upload a scan", href: `${base}/map?upload=1` },
       { label: "Geo Research Platform", href: "https://geo.nlp-tlp.org" },
     ],
