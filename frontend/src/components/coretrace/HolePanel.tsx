@@ -12,6 +12,7 @@ import { StripLegend, StripLog } from "@/components/coretrace/StripLog";
 import { TrayViewer } from "@/components/coretrace/DeepZoom";
 import { TrayPhoto } from "@/components/coretrace/TrayPhoto";
 import { LookAgain } from "@/components/coretrace/LookAgain";
+import { Nearby } from "@/components/coretrace/Nearby";
 import { cn } from "@/lib/utils";
 
 export type Tab = "metre" | "again" | "log" | "gold" | "similar" | "quality" | "report";
@@ -279,9 +280,11 @@ function Report({ hole, models, mvw, run, trays }: { hole: HoleDetail; models: C
   );
 }
 
-export function HolePanel({ holeKey, tab: tabProp, onTab, models, run, onRun, metre, onMetre, wide, onWide, onClose, onOpenHole, onDeleted }: {
+export function HolePanel({ holeKey, tab: tabProp, onTab, models, run, onRun, metre, onMetre, wide, onWide, onClose, onOpenHole, onDeleted, onRing }: {
   holeKey: string; tab: string; onTab: (t: Tab) => void; models: CoreModelInfo[]; run: string; onRun: (r: string) => void; metre: number | null; onMetre: (m: number | null) => void;
   wide: boolean; onWide: (w: boolean) => void; onClose: () => void; onOpenHole: (key: string, m?: number) => void; onDeleted: () => void;
+  /** draw (or clear) a ring of this many km around the hole on the map */
+  onRing?: (km: number | null) => void;
 }) {
   const qc = useQueryClient();
   // the open tab lives in the address, so a link (or the assistant) can open a hole on any tab
@@ -395,6 +398,7 @@ export function HolePanel({ holeKey, tab: tabProp, onTab, models, run, onRun, me
           <Fact k="Data quality" v={hole.n_issues ? `${hole.n_issues} ${hole.n_issues === 1 ? "issue" : "issues"}` : "nothing found"} sub={hole.issues[0] ? issueLabel(hole.issues[0].issue) : undefined} />
         </div>
         {hasReport && <div><H3>Original report</H3><OriginalReport report={rq.data} loading={rq.isPending} /></div>}
+        {hole.lat !== null && <div><H3>Nearby holes</H3><Nearby hole={hole} onOpen={(k) => onOpenHole(k)} onRing={onRing} /></div>}
         {modelPicker}
         <div>
           <H3>Down the hole</H3>

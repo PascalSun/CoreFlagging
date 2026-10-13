@@ -12,8 +12,10 @@ const AXIS_W = 44, GAP = 6, HEAD_H = 30;
  * what the core is (software minerals, logged rock, the model's core type); bar tracks say
  * how much (how unusual, how likely gold, the assay). Each track has its own scale — they
  * sit side by side, never on a shared axis. Hover reads a metre, click selects it. */
-export function StripLog({ metres, model, cursor, onCursor, onHover, hasLith, hasAu }: {
+export function StripLog({ metres, model, cursor, onCursor, onHover, hasLith, hasAu, range }: {
   metres: Metres; model: ModelView | undefined; cursor: number | null; onCursor: (m: number) => void; onHover?: (m: number | null) => void; hasLith: boolean; hasAu: boolean;
+  /** draw to this depth range instead of the hole's own, so two logs side by side share one axis */
+  range?: [number, number];
 }) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -30,7 +32,7 @@ export function StripLog({ metres, model, cursor, onCursor, onHover, hasLith, ha
   ], [hasLith, hasAu, model]);
   const width = AXIS_W + tracks.reduce((a, t) => a + t.w + GAP, 0);
 
-  const m0 = metres.m[0] ?? 0, m1 = metres.m[metres.m.length - 1] ?? 0, span = m1 - m0 + 1;
+  const m0 = range ? range[0] : metres.m[0] ?? 0, m1 = range ? range[1] : metres.m[metres.m.length - 1] ?? 0, span = m1 - m0 + 1;
   const ppm = zoom === "fit" ? Math.max(0.6, (boxH - 8) / span) : zoom;
   const height = Math.ceil(span * ppm);
   const idx = useMemo(() => new Map(metres.m.map((m, i) => [m, i])), [metres.m]);

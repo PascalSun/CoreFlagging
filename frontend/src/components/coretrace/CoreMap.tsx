@@ -28,8 +28,17 @@ function features(holes: HoleRow[], colour: (h: HoleRow) => Look) {
 }
 
 /** The map of scanned holes, on satellite imagery or a terrain map; each hole has a white edge so its colour reads on any ground. A point is a hole; clicking one selects it. */
-export function CoreMap({ holes, colour, card, selected, onSelect, padRight, padBottom = 0, fitTo, basemap = "satellite" }: {
+/** A circle of `km` around a point, as a polygon (geodesic enough at these sizes). */
+function ring(lon: number, lat: number, km: number) {
+  const pts: [number, number][] = []; const dLat = km / 110.574, dLon = km / (111.32 * Math.cos((lat * Math.PI) / 180));
+  for (let i = 0; i <= 72; i++) { const a = (i / 72) * 2 * Math.PI; pts.push([lon + dLon * Math.cos(a), lat + dLat * Math.sin(a)]); }
+  return { type: "FeatureCollection", features: [{ type: "Feature", geometry: { type: "Polygon", coordinates: [pts] }, properties: {} }] };
+}
+
+export function CoreMap({ holes, colour, card, selected, onSelect, padRight, padBottom = 0, fitTo, basemap = "satellite", ringKm = null }: {
   holes: HoleRow[]; selected: HoleRow | null; onSelect: (key: string | null) => void; padRight: number;
+  /** a ring of this many km around the selected hole (its neighbours), or none */
+  ringKm?: number | null;
   /** room taken at the foot by a bottom sheet: the selected hole is framed above it */
   padBottom?: number;
   /** the colour of each point (what the map is coloured by) */
@@ -45,7 +54,7 @@ export function CoreMap({ holes, colour, card, selected, onSelect, padRight, pad
   const readyRef = useRef(false);
   const holesRef = useRef(holes); const fitted = useRef(false); const colourRef = useRef(colour); const cardRef = useRef(card);
   useEffect(() => { cardRef.current = card; }, [card]);
-  const basemapRef = useRef(basemap); const pickedRef = useRef<any>({ type: "FeatureCollection", features: [] });
+  const basemapRef = useRef(basemap); const pickedRef = useRef<any>({ type: "FeatureCollection", features: [] }); const ringRef = useRef<any>({ type: "FeatureCollection", features: [] });
   useEffect(() => {
     if (basemapRef.current === basemap) return;
     basemapRef.current = basemap; const map = mapRef.current;
@@ -72,6 +81,9 @@ export function CoreMap({ holes, colour, card, selected, onSelect, padRight, pad
         if (map.getSource("holes")) return;
           map.addSource("holes", { type: "geojson", data: features(holesRef.current, colourRef.current), promoteId: "key" });
           map.addSource("picked", { type: "geojson", data: pickedRef.current });
+          map.addSource("ring", { type: "geojson", data: ringRef.current });
+          map.addLayer({ id: "ring-fill", type: "fill", source: "ring", paint: { "fill-color": "#00c4f5", "fill-opacity": 0.08 } });
+          map.addLayer({ id: "ring-line", type: "line", source: "ring", paint: { "line-color": "#00c4f5", "line-width": 1.5, "line-dasharray": [2, 2] } });
           // holes still waiting are small grey dots underneath; every processed hole is a coloured shape with a thin
           // white edge (so every colour reads on the satellite ground); a class picked in the legend leaves the rest faint
           // markers: a small coloured dot with a fine white edge, lifted off the imagery by a soft dark halo; a dot grows
@@ -167,6 +179,18 @@ export function CoreMap({ holes, colour, card, selected, onSelect, padRight, pad
   }, []);
 
   const key = selected?.key ?? null; const lon = selected?.lon ?? null; const lat = selected?.lat ?? null;
+  useEffect(() => {
+    const map = mapRef.current; if (!map) return;
+    const apply = () => {
+      ringRef.current = ringKm && lon !== null && lat !== null ? ring(lon, lat, ringKm) : { type: "FeatureCollection", features: [] };
+      map.getSource("ring")?.setData(ringRef.current);
+      if (ringKm && lon !== null && lat !== null) {
+        const dLat = ringKm / 110.574, dLon = ringKm / (111.32 * Math.cos((lat * Math.PI) / 180));
+        map.fitBounds([[lon - dLon, lat - dLat], [lon + dLon, lat + dLat]], { padding: { right: padRight + 40, left: 40, top: 40, bottom: padBottom + 40 }, duration: 700 });
+      }
+    };
+    if (readyRef.current) apply(); else map.once("load", apply);
+  }, [ringKm, lon, lat, padRight, padBottom]);
   useEffect(() => {
     const map = mapRef.current; if (!map) return;
     const apply = () => {

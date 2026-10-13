@@ -116,6 +116,10 @@ export function CoreTraceMap() {
       .sort((a, b) => Number(b.mine) - Number(a.mine) || Number(b.status === "ready") - Number(a.status === "ready") || a.name.localeCompare(b.name));
   }, [onMap, q]);
   // core type by default: only a tenth of the holes carry a log, so "worth a second look" is a view to switch to, not the first picture
+  // the neighbours' ring, when the hole page asks for one (reset when the hole changes)
+  const [ringKm, setRingKm] = useState<number | null>(null);
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { setRingKm(null); }, [holeKey]);
   const [mode, setMode] = useState<ColourMode>("type"); const [focus, setFocus] = useState<string | null>(null);
   const [shapeMode, setShapeMode] = useState<ShapeMode>("gold"); const [filtersOpen, setFiltersOpen] = useState(false); const [legendOpen, setLegendOpen] = useState(true);
   // on a phone the legend starts folded to its one line of pickers, so the map keeps the screen
@@ -184,7 +188,7 @@ export function CoreTraceMap() {
 
   return (
     <div className="fixed inset-0 overflow-hidden bg-slate-50 text-slate-900">
-      <div className="absolute inset-0 z-0"><CoreMap holes={onMap} basemap={basemap} colour={colour} card={(h) => holeCard(h, colour(h), typeName, COLOUR_MODES.find((m) => m.id === mode)?.label)} fitTo={state} selected={selected} onSelect={(k) => set({ hole: k, m: null, full: null })} padRight={mobile ? 0 : panelW + chatW} padBottom={mobile && holeKey ? Math.round(vh * 0.56) : 0} /></div>
+      <div className="absolute inset-0 z-0"><CoreMap holes={onMap} basemap={basemap} colour={colour} card={(h) => holeCard(h, colour(h), typeName, COLOUR_MODES.find((m) => m.id === mode)?.label)} fitTo={state} selected={selected} ringKm={ringKm} onSelect={(k) => set({ hole: k, m: null, full: null })} padRight={mobile ? 0 : panelW + chatW} padBottom={mobile && holeKey ? Math.round(vh * 0.56) : 0} /></div>
 
       {/* the legend: what colour and shape mean, each switchable, in as little room as the map can spare.
           A row picked here leaves every other hole faint; the card folds away to a single line. */}
@@ -314,7 +318,7 @@ export function CoreTraceMap() {
           <HolePanel key={holeKey} holeKey={holeKey} tab={tab} onTab={(t) => set({ tab: t === "metre" ? null : t })} models={models} run={run} onRun={(r) => set({ model: r })} metre={metre} onMetre={(m) => set({ m: m === null ? null : String(m) })}
             wide={wide} onWide={(w) => set({ full: w ? "1" : null })} onClose={() => set({ hole: null, m: null, full: null, tab: null })}
             onOpenHole={(k, m) => set({ hole: k, m: m === undefined ? null : String(m), full: "1" })}
-            onDeleted={() => set({ hole: null, m: null, full: null })} />
+            onDeleted={() => set({ hole: null, m: null, full: null })} onRing={setRingKm} />
         </aside>
       )}
       {holeKey && mobile && (
@@ -322,7 +326,7 @@ export function CoreTraceMap() {
           <HolePanel key={holeKey} holeKey={holeKey} tab={tab} onTab={(t) => set({ tab: t === "metre" ? null : t })} models={models} run={run} onRun={(r) => set({ model: r })} metre={metre} onMetre={(m) => set({ m: m === null ? null : String(m) })}
             wide={wide} onWide={(w) => set({ full: w ? "1" : null })} onClose={() => set({ hole: null, m: null, full: null, tab: null })}
             onOpenHole={(k, m) => set({ hole: k, m: m === undefined ? null : String(m), full: "1" })}
-            onDeleted={() => set({ hole: null, m: null, full: null })} />
+            onDeleted={() => set({ hole: null, m: null, full: null })} onRing={setRingKm} />
         </HoleSheet>
       )}
 

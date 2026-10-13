@@ -132,6 +132,8 @@ export const coreScan = {
   models: () => json<CoreModelInfo[]>("/models/"),
   holes: () => json<{ holes: HoleRow[]; n: number; core_types: { k: number; name: string }[] }>("/holes/"),
   hole: (key: string) => json<HoleDetail>(`/holes/${enc(key)}/`),
+  /** The holes within `km` of this one, nearest first, each with its distance. */
+  nearby: (key: string, km: number) => json<{ km: number; holes: (HoleRow & { km: number })[] }>(`/holes/${enc(key)}/nearby/?km=${km}`),
   /** Every interval where the model disagrees with the log, across the holes the caller may see. */
   lookAgain: (state = "", q = "", limit = 2000) => json<AgainSheet>(`/look-again/?state=${enc(state)}&q=${enc(q)}&limit=${limit}`),
   reviews: (key: string) => json<{ reviews: Review[] }>(`/holes/${enc(key)}/reviews/`),
