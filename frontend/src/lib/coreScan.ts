@@ -19,7 +19,13 @@ export type HoleRow = {
   key: string; name: string; source: "nvcl" | "upload"; status: HoleStatus; message: string; progress: number;
   lon: number | null; lat: number | null; state: string; offshore: boolean; operator: string; project: string; region: string; instrument: string;
   depth_min: number | null; depth_max: number | null; tir: string; has_lith: boolean; au_m: number; au_pos_m: number;
-  n_issues: number; split: string; is_public: boolean; mine: boolean; updated: string; strip?: number[];
+  n_issues: number; split: string; is_public: boolean; mine: boolean; updated: string; processed_at: string | null; strip?: number[];
+};
+
+/** The exploration report a hole was logged in: the mirror's files (the OCR'd PDF first) and the abstract. */
+export type HoleReport = {
+  anumber: string; abstract: string | null; pdf_url: string | null;
+  files: { name: string; bytes: number; download_url: string }[];
 };
 
 export type Issue = { issue: string; dataset: string; depth_from: number | null; depth_to: number | null; value: string; evidence: string; hole?: string; key?: string | null };
@@ -111,6 +117,8 @@ export const coreScan = {
   models: () => json<CoreModelInfo[]>("/models/"),
   holes: () => json<{ holes: HoleRow[]; n: number; core_types: { k: number; name: string }[] }>("/holes/"),
   hole: (key: string) => json<HoleDetail>(`/holes/${enc(key)}/`),
+  /** 404 when the scan names no report. */
+  report: (key: string) => json<HoleReport>(`/holes/${enc(key)}/report/`),
   model: (key: string, run: string) => json<ModelView>(`/holes/${enc(key)}/models/${enc(run)}/`),
   metre: (key: string, m: number, run: string) => json<MetreView>(`/holes/${enc(key)}/metres/${m}/?model=${enc(run)}`),
   similar: (key: string, m: number, run: string) => json<SimilarView>(`/holes/${enc(key)}/similar/?m=${m}&model=${enc(run)}`),
@@ -196,4 +204,33 @@ export const STATES: { id: string; name: string; survey: string }[] = [
   { id: "VIC", name: "Victoria", survey: "Geological Survey of Victoria" },
   { id: "CSIRO", name: "CSIRO", survey: "CSIRO" },
 ];
+/** "8 Oct 2026": when the platform last read the scan, or "" when it has not. */
+export const readDate = (h: { processed_at: string | null }, long = false) =>
+  h.processed_at ? new Date(h.processed_at).toLocaleDateString("en-AU", { day: "numeric", month: long ? "long" : "short", year: "numeric" }) : "";
+/** "NVCL WA · 8 Oct 2026" / "Your scan · 8 Oct 2026": where a hole's scan came from and when it was read. */
+export const sourceLabel = (h: { source: string; state: string; processed_at: string | null }) =>
+  [h.source === "upload" ? "Your scan" : `NVCL ${h.state || "WA"}`, readDate(h)].filter(Boolean).join(" · ");
+
+/** A WAMEX abstract is one run of "Location: … Geology: … Work done: … Results: …"; split it into its labelled parts.
+ * An abstract without labels comes back as one unlabelled part. */
+export function abstractParts(abstract: string): { label: string; text: string }[] {
+  const clean = abstract.replace(/&nbsp;|&amp;/g, (m) => (m === "&amp;" ? "&" : " ")).replace(/\s+/g, " ").trim();
+  const re = /(Location|Geology|Work done|Results|Conclusions(?: (?:&|and) Recommendations)?|Recommendations|Prospects|Assays|Tenements?)\s*:\s*/gi;
+  const parts: { label: string; text: string }[] = []; let m: RegExpExecArray | null; let last: { label: string; at: number } | null = null;
+  while ((m = re.exec(clean))) { if (last) parts.push({ label: last.label, text: clean.slice(last.at, m.index).trim() }); last = { label: m[1], at: m.index + m[0].length }; }
+  if (last) parts.push({ label: last.label, text: clean.slice(last.at).trim() }); else if (clean) parts.push({ label: "", text: clean });
+  return parts.filter((p) => p.text);
+}
+
+/** What a mirrored report file is, from its name: the OCR'd report, drill data, GIS, a 3D model, appendices. */
+export function reportFileKind(name: string): string {
+  const n = name.toLowerCase();
+  if (n.endsWith(".pdf")) return n.includes("(ocr)") ? "Report (PDF, searchable)" : "Report (PDF)";
+  if (/drill/.test(n)) return "Drill data";
+  if (/gis/.test(n)) return "GIS files";
+  if (/3d/.test(n)) return "3D model";
+  if (/append/.test(n)) return "Appendices";
+  if (/log/.test(n)) return "Logging codes";
+  return n.endsWith(".zip") ? "Archive" : "File";
+}
 export const surveyOf = (state: string) => STATES.find((s) => s.id === state)?.survey ?? "the National Virtual Core Library";
