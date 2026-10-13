@@ -118,7 +118,9 @@ export type SimilarHit = {
   hole: string; key: string | null; from_m: number; to_m: number; sim: number; gs: string; gt: string; gs_en: string; gt_en: string;
   rock: string; au: number | null; lat: number | null; lon: number | null; region: string; split: string;
 };
-export type SimilarView = { model: string; library: { intervals: number; holes: number }; results: SimilarHit[]; query: { from_m: number; to_m: number; gs: string; gt: string; rock: string } };
+export type SimilarScope = "state" | "nearby" | "region" | "hole";
+export type SimilarView = { model: string; library: { intervals: number; holes: number }; results: SimilarHit[];
+  query: { from_m: number; to_m: number; metres?: number; scope?: SimilarScope; km?: number | null; region?: string | null; gs: string; gt: string; rock: string } };
 
 /** `box`: the row's band in the photograph, as fractions; `xmm`: where along the scan its first and last samples lie (mm). */
 export type TrayRow = { from_m: number; to_m: number; box?: [number, number, number, number]; xmm?: [number, number] };
@@ -170,7 +172,9 @@ export const coreScan = {
   report: (key: string) => json<HoleReport>(`/holes/${enc(key)}/report/`),
   model: (key: string, run: string) => json<ModelView>(`/holes/${enc(key)}/models/${enc(run)}/`),
   metre: (key: string, m: number, run: string) => json<MetreView>(`/holes/${enc(key)}/metres/${m}/?model=${enc(run)}`),
-  similar: (key: string, m: number, run: string) => json<SimilarView>(`/holes/${enc(key)}/similar/?m=${m}&model=${enc(run)}`),
+  /** Core like a stretch of this hole: the 2 m at a metre, or a window; where to look is the scope. */
+  similar: (key: string, at: { m: number } | { from: number; to: number }, run: string, scope: SimilarScope = "state", km = 10) =>
+    json<SimilarView>(`/holes/${enc(key)}/similar/?${"m" in at ? `m=${at.m}` : `from=${at.from}&to=${at.to}`}&model=${enc(run)}&scope=${scope}&km=${km}`),
   trays: (key: string) => json<{ trays: Tray[] }>(`/holes/${enc(key)}/trays/`),
   /** The original of a tray photograph as a deep-zoom pyramid; 404 for an upload (no original kept). */
   trayZoom: (key: string, id: string) => json<{ width: number; height: number; tile: number; overlap: number; format: string }>(`/holes/${enc(key)}/trays/${id}/zoom/`),

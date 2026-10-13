@@ -5,7 +5,7 @@ import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-quer
 import { AlertTriangle, ArrowRight, ChevronLeft, ChevronRight, Download, ExternalLink, FileDown, FileText, Loader2, Maximize2, Minimize2, Trash2, X } from "lucide-react";
 import { downloadReportPdf } from "@/components/coretrace/pdf";
 import { PAGE_W, ReportDocument } from "@/components/coretrace/ReportDocument";
-import { ACTIVE, abstractParts, commodityName, coreScan, readDate, reportFileKind, sourceLabel, surveyOf, type CoreModelInfo, type HoleDetail, type HoleReport, type MetreView, type ModelView, type Tray } from "@/lib/coreScan";
+import { ACTIVE, abstractParts, commodityName, coreScan, readDate, reportFileKind, sourceLabel, surveyOf, type SimilarScope, type CoreModelInfo, type HoleDetail, type HoleReport, type MetreView, type ModelView, type Tray } from "@/lib/coreScan";
 import { ISSUE_LABEL, STATUS_LABEL, SERIES, coreTypeColor, fmt, groupColor, groupName, issueLabel, mineralName, pct } from "@/components/coretrace/palette";
 import { LINE, SpectraChart } from "@/components/coretrace/SpectraChart";
 import { StripLegend, StripLog } from "@/components/coretrace/StripLog";
@@ -311,7 +311,10 @@ export function HolePanel({ holeKey, tab: tabProp, onTab, models, run, onRun, me
   const shown = peek ?? metre;
   const eq = useQuery({ queryKey: ["core-metre", holeKey, shown, useRun], queryFn: () => coreScan.metre(holeKey, shown as number, useRun),
     enabled: ready && wide && shown !== null && (!!useRun || displayOnly), staleTime: 5 * 60_000, retry: false, placeholderData: keepPreviousData });
-  const sq = useQuery({ queryKey: ["core-similar", holeKey, metre, useRun], queryFn: () => coreScan.similar(holeKey, metre as number, useRun), enabled: ready && wide && tab === "similar" && metre !== null && !!useRun, staleTime: 5 * 60_000, retry: false });
+  // what the similar-core search asks about: the zoomed window when there is one (up to 50 m), else the 2 m at the metre
+  const [simScope, setSimScope] = useState<SimilarScope>("state");
+  const simAt = win && win[1] - win[0] <= 50 ? { from: win[0], to: win[1] } : metre !== null ? { m: metre } : null;
+  const sq = useQuery({ queryKey: ["core-similar", holeKey, simAt, useRun, simScope], queryFn: () => coreScan.similar(holeKey, simAt as { m: number }, useRun, simScope), enabled: ready && wide && tab === "similar" && simAt !== null && !!useRun, staleTime: 5 * 60_000, retry: false });
   const mvw = mq.data; const trays = tq.data?.trays ?? [];
   // the original report: only holes whose scan names a WAMEX report have one
   const hasReport = !!hole?.meta.wamex;
@@ -492,21 +495,34 @@ export function HolePanel({ holeKey, tab: tabProp, onTab, models, run, onRun, me
                       {hole.au_m ? <td className={cn(td, "font-mono")}>{g.au !== null ? g.au.toFixed(2) : "—"}</td> : null}</tr>))}</tbody>
                 </table>
               </div>) : <Empty>Loading…</Empty>)}
-            {tab === "similar" && (metre === null ? <Empty>Click a metre on the log, then look for core like it elsewhere in the State.</Empty>
-              : sq.isLoading ? <Empty>Searching the State library…</Empty>
-              : sq.isError || !sq.data ? <Empty>The similarity search is not available right now. Everything else on this page still works.</Empty> : (
+            {tab === "similar" && (() => {
+              const scopes: { id: SimilarScope; label: string; hint: string }[] = [
+                { id: "hole", label: "This hole", hint: "Where else in this hole is core like this" }, { id: "nearby", label: "Within 10 km", hint: "The neighbouring holes" },
+                { id: "region", label: hole.region ? `Region: ${hole.region}` : "Region", hint: "Holes of the same tectonic region" }, { id: "state", label: "Whole State", hint: "Every other hole, none within 5 km" }];
+              const what = simAt === null ? null : "from" in simAt ? `${fmt(simAt.from, 1)}–${fmt(simAt.to, 1)} m (the window)` : `the 2 m from ${simAt.m} m`;
+              return (
                 <div className="flex flex-col gap-3">
-                  <p className="text-xs leading-relaxed text-slate-600">The 2 m starting at {metre} m, compared with {sq.data.library.intervals.toLocaleString()} two-metre intervals from {sq.data.library.holes.toLocaleString()} holes. Holes within 5 km are left out, and each hole appears once.</p>
+                  <div className="flex flex-wrap items-center gap-1.5" role="tablist" aria-label="Where to look">
+                    <span className="text-[11px] text-slate-500">Look in</span>
+                    {scopes.filter((sc) => sc.id !== "region" || hole.region).map((sc) => <button key={sc.id} type="button" role="tab" aria-selected={simScope === sc.id} title={sc.hint} onClick={() => setSimScope(sc.id)} className={cn("rounded-full px-2.5 py-0.5 text-[11px] font-medium ring-1", simScope === sc.id ? "bg-slate-900 text-white ring-slate-900" : "bg-white text-slate-700 ring-slate-200 hover:ring-slate-400")}>{sc.label}</button>)}
+                  </div>
+                  {simAt === null ? <Empty>Click a metre on the log, or zoom to a window, then look for core like it.</Empty>
+                  : sq.isLoading ? <Empty>Searching…</Empty>
+                  : sq.isError || !sq.data ? <Empty>The similarity search is not available right now. Everything else on this page still works.</Empty> : (
+                <>
+                  <p className="text-xs leading-relaxed text-slate-600">{what}{sq.data.query.metres && sq.data.query.metres > 1 ? ` (${sq.data.query.metres} metres averaged)` : ""}, compared with {simScope === "hole" ? "every interval of this hole" : `${sq.data.library.intervals.toLocaleString()} two-metre intervals from ${sq.data.library.holes.toLocaleString()} holes`}{simScope === "nearby" ? ", within 10 km" : simScope === "region" ? `, in ${hole.region}` : simScope === "state" ? "; holes within 5 km are left out" : ""}.n 5 km are left out, and each hole appears once.</p>
                   <table className="w-full border-collapse">
                     <thead><tr>{["Hole", "Interval (m)", "Similarity", "SWIR / TIR", "Region"].map((h) => <th key={h} className={th}>{h}</th>)}</tr></thead>
                     <tbody>{sq.data.results.map((r) => (
-                      <tr key={r.hole} onClick={() => r.key && onOpenHole(r.key, Math.floor(r.from_m))} className={cn(r.key && "cursor-pointer hover:bg-slate-50")}>
-                        <td className={cn(td, "font-medium text-slate-900")}>{r.hole}{r.key ? <ArrowRight size={12} className="ml-1 inline" /> : null}</td>
+                      <tr key={`${r.hole}-${r.from_m}`} onClick={() => simScope === "hole" ? onWindow?.([r.from_m, r.to_m]) : r.key && onOpenHole(r.key, Math.floor(r.from_m))} className={cn((r.key || simScope === "hole") && "cursor-pointer hover:bg-slate-50")}>
+                        <td className={cn(td, "font-medium text-slate-900")}>{r.hole}{r.key && simScope !== "hole" ? <><ArrowRight size={12} className="ml-1 inline" /><a href={`/compare?a=${encodeURIComponent(hole.key)}&b=${encodeURIComponent(r.key)}`} onClick={(e) => e.stopPropagation()} className="ml-2 text-[11px] font-normal text-slate-500 underline-offset-2 hover:underline">compare</a></> : null}</td>
                         <td className={cn(td, "font-mono")}>{r.from_m.toFixed(0)}–{r.to_m.toFixed(0)}</td><td className={cn(td, "font-mono")}>{r.sim.toFixed(2)}</td>
                         <td className={td}><span className="flex items-center gap-1.5"><i className="inline-block h-2.5 w-2.5 rounded-[2px]" style={{ background: groupColor(r.gs) }} />{groupName(r.gs)} / {groupName(r.gt)}</span></td>
                         <td className={td}>{r.region || "—"}{r.rock ? ` · ${r.rock}` : ""}</td></tr>))}</tbody>
                   </table>
-                </div>))}
+                </>)}
+                </div>);
+            })()}
             {tab === "quality" && (
               <div className="flex flex-col gap-3">
                 <p className="text-xs leading-relaxed text-slate-600">Checks run while the scan was cleaned: unused datasets, thermal-infrared problems, missing core, and missing collar details.</p>
