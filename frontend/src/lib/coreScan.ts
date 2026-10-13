@@ -37,6 +37,15 @@ export type AgainSheet = { model: string; n_holes: number; holes_listed: number;
 export type Review = { run: string; kind: "log" | "flag"; from_m: number; to_m: number; verdict: "agree" | "disagree"; note: string; mine: boolean; at: string };
 export type ReviewBody = { run: string; kind: "log" | "flag"; from_m: number; to_m: number; verdict: "agree" | "disagree"; note?: string };
 
+/** What the DMIRS HyLogger drillhole package holds for a hole: the WAMEX collar, the company's logged
+ * intervals and the multi-element assays by depth. 404 for uploads, other States and unmatched holes. */
+export type HolePackage = {
+  collar_id: number; anumber: string;
+  collar: { hole_id: string; anumber: number | null; company_hole_id: string; company: string; hole_type: string; max_depth: number | null; tectonic_region: string } | null;
+  geology: { from_m: number; to_m: number; code: string; name: string; rock: string; regolith: string; comments: string }[];
+  assays: { columns: string[]; rows: { from_m: number; to_m: number; v: (number | null)[] }[] };
+};
+
 /** The exploration report a hole was logged in: the mirror's files (the OCR'd PDF first) and the abstract. */
 export type HoleReport = {
   anumber: string; abstract: string | null; pdf_url: string | null;
@@ -132,6 +141,7 @@ export const coreScan = {
   models: () => json<CoreModelInfo[]>("/models/"),
   holes: () => json<{ holes: HoleRow[]; n: number; core_types: { k: number; name: string }[] }>("/holes/"),
   hole: (key: string) => json<HoleDetail>(`/holes/${enc(key)}/`),
+  package: (key: string) => json<HolePackage>(`/holes/${enc(key)}/package/`),
   /** The holes within `km` of this one, nearest first, each with its distance. */
   nearby: (key: string, km: number) => json<{ km: number; holes: (HoleRow & { km: number })[] }>(`/holes/${enc(key)}/nearby/?km=${km}`),
   /** Every interval where the model disagrees with the log, across the holes the caller may see. */

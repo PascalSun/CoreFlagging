@@ -9,7 +9,7 @@ import { AccountMenu } from "@/components/auth/AccountMenu";
 import { EmailGate } from "@ntlp/geodata-web/email-gate";
 import { VerifyEmailDialog } from "@/components/auth/VerifyEmailDialog";
 import { CoreChat, type OpenTarget } from "@/components/coretrace/CoreChat";
-import { CoreMap, type Basemap } from "@/components/coretrace/CoreMap";
+import { CoreMap, OVERLAYS, type Basemap, type Overlay } from "@/components/coretrace/CoreMap";
 import { HolePanel } from "@/components/coretrace/HolePanel";
 import { UploadDialog } from "@/components/coretrace/UploadDialog";
 import { isAuthed, isVerified } from "@/lib/auth";
@@ -116,6 +116,9 @@ export function CoreTraceMap() {
       .sort((a, b) => Number(b.mine) - Number(a.mine) || Number(b.status === "ready") - Number(a.status === "ready") || a.name.localeCompare(b.name));
   }, [onMap, q]);
   // core type by default: only a tenth of the holes carry a log, so "worth a second look" is a view to switch to, not the first picture
+  // context layers from the platform (DMIRS interim data), off until asked for
+  const [overlays, setOverlays] = useState<Partial<Record<Overlay, boolean>>>({});
+  const toggleOverlay = (id: Overlay) => setOverlays((o) => ({ ...o, [id]: !o[id] }));
   // the neighbours' ring, when the hole page asks for one (reset when the hole changes)
   const [ringKm, setRingKm] = useState<number | null>(null);
   // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -188,7 +191,7 @@ export function CoreTraceMap() {
 
   return (
     <div className="fixed inset-0 overflow-hidden bg-slate-50 text-slate-900">
-      <div className="absolute inset-0 z-0"><CoreMap holes={onMap} basemap={basemap} colour={colour} card={(h) => holeCard(h, colour(h), typeName, COLOUR_MODES.find((m) => m.id === mode)?.label)} fitTo={state} selected={selected} ringKm={ringKm} onSelect={(k) => set({ hole: k, m: null, full: null })} padRight={mobile ? 0 : panelW + chatW} padBottom={mobile && holeKey ? Math.round(vh * 0.56) : 0} /></div>
+      <div className="absolute inset-0 z-0"><CoreMap holes={onMap} basemap={basemap} colour={colour} card={(h) => holeCard(h, colour(h), typeName, COLOUR_MODES.find((m) => m.id === mode)?.label)} fitTo={state} selected={selected} ringKm={ringKm} overlays={overlays} onSelect={(k) => set({ hole: k, m: null, full: null })} padRight={mobile ? 0 : panelW + chatW} padBottom={mobile && holeKey ? Math.round(vh * 0.56) : 0} /></div>
 
       {/* the legend: what colour and shape mean, each switchable, in as little room as the map can spare.
           A row picked here leaves every other hole faint; the card folds away to a single line. */}
@@ -218,6 +221,15 @@ export function CoreTraceMap() {
               <div className="border-t border-white/70 px-2 pb-2 pt-1.5">
                 <div className="grid grid-cols-2 gap-x-1">{shown.map(([label, e]) => row(label, <Mark color={e.color} ring={e.ring} size={11} />, e.n))}</div>
                 {shapes.length > 0 && <div className="mt-1 grid grid-cols-2 gap-x-1 border-t border-white/70 pt-1">{shapes.map(([label, e]) => row(label, <Mark shape={e.shape} color="#64748b" size={11} />, e.n))}</div>}
+                <div className="mt-1 border-t border-white/70 pt-1.5">
+                  <p className="px-1 text-[10.5px] font-medium text-slate-500">Also show</p>
+                  {OVERLAYS.map((o) => (
+                    <label key={o.id} title={o.hint} className="flex cursor-pointer items-center gap-1.5 rounded px-1 py-0.5 text-xs text-slate-700 hover:bg-white">
+                      <input type="checkbox" checked={!!overlays[o.id]} onChange={() => toggleOverlay(o.id)} className="size-3 accent-slate-900" />
+                      <i className="inline-block size-2.5 rounded-full" style={{ background: o.color }} /><span className="min-w-0 flex-1 truncate">{o.label}</span><span className="text-[10px] text-slate-400">interim</span>
+                    </label>
+                  ))}
+                </div>
                 <p className="mt-1.5 flex items-center justify-between px-1 text-[10.5px] text-slate-500">
                   <span>{focus ? "Showing one class" : "Click a row to show only those holes"}{waiting ? ` · ${waiting.toLocaleString()} still being processed` : ""}</span>
                   {focus && <button type="button" onClick={() => setFocus(null)} className="font-medium text-slate-800 hover:underline">Show all</button>}
@@ -239,6 +251,7 @@ export function CoreTraceMap() {
       )}
       {view === "map" && mobile && !holeKey && holes.length > 0 && (
         <LegendSheet modes={COLOUR_MODES} mode={mode} onMode={setMode} shapeModes={SHAPE_MODES} shapeMode={shapeMode} onShapeMode={setShapeMode}
+          overlays={OVERLAYS.map((o) => ({ id: o.id, label: o.label, color: o.color, on: !!overlays[o.id] }))} onOverlay={(id) => toggleOverlay(id as Overlay)}
           basemaps={[{ id: "satellite" as Basemap, label: "Satellite" }, { id: "map" as Basemap, label: "Map" }]} basemap={basemap} onBasemap={pickBasemap}
           legend={legend} shapes={shapes} focus={focus} onFocus={setFocus} />
       )}

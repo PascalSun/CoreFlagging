@@ -3,6 +3,15 @@
 import { useEffect, useRef } from "react";
 import type { HoleRow } from "@/lib/coreScan";
 import { ICON_PIXEL_RATIO, drawIcon, iconId, type Shape } from "@/components/coretrace/shapes";
+import { PLATFORM_URL } from "@ntlp/geodata-web/fetch";
+
+/** Context layers from the platform's tiles (DMIRS interim data): drawn under the holes, each toggled on its own. */
+export type Overlay = "open_pits" | "officer_copper";
+export const OVERLAYS: { id: Overlay; label: string; hint: string; color: string }[] = [
+  { id: "open_pits", label: "Open pit lakes", hint: "921 open pits seen in 2023–24 imagery, by how full they were (DMIRS interim data).", color: "#0284c7" },
+  { id: "officer_copper", label: "Officer Basin copper samples", hint: "169 core samples from the Officer Basin sediment-hosted copper study, coloured by Cu ppm (DMIRS interim data).", color: "#c2410c" },
+];
+const tilesUrl = (layer: string) => `${PLATFORM_URL}/geo/api/tiles/${layer}/{z}/{x}/{y}`;
 
 const TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN ?? "";
 export type Basemap = "satellite" | "map";
@@ -35,8 +44,10 @@ function ring(lon: number, lat: number, km: number) {
   return { type: "FeatureCollection", features: [{ type: "Feature", geometry: { type: "Polygon", coordinates: [pts] }, properties: {} }] };
 }
 
-export function CoreMap({ holes, colour, card, selected, onSelect, padRight, padBottom = 0, fitTo, basemap = "satellite", ringKm = null }: {
+export function CoreMap({ holes, colour, card, selected, onSelect, padRight, padBottom = 0, fitTo, basemap = "satellite", ringKm = null, overlays = {} }: {
   holes: HoleRow[]; selected: HoleRow | null; onSelect: (key: string | null) => void; padRight: number;
+  /** which context layers are shown */
+  overlays?: Partial<Record<Overlay, boolean>>;
   /** a ring of this many km around the selected hole (its neighbours), or none */
   ringKm?: number | null;
   /** room taken at the foot by a bottom sheet: the selected hole is framed above it */
@@ -54,6 +65,11 @@ export function CoreMap({ holes, colour, card, selected, onSelect, padRight, pad
   const readyRef = useRef(false);
   const holesRef = useRef(holes); const fitted = useRef(false); const colourRef = useRef(colour); const cardRef = useRef(card);
   useEffect(() => { cardRef.current = card; }, [card]);
+  const overlaysRef = useRef(overlays);
+  useEffect(() => {
+    overlaysRef.current = overlays; const map = mapRef.current; if (!map || !readyRef.current) return;
+    for (const o of OVERLAYS) if (map.getLayer(`ov-${o.id}`)) map.setLayoutProperty(`ov-${o.id}`, "visibility", overlays[o.id] ? "visible" : "none");
+  }, [overlays]);
   const basemapRef = useRef(basemap); const pickedRef = useRef<any>({ type: "FeatureCollection", features: [] }); const ringRef = useRef<any>({ type: "FeatureCollection", features: [] });
   useEffect(() => {
     if (basemapRef.current === basemap) return;
@@ -81,6 +97,16 @@ export function CoreMap({ holes, colour, card, selected, onSelect, padRight, pad
         if (map.getSource("holes")) return;
           map.addSource("holes", { type: "geojson", data: features(holesRef.current, colourRef.current), promoteId: "key" });
           map.addSource("picked", { type: "geojson", data: pickedRef.current });
+          // context layers under the holes: hidden until toggled, so they cost nothing by default
+          map.addSource("open_pits", { type: "vector", tiles: [tilesUrl("open_pits")], minzoom: 4, maxzoom: 14, attribution: "Interim data © Gov of WA (DMIRS, CC BY 4.0)" });
+          map.addLayer({ id: "ov-open_pits", type: "circle", source: "open_pits", "source-layer": "open_pits", layout: { visibility: overlaysRef.current.open_pits ? "visible" : "none" }, paint: {
+            "circle-radius": ["interpolate", ["linear"], ["zoom"], 4, 3, 9, 5.5, 12, 8], "circle-color": "#ffffff", "circle-opacity": 0.15,
+            "circle-stroke-width": 2, "circle-stroke-color": ["match", ["get", "pitfillamt"], "full", "#0284c7", "partial", "#38bdf8", "dry", "#a8a29e", "#0284c7"] } });
+          map.addSource("officer_copper", { type: "vector", tiles: [tilesUrl("officer_copper")], minzoom: 4, maxzoom: 14, attribution: "Interim data © Gov of WA (DMIRS, CC BY 4.0)" });
+          map.addLayer({ id: "ov-officer_copper", type: "circle", source: "officer_copper", "source-layer": "officer_copper", layout: { visibility: overlaysRef.current.officer_copper ? "visible" : "none" }, paint: {
+            "circle-radius": ["interpolate", ["linear"], ["zoom"], 4, 3.5, 9, 5.5, 12, 8],
+            "circle-color": ["step", ["coalesce", ["get", "cu_ppm"], 0], "#fdba74", 100, "#f97316", 1000, "#c2410c", 10000, "#7c2d12"],
+            "circle-stroke-width": 1, "circle-stroke-color": "#ffffff" } });
           map.addSource("ring", { type: "geojson", data: ringRef.current });
           map.addLayer({ id: "ring-fill", type: "fill", source: "ring", paint: { "fill-color": "#00c4f5", "fill-opacity": 0.08 } });
           map.addLayer({ id: "ring-line", type: "line", source: "ring", paint: { "line-color": "#00c4f5", "line-width": 1.5, "line-dasharray": [2, 2] } });
@@ -138,6 +164,19 @@ export function CoreMap({ holes, colour, card, selected, onSelect, padRight, pad
           tip.setLngLat(f.geometry.coordinates).setDOMContent(el).addTo(map);
         });
         map.on("mouseleave", LAYERS, () => { map.getCanvas().style.cursor = ""; tip.remove(); hover(null); });
+        const html = (s: string) => { const el = document.createElement("div"); el.className = "ct-card"; el.innerHTML = s; return el; };
+        map.on("mousemove", "ov-open_pits", (e: any) => {
+          const p = e.features?.[0]?.properties; if (!p) return;
+          const d = String(p.imagedate ?? ""); const when = d.length === 8 ? `${d.slice(6)}/${d.slice(4, 6)}/${d.slice(0, 4)}` : d;
+          tip.setLngLat(e.lngLat).setDOMContent(html(`<b>${p.name ?? ""}</b><br>Open pit lake · ${p.pitfillamt ?? "?"}${when ? ` · imaged ${when}` : ""}`)).addTo(map);
+        });
+        map.on("mouseleave", "ov-open_pits", () => tip.remove());
+        map.on("mousemove", "ov-officer_copper", (e: any) => {
+          const p = e.features?.[0]?.properties; if (!p) return;
+          const el = ["cu", "ni", "co", "pb"].map((k) => (p[`${k}_ppm`] != null ? `${k[0].toUpperCase()}${k.slice(1)} ${Number(p[`${k}_ppm`]).toLocaleString()} ppm` : null)).filter(Boolean).join(" · ");
+          tip.setLngLat(e.lngLat).setDOMContent(html(`<b>${p.holeid ?? ""}</b> ${p.from_m != null ? `${Number(p.from_m).toFixed(1)}–${Number(p.to_m).toFixed(1)} m` : ""}<br>${[p.lithology, p.rock_type].filter(Boolean).join(" · ")}${el ? `<br>${el}` : ""}`)).addTo(map);
+        });
+        map.on("mouseleave", "ov-officer_copper", () => tip.remove());
         readyRef.current = true;
         map.resize();
       });
