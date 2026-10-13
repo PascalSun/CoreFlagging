@@ -91,6 +91,31 @@ def similar(body: Similar):
     return {"model": eng.run, "library": {"intervals": int(len(eng.L["hole"])), "holes": int(len(set(eng.L["hole"].tolist())))}, "results": res}
 
 
+@app.get("/api/v1/samples")
+def samples_in_window(dataset: str, lo: float, hi: float, refs: list[str] = Query(...), spectra: int = 0):
+    """Every spectrum sample of a dataset in [lo, hi) m, from the mirrored package (unpacked on first use)."""
+    from . import samples as smp
+    if not (hi > lo) or hi - lo > 20:
+        raise HTTPException(400, "a window is up to 20 m")
+    try:
+        return smp.samples(refs, dataset, lo, hi, spectra=bool(spectra))
+    except smp.NoPackage as e:
+        raise HTTPException(404, str(e))
+
+
+@app.get("/api/v1/linescan.jpg")
+def linescan_in_window(dataset: str, lo: float, hi: float, refs: list[str] = Query(...), width: int = 600):
+    """The line-scan photograph of [lo, hi) m as one JPEG strip."""
+    from . import samples as smp
+    from fastapi.responses import Response as RawResponse
+    if not (hi > lo) or hi - lo > 5:
+        raise HTTPException(400, "a line-scan window is up to 5 m")
+    try:
+        return RawResponse(smp.linescan(refs, dataset, lo, hi, width=max(100, min(width, 1500))), media_type="image/jpeg")
+    except smp.NoPackage as e:
+        raise HTTPException(404, str(e))
+
+
 @app.get("/api/v1/trays/zoom/info")
 def tray_zoom_info(dataset: str, n: int, refs: list[str] = Query(...)):
     """Size and tile layout of a tray photograph's original, cutting its tiles on first use."""
