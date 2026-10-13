@@ -98,3 +98,27 @@ def test_similar_leaves_out_the_hole_itself_and_its_neighbours_and_returns_each_
     assert res[0]["rock"] == "Granitoid" and res[0]["region"] == "R" and res == sorted(res, key=lambda r: -r["sim"])
     with pytest.raises(ValueError):
         extras.similar(eng, np.zeros(7, "f4"))
+
+
+def test_similar_scopes_nearby_region_and_this_hole():
+    from app import extras
+    n = 300; rng = np.random.default_rng(2); Z = rng.normal(size=(n, 4)).astype("f4"); Z /= np.linalg.norm(Z, axis=1, keepdims=True)
+    hole = np.array(["SELF"] * 10 + ["NEAR"] * 10 + ["FAR"] * 10 + [f"H{i // 2}" for i in range(n - 30)])
+    lat = np.full(n, -30.0, "f4"); lon = np.full(n, 120.0, "f4")
+    lat[:10] = -25.0; lon[:10] = 121.0            # SELF
+    lat[10:20] = -25.02; lon[10:20] = 121.0        # NEAR: ~2 km from SELF
+    lat[20:30] = -25.5; lon[20:30] = 121.0         # FAR: ~55 km
+    L = {"Z": Z, "hole": hole, "lat": lat, "lon": lon, "d0": np.arange(n, dtype="f4"), "d1": np.arange(n, dtype="f4") + 2, "gs": np.array(["CHLORITE"] * n), "gt": np.array([""] * n),
+         "rock": np.array(["花岗岩类"] * n), "au": np.full(n, np.nan), "split": np.array(["train"] * n)}
+    regions = {"NEAR": "A", "FAR": "B"}
+    eng = SimpleNamespace(L=L, col_by={}, store=SimpleNamespace(ref_for=lambda h: {"region": regions.get(h, "C")}))
+    nearby = extras.similar(eng, Z[0], hole="SELF", lat=-25.0, lon=121.0, k=10, scope="nearby", radius_km=10)
+    assert [r["hole"] for r in nearby] == ["NEAR"]                                   # one interval per hole, only within 10 km
+    region = extras.similar(eng, Z[0], hole="SELF", lat=-25.0, lon=121.0, k=10, scope="region", region="b")
+    assert [r["hole"] for r in region] == ["FAR"]
+    own = extras.similar(eng, Z[0], hole="SELF", lat=-25.0, lon=121.0, k=5, scope="hole")
+    assert len(own) == 5 and {r["hole"] for r in own} == {"SELF"} and own[0]["from_m"] == 0.0   # the query interval itself comes first
+    state = extras.similar(eng, Z[0], hole="SELF", lat=-25.0, lon=121.0, k=10)
+    assert "SELF" not in {r["hole"] for r in state} and "NEAR" not in {r["hole"] for r in state}
+    with pytest.raises(ValueError):
+        extras.similar(eng, Z[0], hole="SELF", scope="nearby")
