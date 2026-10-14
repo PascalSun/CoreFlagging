@@ -177,9 +177,9 @@ function TrayPicture({ offset }: { offset: number }) {
 }
 
 const FEATURES: { title: string; body: string; offset: number; tint: string; to: "map" | "findings" }[] = [
-  { title: "Every hole, one map", body: "About 6,600 scanned holes from every State's core library, coloured by what the core is made of.", offset: 0.05, tint: "#0d3a4c", to: "map" },
-  { title: "The log next to the scan", body: "Open a hole: the tray photographs, the minerals every 10 cm and CoreTrace's reading, beside the geologist's log.", offset: 0.3, tint: "#173523", to: "map" },
-  { title: "Where they disagree", body: "The intervals where the core and the log tell different stories, each with its photograph, to look at again.", offset: 0.55, tint: "#3b2916", to: "findings" },
+  { title: "Every hole, one map", body: "About 6,600 scanned holes from every State's core library, coloured by what each was drilled for \u2014 gold, copper, nickel \u2014 or by what the core is made of.", offset: 0.05, tint: "#0d3a4c", to: "map" },
+  { title: "The log next to the scan", body: "Open a hole: the log from the whole hole down to 10 cm, the tray photographs and the line scan, the minerals every 10 cm and CoreTrace's reading, beside the geologist's log.", offset: 0.3, tint: "#173523", to: "map" },
+  { title: "Where they disagree", body: "The intervals where the core and the log tell different stories, each with its photograph, to look at again \u2014 and core like them, in the hole, nearby or across the State.", offset: 0.55, tint: "#3b2916", to: "findings" },
   { title: "Ask about the core", body: "An assistant that answers from the same data, in plain words, and opens the hole it is talking about.", offset: 0.15, tint: "#2a2446", to: "map" },
 ];
 
@@ -324,7 +324,7 @@ export function CoreHow() {
 const FOUND: [string, string][] = [
   ["74%", "When CoreTrace and the log disagree, the chemistry backs CoreTrace in 74% of cases, against 51% by chance."],
   ["79 intervals", "Ultramafic rock in WA logged as something else, confirmed by the scanner's own minerals."],
-  ["5,841 holes", "Read across Australia. Checked against logs and chemistry in Western Australia."],
+  ["5,846 holes", "Read across Australia. Checked against logs and chemistry in Western Australia."],
 ];
 
 /** A short look at the findings, three tested numbers and the way in. */
