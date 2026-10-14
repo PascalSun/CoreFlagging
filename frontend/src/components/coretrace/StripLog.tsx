@@ -259,7 +259,7 @@ export function StripLegend({ metres, model, hasLith, hasAu }: { metres: Metres;
         {model && <span className="flex items-center gap-1"><Sw c="#9ca3af" />unusual, not flagged</span>}
         {model && <span className="flex items-center gap-1"><Sw c={SERIES.blue} />gold likelihood (0–1)</span>}
         {hasAu && <span className="flex items-center gap-1"><Sw c={INK} />assay ≥ 0.1 ppm</span>}
-        {hasLith && <span className="text-slate-400">Rock: logged classes, named on hover</span>}
+        {hasLith && <span className="text-slate-400">Rock: logged classes in GSWA map colours, named on hover</span>}
       </div>
     </div>
   );
