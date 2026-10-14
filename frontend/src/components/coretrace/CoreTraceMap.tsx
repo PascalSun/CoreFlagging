@@ -90,7 +90,8 @@ export function CoreTraceMap() {
   const mq = useQuery({ queryKey: ["core-models"], queryFn: coreScan.models, staleTime: 10 * 60_000 });
   const models = useMemo(() => mq.data ?? [], [mq.data]);
   const run = sp.get("model") || models.find((m) => m.default)?.run || models[0]?.run || "";
-  const hq = useQuery({ queryKey: ["core-holes", authed], queryFn: coreScan.holes, refetchInterval: (qq) => (qq.state.data?.holes.some((h) => h.mine && ACTIVE.includes(h.status)) ? 4000 : false), refetchIntervalInBackground: true });
+  // the list is kept a minute: moving between the map, a hole and the list must not fetch six thousand rows again
+  const hq = useQuery({ queryKey: ["core-holes", authed], queryFn: coreScan.holes, staleTime: 60_000, refetchInterval: (qq) => (qq.state.data?.holes.some((h) => h.mine && ACTIVE.includes(h.status)) ? 4000 : false), refetchIntervalInBackground: true });
   const holes = useMemo(() => hq.data?.holes ?? [], [hq.data]);
   const typeName = useMemo(() => new Map((hq.data?.core_types ?? []).map((c) => [c.k, c.name])), [hq.data]);
   const tab = sp.get("tab") || "metre";
