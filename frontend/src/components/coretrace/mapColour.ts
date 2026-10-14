@@ -8,7 +8,7 @@ import type { Shape } from "@/components/coretrace/shapes";
 
 export type ColourMode = "target" | "again" | "type" | "gold" | "data" | "state";
 export const COLOUR_MODES: { id: ColourMode; label: string; short: string; hint: string }[] = [
-  { id: "target", short: "Target", label: "Target commodity", hint: "What the hole was drilled for, from the report (DMIRS HyLogger package)." },
+  { id: "target", short: "Target", label: "Target commodity", hint: "What the hole was drilled for: its survey record, its exploration report, or (dashed) the nearest known deposit." },
   { id: "again", short: "Look again", label: "Worth a second look", hint: "Intervals where the model's reading disagrees with the geologist's log (the ultramafic rule), by metres." },
   { id: "type", short: "Core type", label: "Core type", hint: "The core type the model reads most often down the hole, by its leading mineral." },
   { id: "gold", short: "Gold", label: "Gold assays", hint: "Whether the scan carries gold assays, and whether any reach 0.1 ppm." },

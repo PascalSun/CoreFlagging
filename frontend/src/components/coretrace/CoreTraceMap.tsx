@@ -144,11 +144,11 @@ export function CoreTraceMap() {
   useEffect(() => { if (!mobile && !holeKey && hq.data && !tourSeen()) setTouring(true); }, [hq.data]);   // eslint-disable-line react-hooks/exhaustive-deps
   const tour: TourStep[] = [
     { title: "Welcome to CoreTrace", body: `Every HyLogger-scanned drillhole in Australia's core libraries, ${holes.length ? holes.length.toLocaleString() + " of them, " : ""}read metre by metre by a model trained on scanned drill core. Five quick steps.` },
-    { target: "legend", title: "Each point is a drillhole", body: "Colour is what the hole was drilled for (gold, copper, nickel\u2026 from the survey's record of the hole; WA, SA and Victoria carry it); shape is whether its assays found gold. Switch the colour to \u201cCore type\u201d for what the model reads, or \u201cLook again\u201d for where it differs from the geologist's log. Click a row to show only those holes." },
+    { target: "legend", title: "Each point is a drillhole", body: "Colour is what the hole was drilled for \u2014 gold, copper, nickel\u2026 from the survey's record of the hole in WA, SA and Victoria, from its exploration report or the nearest known deposit elsewhere (a dashed rim). Shape is whether its assays found gold. Switch the colour to \u201cCore type\u201d for what the model reads, or \u201cLook again\u201d for where it differs from the geologist's log. Click a row to show only those holes." },
     { target: "tabs", title: "Map, or every hole as a table", body: "The Holes tab lists every hole: search by name, company or region and sort by depth or gold. The State and filter beside it apply to both." },
     ...(chatOpen && !mobile ? [{ target: "chat", title: "Ask in plain words", body: "\u201cHoles with gold in NSW\u201d, \u201cwhat is unusual in MND036?\u201d. The assistant answers from the same data, and opens the holes it talks about on the map." }] : []),
     { target: "upload", title: "Bring your own scan", body: "Upload a TSG package from a HyLogger: it gets the same checks, log and model reading as the library holes, and stays private to you." },
-    { title: "Open any hole", body: "Click a point. You get its tray photographs, a strip log down the hole, and what the model reads at each metre. Hover the log to move through it." },
+    { title: "Open any hole", body: "Click a point. You get its strip log, its tray photographs, and what the model reads at each metre. Zoom the log from the whole hole down to 10 cm, open \u201cLook again\u201d for where the scan is worth a second look, and \u201cSimilar core\u201d for core like it anywhere in the State." },
   ];
   const colour = useMemo(() => (h: (typeof holes)[number]) => {
     const c = classify(h, mode, typeName), sh = shapeOf(h, shapeMode);
