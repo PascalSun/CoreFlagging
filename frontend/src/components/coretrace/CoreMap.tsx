@@ -58,32 +58,46 @@ function waiting(holes: HoleRow[]) {
     type: "Feature" as const, geometry: { type: "Point" as const, coordinates: [h.lon as number, h.lat as number] }, properties: { key: h.key, name: h.name, wait: 1, dim: 0 } })) };
 }
 
-/** A cluster as a donut on a disc of frosted glass: one thin arc per class in the order of the key, the count
- * in the middle, sized by the count. The shape is the same at every size, so clusters read as one family. */
-function donut(props: Record<string, number>, classes: ClusterClass[]): HTMLElement {
-  const n = props.point_count as number;
-  const parts = classes.map((c, i) => [i, props[`c${i}`] ?? 0] as const).filter(([, v]) => v > 0);
-  const r = Math.round(16 + Math.min(18, Math.sqrt(n) * 1.15)), w = Math.max(4, Math.round(r * 0.2)), S = r * 2 + w + 8, c = S / 2;
-  const arc = (a0: number, a1: number) => {
-    const big = a1 - a0 > Math.PI ? 1 : 0, x0 = c + r * Math.cos(a0), y0 = c + r * Math.sin(a0), x1 = c + r * Math.cos(a1), y1 = c + r * Math.sin(a1);
-    return `M${x0.toFixed(2)} ${y0.toFixed(2)}A${r} ${r} 0 ${big} 1 ${x1.toFixed(2)} ${y1.toFixed(2)}`;
-  };
-  // a small gap between arcs, rounded ends; a class too thin for a gap is drawn as a dot of its colour
+const PX = 2;                 // cluster images are drawn at twice their size, as the marks are
+/** The image id of a cluster: "cl|<count>|<per-slot counts>|<dim>"; one image per distinct make-up and size. */
+const CLUSTER_ICON = ["concat", "cl|", ["get", "point_count"], "|", ...[...Array(SLOTS).keys()].flatMap((i) => [["coalesce", ["get", `c${i}`], 0], ","]), "|", ["case", [">=", ["coalesce", ["get", "dimn"], 0], ["get", "point_count"]], 1, 0]];
+const clusterRadius = (n: number) => Math.round(16 + Math.min(18, Math.sqrt(n) * 1.15));
+
+/** A cluster as a donut on a translucent disc: one thin arc per class in the order of the key, the count in
+ * the middle, sized by the count. Drawn on a canvas and handed to the map as an image, so a thousand clusters
+ * cost the GPU one quad each — the same disc as a DOM marker, blurred, cost a frame per hundred. */
+function drawCluster(id: string, classes: ClusterClass[]): { width: number; height: number; data: Uint8ClampedArray } | null {
+  const [, nS, slots, dimS] = id.split("|"); const n = Number(nS); if (!n || typeof document === "undefined") return null;
+  const counts = slots.split(",").map(Number); const dim = dimS === "1";
+  const parts = classes.map((c, i) => [i, counts[i] || 0] as const).filter(([, v]) => v > 0);
+  const r = clusterRadius(n) * PX, w = Math.max(4, Math.round((r / PX) * 0.2)) * PX, S = r * 2 + w + 10 * PX, c = S / 2;
+  const cv = document.createElement("canvas"); cv.width = cv.height = S;
+  const g = cv.getContext("2d"); if (!g) return null;
+  g.globalAlpha = dim ? 0.3 : 1;
+  // the disc: translucent white with a hairline rim, lifted by a soft shadow
+  g.save(); g.shadowColor = "rgba(2,6,23,0.28)"; g.shadowBlur = 8 * PX; g.shadowOffsetY = 2 * PX;
+  g.beginPath(); g.arc(c, c, r + w / 2 + 2 * PX, 0, Math.PI * 2); g.fillStyle = "rgba(255,255,255,0.72)"; g.fill(); g.restore();
+  g.beginPath(); g.arc(c, c, r + w / 2 + 2 * PX, 0, Math.PI * 2); g.lineWidth = 1 * PX; g.strokeStyle = "rgba(255,255,255,0.85)"; g.stroke();
+  // the ring: a faint track, then one arc per class with a small gap and rounded ends
+  g.beginPath(); g.arc(c, c, r, 0, Math.PI * 2); g.lineWidth = w; g.strokeStyle = "rgba(15,23,42,0.08)"; g.stroke();
   const gap = parts.length > 1 ? Math.min(0.12, (Math.PI * 2) / (parts.length * 6)) : 0;
-  let a = -Math.PI / 2; const paths: string[] = [];
+  let a = -Math.PI / 2; g.lineCap = "round";
   for (const [i, v] of parts) {
     const sweep = (v / n) * Math.PI * 2, a1 = a + sweep - gap;
-    paths.push(a1 - a > 0.001 ? `<path d="${arc(a, a1)}" stroke="${classes[i].color}" stroke-width="${w}" fill="none" stroke-linecap="round"/>`
-      : `<circle cx="${(c + r * Math.cos(a + sweep / 2)).toFixed(2)}" cy="${(c + r * Math.sin(a + sweep / 2)).toFixed(2)}" r="${w / 2}" fill="${classes[i].color}"/>`);
+    g.beginPath(); g.strokeStyle = classes[i].color; g.fillStyle = classes[i].color;
+    if (a1 - a > 0.001) { g.arc(c, c, r, a, a1); g.stroke(); } else { g.arc(c + r * Math.cos(a + sweep / 2), c + r * Math.sin(a + sweep / 2), w / 2, 0, Math.PI * 2); g.fill(); }
     a += sweep;
   }
-  const dim = (props.dimn ?? 0) >= n;
-  const el = document.createElement("div");
-  el.className = "ct-cluster"; el.style.width = el.style.height = `${S}px`; el.style.opacity = dim ? "0.3" : "1";
-  const fs = n >= 1000 ? Math.max(10, r * 0.46) : n >= 100 ? Math.max(11, r * 0.52) : Math.max(12, r * 0.6);
-  el.innerHTML = `<div class="ct-cluster-glass"></div><svg width="${S}" height="${S}" viewBox="0 0 ${S} ${S}"><circle cx="${c}" cy="${c}" r="${r}" stroke="rgba(15,23,42,.08)" stroke-width="${w}" fill="none"/>${paths.join("")}<text x="${c}" y="${c + 0.5}" text-anchor="middle" dominant-baseline="central" font-size="${fs.toFixed(1)}" font-weight="600" fill="#0f172a" letter-spacing="-0.02em" style="font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',ui-sans-serif,system-ui,sans-serif;font-variant-numeric:tabular-nums">${n.toLocaleString()}</text></svg>`;
-  el.title = `${n.toLocaleString()} holes · ` + parts.sort((x, y) => y[1] - x[1]).slice(0, 4).map(([i, v]) => `${classes[i].label} ${v}`).join(", ");
-  return el;
+  const fs = (n >= 1000 ? Math.max(10, (r / PX) * 0.46) : n >= 100 ? Math.max(11, (r / PX) * 0.52) : Math.max(12, (r / PX) * 0.6)) * PX;
+  g.font = `600 ${fs}px -apple-system, BlinkMacSystemFont, "SF Pro Text", ui-sans-serif, system-ui, sans-serif`; g.textAlign = "center"; g.textBaseline = "middle"; g.fillStyle = "#0f172a";
+  g.fillText(n.toLocaleString(), c, c + 0.5 * PX);
+  return { width: S, height: S, data: g.getImageData(0, 0, S, S).data };
+}
+
+/** What a cluster holds, for its tooltip: "182 holes · Gold 120, Nickel 40 …". */
+function clusterText(p: Record<string, number>, classes: ClusterClass[]): string {
+  const n = p.point_count; const parts = classes.map((c, i) => [c.label, p[`c${i}`] ?? 0] as const).filter(([, v]) => v > 0).sort((x, y) => y[1] - x[1]);
+  return `${n.toLocaleString()} holes · ` + parts.slice(0, 4).map(([l, v]) => `${l} ${v}`).join(", ") + (parts.length > 4 ? " …" : "");
 }
 
 /** The map of scanned holes, on satellite imagery or a terrain map; each hole has a white edge so its colour reads on any ground. A point is a hole; clicking one selects it. */
@@ -179,6 +193,8 @@ export function CoreMap({ holes, colour, card, selected, onSelect, padRight, pad
           map.addLayer({ id: "holes-halo", type: "circle", source: "holes", filter: ["==", ["get", "wait"], 0], paint: {
             "circle-radius": ["interpolate", ["linear"], ["zoom"], 3, 5, 6, 6.5, 9, 9, 12, 12],
             "circle-color": "#020617", "circle-blur": 0.9, "circle-opacity": ["case", D, 0.03, 0.4] } });
+          map.addLayer({ id: "holes-cluster", type: "symbol", source: "holes", filter: ["has", "point_count"], layout: {
+            "icon-image": CLUSTER_ICON, "icon-allow-overlap": true, "icon-ignore-placement": true, "symbol-sort-key": ["-", 0, ["get", "point_count"]] } });
           // a mark with letters is a dot or its shape until BADGE_FROM, a badge from there on
           const G = ["!=", ["get", "glyph"], ""];
           map.addLayer({ id: "holes-badge", type: "symbol", source: "holes", minzoom: BADGE_FROM, filter: ["all", ["==", ["get", "wait"], 0], G], layout: {
@@ -211,28 +227,12 @@ export function CoreMap({ holes, colour, card, selected, onSelect, padRight, pad
       };
       map.on("style.load", addLayers);
       // icons are drawn the first time the map asks for one: a shape in a fill colour with an edge
-      map.on("styleimagemissing", (e: any) => { const im = drawIcon(e.id); if (im && !map.hasImage(e.id)) map.addImage(e.id, im, { pixelRatio: ICON_PIXEL_RATIO }); });
-      // the clusters on screen as donut markers: made once per cluster, shown while in view, all dropped when the data changes
-      const made = new Map<number, any>(); let shown = new Map<number, any>();
-      const syncClusters = () => {
-        if (!map.getSource("holes") || !map.isSourceLoaded("holes")) return;
-        const next = new Map<number, any>();
-        for (const f of map.querySourceFeatures("holes")) {
-          const p = f.properties; if (!p?.cluster) continue;
-          const id = p.cluster_id as number; if (next.has(id)) continue;
-          let m = made.get(id);
-          if (!m) {
-            const el = donut(p, classesRef.current);
-            el.addEventListener("click", (e) => { e.stopPropagation(); map.getSource("holes").getClusterExpansionZoom(id, (err: any, z: number) => { if (!err) map.easeTo({ center: f.geometry.coordinates, zoom: Math.min(z + 0.3, 12), duration: 600 }); }); });
-            m = new mapboxgl.Marker({ element: el }).setLngLat(f.geometry.coordinates); made.set(id, m);
-          }
-          next.set(id, m); if (!shown.has(id)) m.addTo(map);
-        }
-        for (const [id, m] of shown) if (!next.has(id)) m.remove();
-        shown = next;
-      };
-      dropClustersRef.current = () => { for (const m of shown.values()) m.remove(); shown = new Map(); made.clear(); };
-      map.on("render", syncClusters);
+      map.on("styleimagemissing", (e: any) => {
+        const im = e.id.startsWith("cl|") ? drawCluster(e.id, classesRef.current) : drawIcon(e.id);
+        if (im && !map.hasImage(e.id)) map.addImage(e.id, im, { pixelRatio: e.id.startsWith("cl|") ? PX : ICON_PIXEL_RATIO });
+      });
+      // when the classes change the cluster images are drawn again (an id names a make-up by slot, not by class)
+      dropClustersRef.current = () => { for (const id of map.listImages?.() ?? []) if (id.startsWith("cl|")) map.removeImage(id); };
       map.on("load", () => {
         addLayers();
         let hovered: string | null = null;
@@ -240,6 +240,13 @@ export function CoreMap({ holes, colour, card, selected, onSelect, padRight, pad
           if (hovered) map.setFeatureState({ source: "holes", id: hovered }, { hover: false });
           hovered = k; if (k) map.setFeatureState({ source: "holes", id: k }, { hover: true });
         };
+        map.on("click", "holes-cluster", (e: any) => {
+          const f = e.features?.[0]; if (!f) return;
+          map.getSource("holes").getClusterExpansionZoom(f.properties.cluster_id, (err: any, z: number) => { if (!err) map.easeTo({ center: f.geometry.coordinates, zoom: Math.min(z + 0.3, 12), duration: 600 }); });
+        });
+        map.on("mouseenter", "holes-cluster", () => { map.getCanvas().style.cursor = "pointer"; });
+        map.on("mousemove", "holes-cluster", (e: any) => { const f = e.features?.[0]; if (!f) return; tip.setLngLat(f.geometry.coordinates).setDOMContent(html(`<div class="px-2.5 py-1.5 text-xs text-slate-800">${clusterText(f.properties, classesRef.current)}</div>`)).addTo(map); });
+        map.on("mouseleave", "holes-cluster", () => { map.getCanvas().style.cursor = ""; tip.remove(); });
         const LAYERS = ["holes-badge", "holes-sym", "holes-sym-far", "holes-pt", "holes-pt-plain", "holes-wait"];
         map.on("click", LAYERS, (e: any) => { const k = e.features?.[0]?.properties?.key; if (k) selectRef.current(k); });
         map.on("mouseenter", LAYERS, () => { map.getCanvas().style.cursor = "pointer"; });
