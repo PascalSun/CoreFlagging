@@ -13,7 +13,7 @@ export const COLOUR_NOTES = {
   },
   target: {
     title: "Commodity colours and symbols",
-    body: "What a hole was drilled for comes from the surveys' own drillhole records: WA from the DMIRS HyLogger drillhole package (DASC), South Australia from SARIG, Victoria from the Earth Resources bores database. NSW, Queensland, the NT and Tasmania record no per-hole target, so those holes show none. The colours are CoreTrace's own: no survey publishes a commodity colour scheme, so the commodities were given fills that stay apart on imagery, with the chemical symbol (Au, Cu, Ni…) on each mark so the colour need not be remembered.",
+    body: "A solid rim is the hole's own record: WA from the DMIRS HyLogger drillhole package (DASC), South Australia from SARIG, Victoria from the Earth Resources bores database. A dashed rim (≈ in the list) is an inference, because the survey records no target on the hole: Queensland and the NT take the commodities of the exploration report or permit the hole belongs to; NSW and Tasmania take the nearest known mineral deposit within 5 km (Geoscience Australia), the project's namesake first. The colours are CoreTrace's own, with the chemical symbol (Au, Cu, Ni…) on each mark so the colour need not be remembered.",
     link: { href: "https://dasc.dmirs.wa.gov.au/", label: "DASC: Datasets › Interim data › Drillholes › HyLogger drillhole package" },
   },
   mineral: {

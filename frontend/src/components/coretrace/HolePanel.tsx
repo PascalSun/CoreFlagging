@@ -5,7 +5,7 @@ import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-quer
 import { AlertTriangle, ArrowRight, Box, ChevronLeft, ChevronRight, Download, ExternalLink, FileDown, FileText, Loader2, Maximize2, Minimize2, Trash2, X } from "lucide-react";
 import { downloadReportPdf } from "@/components/coretrace/pdf";
 import { PAGE_W, ReportDocument } from "@/components/coretrace/ReportDocument";
-import { ACTIVE, abstractParts, commodityName, coreScan, readDate, reportFileKind, sourceLabel, surveyOf, type SimilarScope, type CoreModelInfo, type HoleDetail, type HoleReport, type MetreView, type ModelView, type Tray } from "@/lib/coreScan";
+import { ACTIVE, inferred, TARGET_SOURCE_LABEL, abstractParts, commodityName, coreScan, readDate, reportFileKind, sourceLabel, surveyOf, type SimilarScope, type CoreModelInfo, type HoleDetail, type HoleReport, type MetreView, type ModelView, type Tray } from "@/lib/coreScan";
 import { ISSUE_LABEL, STATUS_LABEL, SERIES, coreTypeColor, fmt, groupColor, groupName, issueLabel, mineralName, pct } from "@/components/coretrace/palette";
 import { LINE, SpectraChart } from "@/components/coretrace/SpectraChart";
 import { StripLegend, StripLog } from "@/components/coretrace/StripLog";
@@ -338,7 +338,7 @@ export function HolePanel({ holeKey, tab: tabProp, onTab, models, run, onRun, me
           {hole?.offshore && <span className="flex-none rounded-full bg-sky-50 px-2 py-0.5 text-[10px] font-medium text-sky-800" title="A petroleum well in offshore (Commonwealth) waters">Offshore</span>}
         </div>
         <p className="truncate text-xs text-slate-500">{hole ? [hole.operator, hole.project, hole.region].filter(Boolean).join(" · ") || "No collar details in the scan" : "Loading…"}</p>
-        {hole?.target && <p className="truncate text-[11px] text-slate-600" title={`What the hole was drilled for, from the report${hole.commodities.length > 1 ? `: ${hole.commodities.map(commodityName).join(", ")}` : ""}`}>Drilled for <b className="font-semibold text-slate-800">{commodityName(hole.target)}</b>{hole.commodities.length > 1 ? <span className="text-slate-500"> · also {hole.commodities.filter((c) => c !== hole.target).map(commodityName).join(", ")}</span> : null}</p>}
+        {hole?.target && <p className="truncate text-[11px] text-slate-600" title={`What the hole was drilled for, ${TARGET_SOURCE_LABEL[hole.target_source] || "from the record"}${hole.commodities.length > 1 ? `: ${hole.commodities.map(commodityName).join(", ")}` : ""}`}>{inferred(hole.target_source) ? <>Likely drilled for <b className="font-semibold text-slate-800">{commodityName(hole.target)}</b> <span className="text-slate-400">({hole.target_source === "deposit" ? "nearest deposit" : "the report"})</span></> : <>Drilled for <b className="font-semibold text-slate-800">{commodityName(hole.target)}</b></>}{hole.commodities.length > 1 ? <span className="text-slate-500"> · also {hole.commodities.filter((c) => c !== hole.target).map(commodityName).join(", ")}</span> : null}</p>}
       </div>
       <div className="flex flex-none items-center gap-1">
         {hasReport && rq.data?.pdf_url && <a href={rq.data.pdf_url} target="_blank" rel="noopener" aria-label="Open the original report" title={`Open the original exploration report (WAMEX ${rq.data.anumber})`} className="grid h-8 w-8 place-items-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-900"><ExternalLink size={15} /></a>}

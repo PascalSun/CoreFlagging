@@ -15,11 +15,17 @@ export class CoreError extends Error {
 
 export type HoleStatus = "awaiting_upload" | "queued" | "reading" | "cleaning" | "modelling" | "ready" | "failed";
 
+/** Where a hole's target came from: its own survey record, the report or permit it belongs to, the nearest known deposit (an inference), or nowhere. */
+export type TargetSource = "survey" | "report" | "deposit" | "";
+export const TARGET_SOURCE_LABEL: Record<TargetSource, string> = { survey: "from the hole's own record", report: "from the exploration report", deposit: "inferred from the nearest known deposit", "": "" };
+/** A target that is not the hole's own record: shown with a dashed rim and a ≈. */
+export const inferred = (s: TargetSource | undefined) => !!s && s !== "survey";
+
 export type HoleRow = {
   key: string; name: string; source: "nvcl" | "upload"; status: HoleStatus; message: string; progress: number;
   lon: number | null; lat: number | null; state: string; offshore: boolean; operator: string; project: string; region: string; instrument: string;
   depth_min: number | null; depth_max: number | null; tir: string; has_lith: boolean; au_m: number; au_pos_m: number;
-  n_issues: number; n_again: number; again_m: number; target: string; commodities: string[]; split: string; is_public: boolean; mine: boolean; updated: string; processed_at: string | null; strip?: number[];
+  n_issues: number; n_again: number; again_m: number; target: string; commodities: string[]; target_source: TargetSource; split: string; is_public: boolean; mine: boolean; updated: string; processed_at: string | null; strip?: number[];
 };
 
 /** An interval where the model's reading disagrees with the log, by the ultramafic rule (computed on the platform, `core_scan/look_again.py`). */
