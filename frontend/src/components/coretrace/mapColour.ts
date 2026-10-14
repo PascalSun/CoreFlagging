@@ -32,6 +32,7 @@ const TARGET_COLOUR: [string, string, string, string][] = [
   ["petroleum", "Petroleum", "#3f3a36", "Oil"], ["zinc", "Zinc", "#0f8fa8", "Zn"], ["lead", "Lead", "#5b6472", "Pb"], ["coal", "Coal", "#1f1d1b", "C"],
   ["cobalt", "Cobalt", "#2a4bd7", "Co"], ["platinum group elements", "PGE", "#6d28d9", "PGE"], ["silver", "Silver", "#8a94a6", "Ag"], ["manganese", "Manganese", "#a3165a", "Mn"],
   ["tin", "Tin", "#0f766e", "Sn"], ["tungsten", "Tungsten", "#4338ca", "W"], ["vanadium", "Vanadium", "#c2410c", "V"], ["diamonds", "Diamonds", "#38bdf8", "Dia"],
+  ["heavy mineral sands", "Mineral sands", "#a16207", "HMS"], ["water", "Water", "#0ea5e9", "H₂O"], ["molybdenum", "Molybdenum", "#475569", "Mo"], ["antimony", "Antimony", "#7e22ce", "Sb"],
 ];
 const STATE_COLOUR: Record<string, string> = {
   WA: SERIES.orange, NSW: SERIES.blue, QLD: SERIES.magenta, SA: SERIES.green, NT: SERIES.yellow, TAS: SERIES.violet, VIC: SERIES.aqua, CSIRO: PLAIN,
@@ -55,7 +56,7 @@ export function classify(h: HoleRow, mode: ColourMode, typeName: Map<number, str
     return { label: "No assays", color: "#94a3b8", order: 2 };
   }
   if (mode === "target") {
-    if (!h.target) return { label: h.state && h.state !== "WA" ? "No target (other States)" : "No target on record", color: "#cbd5e1", order: 99 };   // a quiet dot, not a ring: the rings mean "no model reading"
+    if (!h.target) return { label: "No target on record", color: "#cbd5e1", order: 99 };   // a quiet dot, not a ring: the rings mean "no model reading"
     const i = TARGET_COLOUR.findIndex(([k]) => k === h.target);
     return i >= 0 ? { label: TARGET_COLOUR[i][1], color: TARGET_COLOUR[i][2], order: i, glyph: TARGET_COLOUR[i][3] } : { label: "Other", color: "#94a3b8", order: 50 };
   }
