@@ -16,6 +16,7 @@ import { isAuthed, isVerified } from "@/lib/auth";
 import { ACTIVE, coreScan, STATES } from "@/lib/coreScan";
 import { COLOUR_MODES, SHAPE_MODES, classify, shapeOf, type ColourMode, type ShapeMode } from "@/components/coretrace/mapColour";
 import { Mark, type Shape } from "@/components/coretrace/shapes";
+import { ColourNote } from "@/components/coretrace/ColourNote";
 import { HoleTable } from "@/components/coretrace/HoleTable";
 import { holeCard } from "@/components/coretrace/mapCard";
 import { Tour, tourSeen, type TourStep } from "@/components/coretrace/Tour";
@@ -237,6 +238,7 @@ export function CoreTraceMap() {
                   <span>{focus ? "Showing one class" : "Click a row to show only those holes"}{waiting ? ` · ${waiting.toLocaleString()} still being processed` : ""}</span>
                   {focus && <button type="button" onClick={() => setFocus(null)} className="font-medium text-slate-800 hover:underline">Show all</button>}
                 </p>
+                {(mode === "target" || mode === "type") && <ColourNote kind={mode === "target" ? "target" : "mineral"} className="mt-0.5" />}
               </div>
             )}
           </div>
