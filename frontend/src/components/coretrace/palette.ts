@@ -51,11 +51,15 @@ export function coreTypeColor(name: string | undefined): string {
   return OTHER;
 }
 
-/** Logged rock classes: neutral family tones, named in the tooltip. Rock is context here, not the subject. */
+/** Logged rock classes in GSWA's own colours. Each is the modal fill GSWA gives units of that rock type in the
+ * 1:500 000 Interpreted bedrock geology of Western Australia (DASC, the layer's symbology over its 1,537 unit
+ * codes): granitoids pink, mafic intrusives mint, mafic volcanics green, felsic volcanics yellow, ultramafics
+ * lavender, siliciclastics pale grey, chemical sediments and iron formation sky blue, metamorphics grey-green.
+ * A geologist who reads GSWA maps reads the Rock track without a key. */
 const LITH: Record<string, string> = {
-  Ultramafic: "#3f5f4b", "Mafic intrusive": "#5d7f68", "Mafic volcanic": "#86a58f", "Intermediate intrusive": "#9aa0a8", Granitoid: "#d9a9a0",
-  "Felsic and intermediate volcanic": "#e6c9a8", Metamorphic: "#8f86a8", "Clastic sedimentary": "#d9cf9a", "Carbonate rock": "#a9c7e0",
-  "Iron formation and chert": "#9a5a4a", "Vein and alteration": "#f0f0f0", "Regolith and cover": "#cbb8a0",
+  Ultramafic: "#c8c0fd", "Mafic intrusive": "#8ee4b4", "Mafic volcanic": "#b1feb3", "Intermediate intrusive": "#fecfcb", Granitoid: "#fe9e98",
+  "Felsic and intermediate volcanic": "#fee79f", Metamorphic: "#cfdad7", "Clastic sedimentary": "#e3dddb", "Carbonate rock": "#9dd7fb",
+  "Iron formation and chert": "#6bc3f9", "Vein and alteration": "#b2bdc3", "Regolith and cover": "#f3e6b8",
 };
 export function lithColor(l: string | null | undefined): string {
   return l ? LITH[l] ?? OTHER : NONE;
