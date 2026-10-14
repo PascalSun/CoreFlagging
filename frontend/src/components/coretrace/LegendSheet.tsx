@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Layers, X } from "lucide-react";
 import { Mark, type Shape } from "@/components/coretrace/shapes";
+import { ColourNote } from "@/components/coretrace/ColourNote";
 import { cn } from "@/lib/utils";
 
 type Entry = { color: string; n: number; ring?: string; wait?: boolean; glyph?: string };
@@ -70,6 +71,7 @@ export function LegendSheet<C extends string, S extends string, B extends string
                 <p className="mb-2 text-xs font-semibold text-slate-500">Colour the holes by</p>
                 <div className="flex flex-wrap gap-1.5">{p.modes.map((m) => <button key={m.id} type="button" onClick={() => { p.onMode(m.id); p.onFocus(null); }} className={chip(p.mode === m.id)}>{m.label}</button>)}</div>
                 <div className="mt-2.5 grid grid-cols-2 gap-x-1">{shown.map(([l, e]) => row(l, <Mark color={e.color} ring={e.ring} glyph={e.glyph} size={12} />, e.n))}</div>
+                {(p.mode === "target" || p.mode === "type") && <ColourNote kind={p.mode === "target" ? "target" : "mineral"} className="mt-1" />}
               </section>
               <section>
                 <p className="mb-2 text-xs font-semibold text-slate-500">Shape the holes by</p>

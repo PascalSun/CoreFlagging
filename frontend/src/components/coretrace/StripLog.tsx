@@ -5,6 +5,7 @@ import type { Metres, ModelView } from "@/lib/coreScan";
 import { GRID, INK, MUTED, SERIES, coreTypeColor, fmt, groupColor, groupName, lithColor, pct } from "@/components/coretrace/palette";
 import { cn } from "@/lib/utils";
 import { DepthNav } from "@/components/coretrace/DepthNav";
+import { ColourNote } from "@/components/coretrace/ColourNote";
 import { LEVELS, MIN_SPAN, fmtSpan, levelOf, windowAbout, windowAt } from "@/lib/depth";
 
 type Track = { id: string; label: string; w: number; kind: "cat" | "bar" };
@@ -260,6 +261,9 @@ export function StripLegend({ metres, model, hasLith, hasAu }: { metres: Metres;
         {model && <span className="flex items-center gap-1"><Sw c={SERIES.blue} />gold likelihood (0–1)</span>}
         {hasAu && <span className="flex items-center gap-1"><Sw c={INK} />assay ≥ 0.1 ppm</span>}
         {hasLith && <span className="text-slate-400">Rock: logged classes in GSWA map colours, named on hover</span>}
+      </div>
+      <div className="flex flex-wrap gap-x-2">
+        <ColourNote kind="mineral" />{hasLith && <ColourNote kind="rock" />}
       </div>
     </div>
   );
