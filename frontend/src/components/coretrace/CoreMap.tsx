@@ -19,7 +19,7 @@ const STYLES: Record<Basemap, string> = { satellite: "mapbox://styles/mapbox/sat
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-type Look = { color: string; label: string; ring?: string; wait?: boolean; dim?: boolean; shape?: Shape; shapeLabel?: string; glyph?: string };
+type Look = { color: string; label: string; ring?: string; wait?: boolean; dim?: boolean; shape?: Shape; shapeLabel?: string; glyph?: string; dashed?: boolean };
 const BADGE_FROM = 6;      // zoom from which a mark with letters is drawn as a badge; further out it is a dot like the rest
 
 // the rarer marks draw over the common ones, so a gold triangle is not buried under the circles around it
@@ -43,10 +43,10 @@ function features(holes: HoleRow[], colour: (h: HoleRow) => Look): { fc: any; cl
     type: "FeatureCollection" as const,
     features: placed.map((h, i) => ({
       type: "Feature" as const, geometry: { type: "Point" as const, coordinates: [h.lon as number, h.lat as number] },
-      properties: { key: h.key, name: h.name, mine: h.mine ? 1 : 0, ready: 1, issues: h.n_issues, [`s${slot.get(looks[i].label) ?? SLOTS - 1}`]: 1, ...(({ color, label, ring, wait, dim, shape, shapeLabel, glyph }) => ({
+      properties: { key: h.key, name: h.name, mine: h.mine ? 1 : 0, ready: 1, issues: h.n_issues, [`s${slot.get(looks[i].label) ?? SLOTS - 1}`]: 1, ...(({ color, label, ring, wait, dim, shape, shapeLabel, glyph, dashed }) => ({
         color, cls: [label, shapeLabel].filter(Boolean).join(" · "), ring: ring ?? "", wait: wait ? 1 : 0, dim: dim ? 1 : 0, z: dim ? 0 : RANK[shape ?? "circle"], shape: shape ?? "circle", glyph: glyph ?? "",
         icon: iconId(shape ?? "circle", ring ? "#ffffff" : color, h.mine ? "#111111" : ring ?? "rgba(255,255,255,0.9)", ring || h.mine ? 1.6 : 1),
-        badge: glyph ? iconId(shape ?? "circle", ring ? "#ffffff" : color, h.mine ? "#111111" : ring ?? "rgba(255,255,255,0.9)", ring || h.mine ? 1.6 : 1, glyph) : "" }))(looks[i]) },
+        badge: glyph ? iconId(shape ?? "circle", ring ? "#ffffff" : color, h.mine ? "#111111" : ring ?? "rgba(255,255,255,0.9)", ring || h.mine ? 1.6 : 1, glyph, !!dashed) : "" }))(looks[i]) },
     })),
   };
   return { fc, classes };

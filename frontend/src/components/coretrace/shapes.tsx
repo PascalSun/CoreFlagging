@@ -14,7 +14,7 @@ function path(ctx: CanvasRenderingContext2D | Path2D, shape: Shape, c: number, r
 }
 
 /** The image id the map asks for: "ct|<shape>|<fill>|<edge>|<edge width>|<glyph>". */
-export const iconId = (shape: Shape, fill: string, edge: string, w: number, glyph = "") => `ct|${shape}|${fill}|${edge}|${w}|${glyph}`;
+export const iconId = (shape: Shape, fill: string, edge: string, w: number, glyph = "", dashed = false) => `ct|${shape}|${fill}|${edge}|${w}|${glyph}|${dashed ? 1 : 0}`;
 const BADGE = 30;      // css px across for a mark that carries letters (room for the rim, the shadow and the shoulder dot)
 
 /** Black or white, whichever reads on this fill. */
@@ -29,7 +29,7 @@ const ACCENT: Record<Shape, string | null> = { circle: null, triangle: "#facc15"
 
 /** Draw the icon a map image id names, or null if the id is not one of ours. */
 export function drawIcon(id: string): { width: number; height: number; data: Uint8ClampedArray } | null {
-  const [tag, shape, fill, edge, w, glyph = ""] = id.split("|");
+  const [tag, shape, fill, edge, w, glyph = "", dashedS = "0"] = id.split("|"); const dashed = dashedS === "1";
   if (tag !== "ct" || typeof document === "undefined") return null;
   const n = (glyph ? BADGE : SIZE) * PX, cv = document.createElement("canvas"); cv.width = cv.height = n;
   const ctx = cv.getContext("2d"); if (!ctx) return null;
@@ -39,6 +39,9 @@ export function drawIcon(id: string): { width: number; height: number; data: Uin
     const c = n / 2, r = 10 * PX;
     ctx.save(); ctx.shadowColor = "rgba(2,6,23,0.38)"; ctx.shadowBlur = 5 * PX; ctx.shadowOffsetY = 1.5 * PX;
     ctx.beginPath(); ctx.arc(c, c, r + 1.25 * PX, 0, Math.PI * 2); ctx.fillStyle = edge === "#111111" ? "#111111" : "rgba(255,255,255,0.96)"; ctx.fill(); ctx.restore();
+    if (dashed) {   // an inferred target: the rim is a dashed dark ring instead of a solid white one
+      ctx.beginPath(); ctx.arc(c, c, r + 0.9 * PX, 0, Math.PI * 2); ctx.setLineDash([2.2 * PX, 1.8 * PX]); ctx.lineWidth = 1.5 * PX; ctx.strokeStyle = "rgba(15,23,42,0.75)"; ctx.stroke(); ctx.setLineDash([]);
+    }
     ctx.beginPath(); ctx.arc(c, c, r, 0, Math.PI * 2); ctx.fillStyle = fill; ctx.fill();
     const sheen = ctx.createLinearGradient(0, c - r, 0, c + r); sheen.addColorStop(0, "rgba(255,255,255,0.28)"); sheen.addColorStop(0.55, "rgba(255,255,255,0)"); sheen.addColorStop(1, "rgba(2,6,23,0.12)");
     ctx.beginPath(); ctx.arc(c, c, r, 0, Math.PI * 2); ctx.fillStyle = sheen; ctx.fill();
@@ -62,13 +65,13 @@ export function drawIcon(id: string): { width: number; height: number; data: Uin
 export const ICON_PIXEL_RATIO = PX;
 
 /** The same mark as a small inline SVG, for the legend and the list. */
-export function Mark({ shape = "circle", color, ring, size = 12, title, glyph }: { shape?: Shape; color: string; ring?: string; size?: number; title?: string; glyph?: string }) {
+export function Mark({ shape = "circle", color, ring, size = 12, title, glyph, dashed }: { shape?: Shape; color: string; ring?: string; size?: number; title?: string; glyph?: string; dashed?: boolean }) {
   if (glyph) {
     const S = Math.max(size, 20), c = S / 2, r = S / 2 - 1.5, acc = ACCENT[shape];
     return (
       <svg width={S} height={S} viewBox={`0 0 ${S} ${S}`} className="flex-none" role={title ? "img" : undefined} aria-label={title} aria-hidden={title ? undefined : true}>
         {title && <title>{title}</title>}
-        <circle cx={c} cy={c} r={r} fill={color} stroke="#fff" strokeWidth={1.5} />
+        <circle cx={c} cy={c} r={r} fill={color} stroke={dashed ? "rgba(15,23,42,.75)" : "#fff"} strokeWidth={1.5} strokeDasharray={dashed ? "2 1.6" : undefined} />
         <text x={c} y={c + 0.5} textAnchor="middle" dominantBaseline="central" fontSize={glyph.length >= 3 ? S * 0.36 : glyph.length === 2 ? S * 0.5 : S * 0.58} fontWeight={700} fill={inkOn(color)} style={{ fontFamily: "ui-sans-serif, system-ui, sans-serif" }}>{glyph}</text>
         {acc && <><circle cx={c + r * 0.72} cy={c - r * 0.72} r={3.2} fill="#fff" /><circle cx={c + r * 0.72} cy={c - r * 0.72} r={2.1} fill={acc} /></>}
       </svg>);

@@ -13,7 +13,7 @@ import { CoreMap, OVERLAYS, type Basemap, type Overlay } from "@/components/core
 import { HolePanel } from "@/components/coretrace/HolePanel";
 import { UploadDialog } from "@/components/coretrace/UploadDialog";
 import { isAuthed, isVerified } from "@/lib/auth";
-import { ACTIVE, coreScan, STATES } from "@/lib/coreScan";
+import { ACTIVE, inferred, coreScan, STATES } from "@/lib/coreScan";
 import { COLOUR_MODES, SHAPE_MODES, classify, shapeOf, type ColourMode, type ShapeMode } from "@/components/coretrace/mapColour";
 import { Mark, type Shape } from "@/components/coretrace/shapes";
 import { ColourNote } from "@/components/coretrace/ColourNote";
@@ -239,6 +239,7 @@ export function CoreTraceMap() {
                   <span>{focus ? "Showing one class" : "Click a row to show only those holes"}{waiting ? ` · ${waiting.toLocaleString()} still being processed` : ""}</span>
                   {focus && <button type="button" onClick={() => setFocus(null)} className="font-medium text-slate-800 hover:underline">Show all</button>}
                 </p>
+                {mode === "target" && onMap.some((h) => inferred(h.target_source)) && <p className="flex items-center gap-1.5 px-1 pt-1 text-[10.5px] text-slate-500"><Mark color="#94a3b8" glyph="Au" dashed size={10} /> dashed rim: inferred from the report or the nearest deposit</p>}
                 {(mode === "target" || mode === "type") && <ColourNote kind={mode === "target" ? "target" : "mineral"} className="mt-0.5" />}
               </div>
             )}

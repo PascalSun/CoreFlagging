@@ -2,7 +2,7 @@
 // colour and a plain name for the legend; colours come from the shared palette, so a mineral family
 // has the same colour on the map as in the logs.
 
-import type { HoleRow } from "@/lib/coreScan";
+import { inferred, type HoleRow } from "@/lib/coreScan";
 import { SERIES, coreTypeColor } from "@/components/coretrace/palette";
 import type { Shape } from "@/components/coretrace/shapes";
 
@@ -19,7 +19,7 @@ export const COLOUR_MODES: { id: ColourMode; label: string; short: string; hint:
 const WAIT = "#94a3b8", PLAIN = "#475569";
 /** `ring` set = drawn as a hollow ring of that colour (holes the models have nothing to say about) */
 /** `glyph` set = the mark carries letters (a commodity's chemical symbol), drawn as a badge when zoomed in */
-export type Class = { label: string; color: string; order: number; ring?: string; wait?: boolean; glyph?: string };
+export type Class = { label: string; color: string; order: number; ring?: string; wait?: boolean; glyph?: string; dashed?: boolean };
 
 const FAMILY: [string, string][] = [
   ["chlorite", "Chlorite"], ["white mica", "White mica"], ["kaolin", "Kaolin"], ["amphibole", "Amphibole"], ["carbonate", "Carbonate"],
@@ -58,7 +58,8 @@ export function classify(h: HoleRow, mode: ColourMode, typeName: Map<number, str
   if (mode === "target") {
     if (!h.target) return { label: "No target on record", color: "#cbd5e1", order: 99 };   // a quiet dot, not a ring: the rings mean "no model reading"
     const i = TARGET_COLOUR.findIndex(([k]) => k === h.target);
-    return i >= 0 ? { label: TARGET_COLOUR[i][1], color: TARGET_COLOUR[i][2], order: i, glyph: TARGET_COLOUR[i][3] } : { label: "Other", color: "#94a3b8", order: 50 };
+    const dashed = inferred(h.target_source);               // a report's or a deposit's commodity, not the hole's own record
+    return i >= 0 ? { label: TARGET_COLOUR[i][1], color: TARGET_COLOUR[i][2], order: i, glyph: TARGET_COLOUR[i][3], dashed } : { label: "Other", color: "#94a3b8", order: 50, dashed };
   }
   if (mode === "again") {
     if (!modelled) return { label: "No model reading", color: "#ffffff", ring: PLAIN, order: 5 };

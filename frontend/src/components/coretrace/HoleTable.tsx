@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { AlertTriangle, ArrowDown, ArrowUp, Download, Loader2, MessageCircle, Search, X } from "lucide-react";
-import { commodityName, coreScan, type HoleRow } from "@/lib/coreScan";
+import { commodityName, coreScan, type HoleRow, inferred, TARGET_SOURCE_LABEL } from "@/lib/coreScan";
 import { csvSheet } from "@/lib/lookAgain";
 import { NONE, coreTypeColor, fmt } from "@/components/coretrace/palette";
 import { Mark, type Shape } from "@/components/coretrace/shapes";
@@ -122,7 +122,7 @@ export function HoleTable({ holes, q, onQ, look, typeName, onOpen, onAsk, loadin
                   </td>
                   <td className="px-3 py-2 text-slate-600">{h.state || "Upload"}</td>
                   <td className="max-w-[22rem] truncate px-3 py-2 text-slate-600">{h.status !== "ready" ? <span className="text-slate-400">{STATUS_LABEL[h.status]}</span> : [h.operator, h.project, h.region].filter(Boolean).join(" · ") || "—"}</td>
-                  <td className="px-3 py-2 text-slate-600" title={h.commodities.length > 1 ? h.commodities.map(commodityName).join(", ") : undefined}>{h.target ? <>{commodityName(h.target)}{h.commodities.length > 1 && <span className="text-slate-400"> +{h.commodities.length - 1}</span>}</> : <span className="text-slate-300">—</span>}</td>
+                  <td className="px-3 py-2 text-slate-600" title={h.commodities.length > 1 ? h.commodities.map(commodityName).join(", ") : undefined}>{h.target ? <>{inferred(h.target_source) && <span className="text-slate-400" title={TARGET_SOURCE_LABEL[h.target_source]}>≈ </span>}{commodityName(h.target)}{h.commodities.length > 1 && <span className="text-slate-400"> +{h.commodities.length - 1}</span>}</> : <span className="text-slate-300">—</span>}</td>
                   <td className="px-3 py-2">
                     <span className="flex h-1.5 w-40 overflow-hidden rounded-full" aria-hidden>
                       {h.strip?.length ? h.strip.map((k, i) => <i key={i} className="h-full flex-1" style={{ background: coreTypeColor(typeName.get(k)) }} />) : <i className="h-full flex-1" style={{ background: NONE }} />}
