@@ -133,12 +133,14 @@ export function ReportDocument({ hole, mv, run, models, trays, nodeRef }: {
           <div className="leading-tight"><div className="font-display text-[13px] font-bold tracking-tight">CoreFlagging</div><div className="text-[10.5px] text-slate-500">Scan report · UWA NTLP</div></div>
         </div>
         <div className="flex items-center gap-4">
-          {/* the survey whose core it reads, and the lab that made the report */}
-          <div className="flex items-center gap-2.5">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/gswa-logo.png" alt="Geological Survey of Western Australia" className="size-9" />
+          {/* the lab, the ARC training centre and the survey, as on the landing page */}
+          <div className="flex items-center gap-3">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/ntlp-logo.png" alt="UWA NTLP" className="size-9 rounded-full" />
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/critical-resources-logo.svg" alt="ARC Training Centre in Critical Resources for the Future" className="h-7 w-auto" />
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/gswa-logo.png" alt="Geological Survey of Western Australia" className="size-9" />
           </div>
           <div className="text-right text-[10.5px] leading-snug text-slate-500"><div>{today}</div><div>coretrace.nlp-tlp.org</div></div>
         </div>
@@ -279,10 +281,12 @@ export function ReportDocument({ hole, mv, run, models, trays, nodeRef }: {
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/ntlp-logo.png" alt="NTLP" className="size-8 rounded-full" />
             {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/critical-resources-logo.svg" alt="ARC Training Centre in Critical Resources for the Future" className="h-6 w-auto" />
+            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/gswa-logo.png" alt="GSWA" className="size-8 mix-blend-multiply" />
           </div>
         </div>
-        <p className="mt-1 max-w-[68ch] text-[10.5px] leading-relaxed text-slate-600">UWA Centre for Natural and Technical Language Processing (NTLP), The University of Western Australia, with the Geological Survey of Western Australia (GSWA).</p>
+        <p className="mt-1 max-w-[68ch] text-[10.5px] leading-relaxed text-slate-600">UWA Centre for Natural and Technical Language Processing (NTLP), The University of Western Australia, with the ARC Training Centre in Critical Resources for the Future and the Geological Survey of Western Australia (GSWA).</p>
         <ul className="mt-4 grid grid-cols-5 gap-3">
           {CORE_TEAM.map((m) => (
             <li key={m.name} className="flex flex-col items-start">
