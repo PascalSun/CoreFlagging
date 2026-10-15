@@ -15,12 +15,13 @@ const glass = "rounded-2xl border border-white/60 bg-white/85 shadow-glass backd
 const RINGS = [2, 5, 10] as const;
 
 /** A hole and its neighbours as lines in space, in metres from this hole's collar (east, north, up). The hole is
- * coloured by the rock class the model read every 2 m; the neighbours are grey, or coloured when "colour all" is on;
+ * coloured by the rock class the model read every metre; the neighbours are grey, or coloured when "colour all" is on;
  * the flagged metres and the log disagreements are drawn thick. A click on a point opens that depth on the map. */
 export function Scene() {
   const sp = useSearchParams(); const router = useRouter();
   const key = sp.get("hole"); const [km, setKm] = useState<number>(Number(sp.get("km")) || 2);
   const [colourAll, setColourAll] = useState(false);
+  const [frame, setFrame] = useState<"hole" | "all">("hole");      // what the view is framed on: this hole at true proportions, or every neighbour
   const q = useQuery({ queryKey: ["core-trace", key, km], queryFn: () => coreScan.trace(key as string, km), enabled: !!key, staleTime: 10 * 60_000 });
   const host = useRef<HTMLDivElement>(null);
   const names = useMemo(() => new Map((q.data?.core_types ?? []).map((c) => [c.k, c.name])), [q.data]);
@@ -50,7 +51,7 @@ export function Scene() {
         // point instead of blending along the segment (Plotly shades a segment between its ends' colours)
         const V: { p: Trace["points"][number]; k: number | null }[] = coloured ? P.flatMap((p, i) => (i < P.length - 1 ? [{ p, k: p.k }, { p: P[i + 1], k: p.k }] : [])) : P.map((p) => ({ p, k: p.k }));
         traces.push({ type: "scatter3d", mode: "lines", x: V.map((v) => v.p.e + dx), y: V.map((v) => v.p.n + dy), z: V.map((v) => v.p.u + dz),
-          line: coloured ? { color: V.map((v) => idx(v.k)), colorscale, cmin: 0, cmax: n, width: main ? 9 : 4, showscale: false } : { color: "#94a3b8", width: 3 },
+          line: coloured ? { color: V.map((v) => idx(v.k)), colorscale, cmin: 0, cmax: n, width: main ? 14 : 5, showscale: false } : { color: "#94a3b8", width: 3 },
           hovertemplate: `${t.name}${main ? "" : ` · ${t.km} km`}<br>%{text}<extra></extra>`,
           text: V.map((v) => `${v.p.m.toFixed(0)} m${coloured ? `<br>${v.p.k === null ? "no reading" : names.get(v.p.k) ?? ""}` : ""}${!main && t.target ? `<br>drilled for ${t.target}` : ""}${!main && t.n_again ? `<br>look again: ${t.n_again} intervals` : ""}`),
           customdata: V.map((v) => [t.key, v.p.m]), showlegend: false, opacity: main ? 1 : coloured ? 0.85 : 0.7 });
@@ -69,10 +70,24 @@ export function Scene() {
         }
       };
       mark(d.again, SERIES.orange, "Model disagrees with the log"); mark(d.flags, "#7c3aed", "Stands out from its surroundings");
+      // depth every 50 m down the hole, so the eye reads it as a drillhole and not a stick
+      const H = d.hole.points; const ticks = H.filter((p) => Math.round(p.m) % 50 === 0 && Math.abs(p.m - Math.round(p.m)) < 0.05);
+      if (ticks.length) traces.push({ type: "scatter3d", mode: "markers+text", x: ticks.map((p) => p.e), y: ticks.map((p) => p.n), z: ticks.map((p) => p.u), text: ticks.map((p) => `${Math.round(p.m)} m`),
+        textposition: "middle right", textfont: { size: 10, color: "#475569" }, marker: { size: 2.5, color: "#0f172a" }, hoverinfo: "skip", showlegend: false });
+      // framed on this hole: a cube around it at true proportions, the ground as a faint square at the collar's level
+      const ex = H.map((p) => p.e), ny = H.map((p) => p.n), up = H.map((p) => p.u);
+      const lo = [Math.min(...ex), Math.min(...ny), Math.min(...up)], hi = [Math.max(...ex), Math.max(...ny), Math.max(...up)];
+      const half = Math.max(40, 0.62 * Math.max(hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2])); const c = lo.map((v, i) => (v + hi[i]) / 2);
+      const rng = (i: number) => [c[i] - half, c[i] + half];
+      if (frame === "hole") {
+        const [x0, x1] = rng(0), [y0, y1] = rng(1);
+        traces.push({ type: "mesh3d", x: [x0, x1, x1, x0], y: [y0, y0, y1, y1], z: [0, 0, 0, 0], i: [0, 0], j: [1, 2], k: [2, 3], color: "#cbd5e1", opacity: 0.25, hoverinfo: "skip", showlegend: false, name: "ground" });
+      }
+      const axis = (title: string, i: number) => ({ title: { text: title }, gridcolor: "#e2e8f0", zerolinecolor: "#cbd5e1", ...(frame === "hole" ? { range: rng(i), autorange: false } : {}) });
       const layout = {
         margin: { l: 0, r: 0, t: 0, b: 0 }, paper_bgcolor: "rgba(0,0,0,0)", showlegend: false,
-        scene: { aspectmode: "data", xaxis: { title: { text: "east (m)" }, gridcolor: "#e2e8f0", zerolinecolor: "#cbd5e1" }, yaxis: { title: { text: "north (m)" }, gridcolor: "#e2e8f0", zerolinecolor: "#cbd5e1" },
-          zaxis: { title: { text: c0.rl !== null ? "up (m, from this collar)" : "up (m)" }, gridcolor: "#e2e8f0", zerolinecolor: "#cbd5e1" }, camera: { eye: { x: 0.75, y: -0.9, z: 0.45 } }, bgcolor: "#f8fafc" },
+        scene: { aspectmode: frame === "hole" ? "cube" : "data", xaxis: axis("east (m)", 0), yaxis: axis("north (m)", 1), zaxis: axis(c0.rl !== null ? "up (m, from this collar)" : "up (m)", 2),
+          camera: { eye: frame === "hole" ? { x: 1.3, y: -1.5, z: 0.6 } : { x: 0.75, y: -0.9, z: 0.45 } }, bgcolor: "#f8fafc" },
       };
       await Plotly.react(el, traces, layout, { displaylogo: false, responsive: true, modeBarButtonsToRemove: ["toImage"] });
       (el as any).on?.("plotly_click", (ev: any) => {
@@ -82,7 +97,7 @@ export function Scene() {
       });
     })();
     return () => { gone = true; };
-  }, [q.data, colourAll, names, router]);
+  }, [q.data, colourAll, frame, names, router]);
 
   const d: TraceView | undefined = q.data;
   return (
@@ -95,6 +110,9 @@ export function Scene() {
         <div className="flex overflow-hidden rounded-md border border-slate-200 text-[11px]" role="group" aria-label="Neighbours within">
           {RINGS.map((r) => <button key={r} type="button" onClick={() => setKm(r)} className={cn("px-2 py-0.5", km === r ? "bg-slate-900 text-white" : "bg-white text-slate-600 hover:bg-slate-50")}>{r} km</button>)}
         </div>
+        <div className="flex overflow-hidden rounded-md border border-slate-200 text-[11px]" role="group" aria-label="Framed on">
+          {([["hole", "This hole"], ["all", "Everything"]] as const).map(([f, label]) => <button key={f} type="button" onClick={() => setFrame(f)} className={cn("px-2 py-0.5", frame === f ? "bg-slate-900 text-white" : "bg-white text-slate-600 hover:bg-slate-50")}>{label}</button>)}
+        </div>
         <label className="flex items-center gap-1.5 text-[11px] text-slate-600"><input type="checkbox" checked={colourAll} onChange={(e) => setColourAll(e.target.checked)} className="size-3 accent-slate-900" />colour the neighbours too</label>
         {q.isPending && <span className="text-[11px] text-slate-500">Loading…</span>}
         {q.isError && <span className="text-[11px] text-rose-700">This hole has no collar position.</span>}
@@ -105,7 +123,7 @@ export function Scene() {
             {[...new Set(d.hole.points.map((p) => p.k).filter((k): k is number => k !== null))].slice(0, 8).map((k) => <span key={k} className="flex items-center gap-1"><i className="inline-block size-2.5 rounded-[2px]" style={{ background: coreTypeColor(names.get(k)) }} />{names.get(k)}</span>)}
           </div>
           <div className="flex flex-wrap gap-x-3"><span className="flex items-center gap-1"><i className="inline-block h-1.5 w-4 rounded" style={{ background: SERIES.orange }} />model disagrees with the log</span><span className="flex items-center gap-1"><i className="inline-block h-1.5 w-4 rounded bg-violet-700" />stands out from its surroundings</span><span className="flex items-center gap-1"><i className="inline-block h-1 w-4 rounded bg-slate-400" />neighbour</span></div>
-          <p className="mt-1 text-slate-400">Drag to turn, scroll to zoom. Click a point to open that depth on the map.</p>
+          <p className="mt-1 text-slate-400">True proportions, no vertical exaggeration. Drag to turn, scroll to zoom; Everything fits every neighbour in. Click a point to open that depth on the map.</p>
         </div>
       )}
     </div>
