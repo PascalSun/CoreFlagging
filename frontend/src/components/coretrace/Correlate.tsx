@@ -14,7 +14,7 @@ import { coreTypeColor, groupColor } from "@/components/coretrace/palette";
 
 export type CorrSide = { hole: HoleDetail; mv?: ModelView; spectral?: SpectralLog };
 export type Link = { a: number; b: number; sim: number };
-export type Correlation = { links: Link[]; score: number; rho: number; basis: "minerals" | "rock class" };
+export type Correlation = { links: Link[]; score: number; rho: number; basis: "representation" | "minerals" | "rock class" };
 
 export const CORR_TIP = {
   score: "Match: how alike the two holes are, metre for metre. Every metre of the left hole is linked to the metre of the right hole it is most like, by the rock classes HyFormer reads over the 5 m around it (or the mineral groups the scanner reads, without a model reading), once the make-up the two holes share is taken out; this is the mean likeness of those links, 0 (no more alike than any two metres) to 1 (identical).",

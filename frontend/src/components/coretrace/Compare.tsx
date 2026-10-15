@@ -14,7 +14,7 @@ function useHole(key: string | null) {
   const run = mq.data?.find((m) => m.default)?.run ?? hq.data?.results[0]?.run ?? "";
   const vq = useQuery({ queryKey: ["core-model", key, run], queryFn: () => coreScan.model(key as string, run), enabled: !!key && !!run && !!hq.data?.results.some((r) => r.run === run), staleTime: 5 * 60_000 });
   const sq = useQuery({ queryKey: ["core-spectral", key], queryFn: () => coreScan.spectralLog(key as string, 1), enabled: !!key && hq.data?.status === "ready", staleTime: 60 * 60_000, retry: false });
-  return { hole: hq.data, mv: vq.data, spectral: sq.data, loading: hq.isPending || vq.isPending, error: hq.isError };
+  return { hole: hq.data, mv: vq.data, spectral: sq.data, run, loading: hq.isPending || vq.isPending, error: hq.isError };
 }
 
 /** One hole's column: who and what it is, and its log. */
@@ -61,8 +61,12 @@ function nearest(corr: Correlation | null, m: number, from: "a" | "b") {
 export function ComparePanel({ a: aKey, b: bKey, onClose, onOpenHole }: { a: string; b: string; onClose: () => void; onOpenHole: (key: string) => void }) {
   const a = useHole(aKey), b = useHole(bKey);
   const [ca, setCa] = useState<number | null>(null), [cb, setCb] = useState<number | null>(null);
-  const corr = useMemo(() => (a.hole && b.hole ? correlate({ hole: a.hole, mv: a.mv, spectral: a.spectral }, { hole: b.hole, mv: b.mv, spectral: b.spectral }) : null),
-    [a.hole, a.mv, a.spectral, b.hole, b.mv, b.spectral]);
+  // HyFormer's fingerprints, matched by the platform; until it answers (or where it cannot), a stand-in by rock class
+  const mq = useQuery({ queryKey: ["core-match", aKey, bKey, a.run], queryFn: () => coreScan.match(aKey, bKey, a.run), enabled: !!a.run && !!a.hole && !!b.hole, staleTime: 60 * 60_000, retry: false });
+  const corr = useMemo<Correlation | null>(() => {
+    if (mq.data?.links.length) return { links: mq.data.links.map((l) => ({ a: l.a_m, b: l.b_m, sim: l.sim })), score: mq.data.score, rho: mq.data.rho, basis: "representation" };
+    return a.hole && b.hole ? correlate({ hole: a.hole, mv: a.mv, spectral: a.spectral }, { hole: b.hole, mv: b.mv, spectral: b.spectral }) : null;
+  }, [mq.data, a.hole, a.mv, a.spectral, b.hole, b.mv, b.spectral]);
   const missing = (x: typeof a, which: string) => (x.error ? `Hole ${which} could not be opened.` : "Loading…");
   // a metre on one log marks its match on the other
   const pickA = (m: number) => { setCa(m); const l = nearest(corr, m, "a"); if (l) setCb(l.b); };
@@ -85,7 +89,7 @@ export function ComparePanel({ a: aKey, b: bKey, onClose, onOpenHole }: { a: str
                 <span className="flex items-center gap-1" data-keytip={CORR_TIP.score}>{corr.score.toFixed(2)}<Info size={12} className="text-slate-400" /></span>
                 <span className="flex items-center gap-1" data-keytip={CORR_TIP.rho}>ρ = {corr.rho.toFixed(2)}<Info size={12} className="text-slate-400" /></span>
               </div>
-              <p className="pb-2 text-center text-[11px] text-slate-500">matched by {corr.basis === "rock class" ? "HyFormer\u2019s rock class (RC), over 5 m around each metre" : "the mineral groups the scanner reads (SWIR and TIR); no model reading on both holes"}</p>
+              <p className="pb-2 text-center text-[11px] text-slate-500">matched by {corr.basis === "representation" ? "HyFormer\u2019s representation (2 m fingerprints), as Similar core" : corr.basis === "rock class" ? "rock class (RC) for now, until the representation match is available" : "the mineral groups the scanner reads (SWIR and TIR) for now; no model reading on both holes"}</p>
               <div className="min-h-0 flex-1"><CorrelationView a={{ hole: a.hole!, mv: a.mv, spectral: a.spectral }} b={{ hole: b.hole!, mv: b.mv, spectral: b.spectral }} corr={corr} cursorA={ca} onPick={(x, y) => { setCa(x); setCb(y); }} /></div>
             </>
           ) : <div className="m-auto text-center text-xs text-slate-500">{a.loading || b.loading ? "Matching the two holes…" : "These two holes have nothing to match by: neither a spectral log nor a model reading on both."}</div>}
