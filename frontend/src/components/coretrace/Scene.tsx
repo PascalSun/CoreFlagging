@@ -83,11 +83,15 @@ export function Scene() {
         const [x0, x1] = rng(0), [y0, y1] = rng(1);
         traces.push({ type: "mesh3d", x: [x0, x1, x1, x0], y: [y0, y0, y1, y1], z: [0, 0, 0, 0], i: [0, 0], j: [1, 2], k: [2, 3], color: "#cbd5e1", opacity: 0.25, hoverinfo: "skip", showlegend: false, name: "ground" });
       }
+      // look at the hole side-on: from the side of its dip direction, so an inclined hole reads as inclined rather than
+      // being seen end-on and looking vertical (a vertical hole is viewed from the south-east)
+      const end = H[H.length - 1]; const hx = end.e - H[0].e, hy = end.n - H[0].n; const hl = Math.hypot(hx, hy);
+      const side = hl > 5 ? { x: (-hy / hl) * 1.7, y: (hx / hl) * 1.7 } : { x: 1.2, y: -1.2 };
       const axis = (title: string, i: number) => ({ title: { text: title }, gridcolor: "#e2e8f0", zerolinecolor: "#cbd5e1", ...(frame === "hole" ? { range: rng(i), autorange: false } : {}) });
       const layout = {
         margin: { l: 0, r: 0, t: 0, b: 0 }, paper_bgcolor: "rgba(0,0,0,0)", showlegend: false,
         scene: { aspectmode: frame === "hole" ? "cube" : "data", xaxis: axis("east (m)", 0), yaxis: axis("north (m)", 1), zaxis: axis(c0.rl !== null ? "up (m, from this collar)" : "up (m)", 2),
-          camera: { eye: frame === "hole" ? { x: 1.3, y: -1.5, z: 0.6 } : { x: 0.75, y: -0.9, z: 0.45 } }, bgcolor: "#f8fafc" },
+          camera: { eye: frame === "hole" ? { ...side, z: 0.55 } : { x: 0.75, y: -0.9, z: 0.45 } }, bgcolor: "#f8fafc" },
       };
       await Plotly.react(el, traces, layout, { displaylogo: false, responsive: true, modeBarButtonsToRemove: ["toImage"] });
       (el as any).on?.("plotly_click", (ev: any) => {
