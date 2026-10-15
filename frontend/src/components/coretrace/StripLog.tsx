@@ -96,8 +96,8 @@ export function StripLog({ metres, model, cursor, onCursor, onHover, hasLith, ra
 
   const tracks = useMemo<Track[]>(() => [
     { id: "gs", label: "SWIR", w: 54, kind: "mix", info: TIP.swir }, { id: "gt", label: "TIR", w: 54, kind: "mix", info: TIP.tir },
-    ...(model ? [{ id: "bd", label: "BD", w: 24, kind: "line", info: TIP.bd } as Track, { id: "rc", label: "RC", w: 30, kind: "cat", info: TIP.rc } as Track,
-      { id: "anom", label: "Unusual", w: 54, kind: "bar", info: TIP.unusual } as Track] : []),
+    ...(model ? [{ id: "anom", label: "Unusual", w: 54, kind: "bar", info: TIP.unusual } as Track, { id: "rc", label: "RC", w: 30, kind: "cat", info: TIP.rc } as Track,
+      { id: "bd", label: "BD", w: 24, kind: "line", info: TIP.bd } as Track] : []),
   ], [model]);
   const order = useMemo(() => groupOrder(spectral), [spectral]);
   const width = AXIS_W + tracks.reduce((a, t) => a + t.w + GAP, 0);
