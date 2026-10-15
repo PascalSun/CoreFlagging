@@ -124,6 +124,29 @@ def _spectra_of(d: Path, dataset: str):
     return sp
 
 
+_tir: OrderedDict[str, object] = OrderedDict()       # dataset -> pytsg Spectra of the TIR file, or None when it has none
+
+
+def _tir_of(d: Path, dataset: str):
+    """The dataset's TIR spectra, when the package has the TIR pair; None otherwise. Cached like the SWIR."""
+    with _guard:
+        if dataset in _tir:
+            _tir.move_to_end(dataset); return _tir[dataset]
+    f = _files(d)
+    sp = None
+    if "tir_tsg" in f and "tir_bip" in f:
+        from pytsg import parse_tsg as p
+        try:
+            sp = p.read_tsg_bip_pair(str(f["tir_tsg"]), str(f["tir_bip"]), "tir")
+        except Exception:        # noqa: BLE001 - a damaged TIR file loses the TIR, not the samples
+            sp = None
+    with _guard:
+        _tir[dataset] = sp; _tir.move_to_end(dataset)
+        while len(_tir) > 4:
+            _tir.popitem(last=False)
+    return sp
+
+
 def _window(sp, lo: float, hi: float) -> tuple[int, int, np.ndarray]:
     D = sp.sampleheaders["D"].astype(float).to_numpy()
     i0, i1 = int(np.searchsorted(D, lo)), int(np.searchsorted(D, hi))
@@ -153,6 +176,15 @@ def samples(refs: list[str], dataset: str, lo: float, hi: float, spectra: bool =
             h = p.read_hires_dat(str(f["hires"]), per_spectra=True); height = h[i0:i1]
         except Exception:        # noqa: BLE001 - a damaged profile is not worth failing the samples for
             height = None
+    tir = _tir_of(d, dataset) if spectra else None
+    tirD = tir.sampleheaders["D"].astype(float).to_numpy() if tir is not None else None
+    def tir_at(depth: float):
+        if tirD is None or len(tirD) == 0: return None
+        k = int(np.searchsorted(tirD, depth)); k = min(max(k, 0), len(tirD) - 1)
+        if k > 0 and abs(tirD[k - 1] - depth) < abs(tirD[k] - depth): k -= 1
+        if abs(tirD[k] - depth) > 0.005: return None
+        v = tir.spectra[k]
+        return None if not np.isfinite(v).any() else [round(float(x), 4) for x in v]
     def cls(col, i):
         if col is None: return ""
         v = col.iloc[i]
@@ -165,10 +197,12 @@ def samples(refs: list[str], dataset: str, lo: float, hi: float, spectra: bool =
              "height_mm": None if height is None or np.isnan(height[j]) else round(float(height[j]), 2)}
         if spectra:
             r["swir"] = [round(float(x), 4) for x in sp.spectra[i]]
+            r["tir"] = tir_at(float(D[i]))
         rows.append(r)
     out = {"dataset": dataset, "from_m": lo, "to_m": hi, "n": len(rows), "step_mm": round(float(np.median(np.diff(D[i0:i1])) * 1000), 2) if i1 - i0 > 2 else None, "samples": rows}
     if spectra:
         out["swir_wl"] = [round(float(x), 1) for x in sp.wavelength]
+        out["tir_wl"] = [round(float(x), 1) for x in tir.wavelength] if tir is not None else None
     return out
 
 
