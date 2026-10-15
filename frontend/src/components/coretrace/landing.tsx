@@ -110,9 +110,10 @@ export function CoreHero() {
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src="/critical-resources-logo.svg" alt="" className="h-9 w-auto" />
               </a>
-              <a href="https://www.dmirs.wa.gov.au/gswa" target="_blank" rel="noopener noreferrer" aria-label="Geological Survey of Western Australia, Department of Mines, Petroleum and Exploration" className="flex h-14 items-center">
+              <a href="https://www.dmirs.wa.gov.au/gswa" target="_blank" rel="noopener noreferrer" aria-label="Geological Survey of Western Australia, Department of Mines, Petroleum and Exploration" className="flex h-14 items-center gap-2.5 rounded-lg bg-white px-3 ring-1 ring-white/20">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src="/gswa-dmpe-logo-white.png" alt="" className="h-11 w-auto" />
+                <img src="/gswa-logo.png" alt="" className="h-11 w-11" />
+                <span className="text-[11px] font-semibold leading-tight text-slate-800">Geological Survey of<br />Western Australia</span>
               </a>
             </div>
           </div>
@@ -285,9 +286,10 @@ export function CoreTeam() {
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src="/critical-resources-logo.svg" alt="" className="h-10 w-auto" />
             </a>
-            <a href="https://www.dmirs.wa.gov.au/gswa" target="_blank" rel="noopener noreferrer" aria-label="Geological Survey of Western Australia, Department of Mines, Petroleum and Exploration" className="flex h-12 items-center rounded-lg bg-ink px-3">
+            <a href="https://www.dmirs.wa.gov.au/gswa" target="_blank" rel="noopener noreferrer" aria-label="Geological Survey of Western Australia, Department of Mines, Petroleum and Exploration" className="flex h-12 items-center gap-2.5">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/gswa-dmpe-logo-white.png" alt="" className="h-9 w-auto" />
+              <img src="/gswa-logo.png" alt="" className="h-10 w-10" />
+              <span className="text-[11px] font-semibold leading-tight text-slate-800">Geological Survey of<br />Western Australia</span>
             </a>
           </div>
         </div>

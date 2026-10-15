@@ -34,6 +34,16 @@ export function coretraceTools(token: string) {
     if (hit.status !== "ready") throw new Error(`${hit.name} is not processed yet (status: ${hit.status})`);
     return hit;
   };
+  const geo = async <T,>(path: string, init?: RequestInit): Promise<T> => {
+    const res = await fetch(`${PLATFORM}/geo/api${path}`, { ...init, headers: { Authorization: `Bearer ${token}`, "content-type": "application/json", ...(init?.headers ?? {}) }, cache: "no-store" });
+    if (!res.ok) throw new Error(`platform answered ${res.status}`);
+    return (await res.json()) as T;
+  };
+  /** Same-origin stream of one document file, for the in-page viewer. */
+  const docUrl = (corpus: string, key: string, file: string) => corpus === "wamex"
+    ? `/geo/api/wamex/report/${encodeURIComponent(key)}/${encodeURIComponent(file)}`
+    : `/geo/api/doc/file/?corpus=${encodeURIComponent(corpus)}&key=${encodeURIComponent(key)}&filename=${encodeURIComponent(file)}`;
+  const corpus = z.enum(["wamex", "hylogger", "ebookshop", "geolit"]).optional().describe("Which document store: wamex (WA open-file exploration reports, default), hylogger (NVCL and GSWA HyLogger reports for every State), ebookshop (GSWA publications), geolit (peer-reviewed papers).");
   const defaultRun = async (run?: string) => run || (await get<{ run: string; default: boolean }[]>("/models/")).find((m) => m.default)?.run || "v2";
   const hole = z.string().describe("Hole key as the tools return it, e.g. 'MND036', 'Wilson Cliffs 1' or 'NSW-NKD002' (holes outside WA are prefixed with their State).");
   const model = z.string().optional().describe("Model run: v2 (HyFormer, default), s2_mae_dino, s2_mae_jepa, baseline (conventional methods).");
@@ -102,6 +112,23 @@ export function coretraceTools(token: string) {
       },
     }),
 
+    unusual_10cm: tool({
+      description: "The model's unusual score for every 10 cm of a depth window (up to 50 m): which 10 cm pieces make a metre stand out. Each row is a 10 cm bin with its State percentile and raw contrast against the 15 m either side; a metre is flagged when its highest 10 cm reaches both thresholds returned. Use after hole_log to see where in a flagged interval the signal sits.",
+      inputSchema: z.object({ hole, from_m: z.number().describe("Top of the window in metres."), to_m: z.number().describe("Bottom of the window in metres, at most 50 m below the top."), model }),
+      toModelOutput: modelView(),
+      execute: async ({ hole: name, from_m, to_m, model: run }) => {
+        try {
+          const h = await resolve(name); const m = await defaultRun(run);
+          if (!(to_m > from_m) || to_m - from_m > 50) return { error: "to_m must be above from_m and at most 50 m below it" };
+          type T = { flag_at: number | null; flag_raw: number | null; bin: number[]; anom: number[]; anom_raw: number[] };
+          const t = await get<T>(`/holes/${encodeURIComponent(h.key)}/models/${encodeURIComponent(m)}/tokens/?from=${from_m}&to=${to_m}`);
+          return { hole: h.key, state: h.state, model: m, flag_thresholds: { state_percentile: t.flag_at, raw_contrast: t.flag_raw },
+            bins: t.bin.map((b, i) => ({ from_m: Math.round(b) / 10, state_percentile: r3(t.anom[i]), raw_contrast: r3(t.anom_raw[i]),
+              above_flag: t.flag_at !== null && t.flag_raw !== null && t.anom[i] >= t.flag_at && t.anom_raw[i] >= t.flag_raw })) };
+        } catch (e) { return err(e); }
+      },
+    }),
+
     metre_detail: tool({
       description: "One metre of one hole: logged rock and assay, the TSG software's minerals in it and in the 15 m around it, the spectral features that set it apart, and the model's readings (core type, unusual percentile, gold likelihood, TIR group filled in from SWIR).",
       inputSchema: z.object({ hole, m: z.number().int().describe("Depth in metres; the metre from m to m+1."), model }),
@@ -147,6 +174,71 @@ export function coretraceTools(token: string) {
       },
     }),
 
+    hole_documents: tool({
+      description: "The documents behind a hole: its own HyLogger PDFs (the NVCL spectral summary report for every State; GSWA's mineralogy histograms and HyLogger record in WA) and, for a WA hole, the WAMEX open-file exploration reports it was logged in (with abstract and files) plus the reports whose footprint covers the collar. Holes outside WA have no WAMEX report: the answer names the State survey's portal instead. Call this first for any question about a hole's report, paperwork or PDF.",
+      inputSchema: z.object({ hole }),
+      toModelOutput: modelView(),
+      execute: async ({ hole: name }) => {
+        try {
+          const h = await resolve(name);
+          type D = { hole: string; name: string; state: string; portal: { name: string; url: string } | null;
+            hole_pdfs: { corpus: string; key: string; kind: string; title: string; pages: number | null; file: string }[];
+            wamex: null | { linked: { anumber: string; found_by: string; title?: string; year?: number | null; type?: string; company?: string | null; commodities?: string | null; url: string; abstract?: string | null; pdf?: string | null; files?: { name: string; bytes: number }[] }[];
+              covering: { anumber: string; title: string; year: number | null; type: string; company: string | null; commodities: string | null }[]; covering_count: number } };
+          const d = await get<D>(`/holes/${encodeURIComponent(h.key)}/documents/`);
+          return { hole: h.key, state: h.state, operator: h.operator, project: h.project,
+            hole_pdfs: d.hole_pdfs.map((p) => ({ corpus: p.corpus, key: p.key, file: p.file, kind: p.kind, title: p.title, pages: p.pages })),
+            wamex: d.wamex ? { note: "WAMEX is Western Australia's open-file exploration report system.",
+              reports_this_hole_was_logged_in: d.wamex.linked.map((r) => ({ anumber: r.anumber, found_by: r.found_by, title: r.title, year: r.year, type: r.type, company: r.company, commodities: r.commodities,
+                abstract: r.abstract ? r.abstract.slice(0, 700) : null, pdf: r.pdf, files: (r.files ?? []).map((f) => f.name), wamex_page: r.url })),
+              reports_covering_the_collar: d.wamex.covering.map((r) => ({ anumber: r.anumber, title: r.title, year: r.year, type: r.type, company: r.company, commodities: r.commodities })),
+              reports_covering_the_collar_total: d.wamex.covering_count }
+              : { note: `${h.state || "This"} is outside WAMEX (Western Australia only); the hole's own HyLogger PDFs above are what the platform holds.` },
+            state_survey_portal: d.portal,
+            how_to_show: "open_document(corpus, key, file) opens any of these PDFs for the reader; document_text reads their pages for a summary." };
+        } catch (e) { return err(e); }
+      },
+    }),
+
+    document_text: tool({
+      description: "The extracted text of a document, page by page, to summarise or quote from: a WAMEX report (key = anumber, e.g. A77996; one report is several PDFs, `file` picks one), a HyLogger PDF (key from hole_documents), a GSWA publication or a paper. Up to 30 pages a call; start with the first pages, which carry the summary and introduction.",
+      inputSchema: z.object({ corpus, key: z.string().describe("Document key: WAMEX anumber (A77996), HyLogger key (<dataset>.sp), GSWA code or paper sha256."),
+        file: z.string().optional().describe("Which PDF of the document, as hole_documents lists them (WAMEX reports have several)."), pages: z.string().default("1-6").describe("Page range, e.g. 1-6 or 12") }),
+      toModelOutput: modelView(),
+      execute: async ({ corpus: c, key, file, pages }) => {
+        try {
+          const q = new URLSearchParams({ corpus: c ?? "wamex", key, pages: pages ?? "1-6", ...(file ? { file } : {}) });
+          type T = { corpus: string; key: string; pages: { file: string | null; page: number; text: string }[]; documents: { file: string; pages: number }[] | null; truncated: boolean };
+          const d = await geo<T>(`/doc/text/?${q}`);
+          return { corpus: d.corpus, key: d.key, documents: d.documents, truncated: d.truncated, pages: d.pages.map((p) => ({ file: p.file, page: p.page, text: p.text.slice(0, 6000) })) };
+        } catch (e) { return err(e); }
+      },
+    }),
+
+    search_documents: tool({
+      description: "Full-text search over a document store, ranked passages with document, page and sentence: WAMEX exploration reports (what a company did on a tenement; a hole or prospect name finds the reports that mention it), HyLogger reports (which scanned holes show a mineral), GSWA publications (what the region is), papers (the published science). Plain words, no operators. Use it when a hole has no linked report or the question is about a place, prospect or mineral rather than one hole.",
+      inputSchema: z.object({ query: z.string().describe("Plain words to look for, e.g. a hole name, prospect, tenement or mineral."), corpus, limit: z.number().int().min(1).max(40).default(12) }),
+      toModelOutput: modelView(),
+      execute: async ({ query, corpus: c, limit }) => {
+        try {
+          const lit = (v: string) => `'${v.replace(/'/g, "''")}'`;
+          const sql = `SELECT doc_key, title, series, page, snippet, rank, sampled FROM derived.search_corpus(${lit(c ?? "wamex")}, ${lit(query)}, ${limit}, NULL, NULL)`;
+          const d = await geo<{ columns: string[]; rows: unknown[][]; error?: string }>("/sql/query/", { method: "POST", body: JSON.stringify({ sql, limit }) });
+          if (d.error) return { error: d.error };
+          const col = (n: string) => d.columns.indexOf(n);
+          const hits = d.rows.map((r) => ({ key: (c ?? "wamex") === "wamex" ? `A${r[col("doc_key")]}` : String(r[col("doc_key")]), title: r[col("title")], series: r[col("series")], page: r[col("page")], snippet: String(r[col("snippet")] ?? "").replace(/\s+/g, " ").slice(0, 300) }));
+          return { corpus: c ?? "wamex", query, hits, documents: new Set(hits.map((h) => h.key)).size, note: d.rows.some((r) => r[col("sampled")]) ? "A common term: the best of a sample, not of the whole store." : "Every match was ranked." };
+        } catch (e) { return err(e); }
+      },
+    }),
+
+    open_document: tool({
+      description: "Show a PDF to the reader, in the conversation, at a page: a WAMEX report (corpus wamex, key = anumber, file = one of its PDFs, the OCR copy when there is one), a hole's HyLogger PDF (corpus hylogger, key and file from hole_documents) or any other document. Call it whenever you have found a report the reader asked for, so they can read it rather than take your word.",
+      inputSchema: z.object({ corpus, key: z.string(), file: z.string().describe("The PDF's filename as the tools list it."), page: z.number().int().min(1).optional(), title: z.string().optional().describe("A short caption: report number and title, or the hole and document kind.") }),
+      toModelOutput: modelView(),
+      execute: async ({ corpus: c, key, file, page, title }) => ({ shown: true, corpus: c ?? "wamex", key, file, page: page ?? null, title: title ?? `${key} · ${file}`, url: docUrl(c ?? "wamex", key, file), note: "The PDF is open in the conversation for the reader." }),
+    }),
+
     open_hole: tool({
       description: "Show a hole on the map page, at a metre if given, so the reader sees what you are describing. Call it when you discuss a specific hole or metre.",
       inputSchema: z.object({ hole, m: z.number().int().optional(), tab: z.enum(["metre", "log", "unusual", "similar", "quality", "report"]).optional() }),
@@ -171,6 +263,7 @@ How to answer:
 - The models were trained on WA core only. For a hole from another State say that its results are read outside the training area and deserve more caution; "similar core" searches WA core only. Offshore wells are petroleum wells in Commonwealth waters.
 - Refer to a hole by the key the tools return (e.g. NSW-NKD002); two holes can share a name in different places.
 - When you talk about one hole or metre, call the open_hole tool once so the map shows it. Never write a tool's name in your answer, and do not say you opened something unless you called open_hole.
+- Reports and PDFs: for "the report for hole X", "any WAMEX for X", "what PDFs are there" call hole_documents first. A WA hole may be linked to the WAMEX report it was logged in and always has its own HyLogger PDFs; a hole from another State has no WAMEX report (WAMEX is WA only) but has its NVCL spectral summary PDF, and the State survey's portal holds the rest. Answer with a list of every document found, one line each, before anything else: for a WAMEX report its A-number, title, year, company and one sentence on what it covers (from its abstract); for a hole PDF its kind (NVCL spectral summary, GSWA mineralogy histograms, HyLogger record) and what that document shows; then the number of other reports whose footprint covers the collar, if any. Then, for the most relevant report (the one the hole was logged in, else the first), read its first pages with document_text and give a short summary in your own words (what was drilled or sampled, where, what was found, with the page each point comes from), open it for the reader with open_document (the OCR copy of a WAMEX report when there is one), and offer to open or read any other document on the list. To show a PDF you must call open_document: it appears in the conversation. Never write a link or path to a PDF in your text (no "wamex:" links, no file paths); the only link form in text is [HOLE m](hole:HOLE?m=M). Never say a report does not exist until hole_documents and search_documents have both come back empty; never invent an A-number.
 - Keep answers short: a few sentences or a short list, then offer the next step. Use markdown lists and bold sparingly. Refer to a hole and metre as [HOLE m](hole:HOLE?m=M) so the reader can click it.
 - Answer in the language the reader writes in${locale ? ` (interface language: ${locale})` : ""}.
 ${ctx.hole ? `\nThe reader has hole ${ctx.hole} open${ctx.m !== null && ctx.m !== undefined ? `, at ${ctx.m}–${ctx.m + 1} m` : ""}${ctx.model ? `, model ${ctx.model}` : ""}. "This hole" / "here" means that.` : ""}`;

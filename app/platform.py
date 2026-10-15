@@ -62,6 +62,35 @@ class Platform:
         r.raise_for_status()
         return True
 
+    def hole(self, key: str) -> dict | None:
+        """{meta, report, runs: {run: {token_scores: bool}}} of a processed hole, or None when the platform has no such hole."""
+        r = self.http.get(f"holes/{quote(key, safe='')}/")
+        if r.status_code == 404:
+            return None
+        r.raise_for_status()
+        return r.json()
+
+    def hole_tokens(self, key: str, dest: Path) -> bool:
+        """The hole's tokens as the service's processed .npz, written to `dest`. False when the platform has no such hole."""
+        with self.http.stream("GET", f"holes/{quote(key, safe='')}/", params={"part": "tokens"}) as r:
+            if r.status_code == 404:
+                return False
+            r.raise_for_status()
+            with open(dest, "wb") as f:
+                for chunk in r.iter_bytes(1 << 20):
+                    f.write(chunk)
+        return True
+
+    def token_scores(self, key: str, arrays: Path) -> bool:
+        """Hand the platform a hole's per-token unusual scores on their own (the backfill). False when the hole, or a result
+        for these runs, is not on the platform."""
+        with open(arrays, "rb") as f:
+            r = self.http.post(f"holes/{quote(key, safe='')}/token-scores/", files={"arrays": ("arrays.npz", f, "application/octet-stream")})
+        if r.status_code == 404:
+            return False
+        r.raise_for_status()
+        return True
+
     def done(self, job: dict) -> None:
         self.http.post(f"jobs/{job['job']}/done/", json={"token": job["token"]}).raise_for_status()
 

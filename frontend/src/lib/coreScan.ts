@@ -77,6 +77,19 @@ export type HolePackage = {
 };
 
 /** The exploration report a hole was logged in: the mirror's files (the OCR'd PDF first) and the abstract. */
+/** Every document the platform holds about a hole: its own HyLogger PDFs (every State) and, in WA, the WAMEX
+ * reports it was logged in. `url` fields are same-origin streams the in-page viewer can open. */
+export type HoleDocuments = {
+  hole: string; name: string; state: string;
+  hole_pdfs: { corpus: string; key: string; product: string; kind: string; title: string; pages: number | null; file: string; state: string; url: string }[];
+  wamex: null | {
+    linked: { anumber: string; found_by: string; title?: string; year?: number | null; type?: string; company?: string | null; commodities?: string | null; url: string;
+      abstract?: string | null; files?: { name: string; bytes: number; download_url: string; url: string | null }[]; pdf?: string | null }[];
+    covering: { anumber: string; title: string; year: number | null; type: string; company: string | null; commodities: string | null; url: string }[];
+    covering_count: number;
+  };
+  portal: { name: string; url: string } | null;
+};
 export type HoleReport = {
   anumber: string; abstract: string | null; pdf_url: string | null;
   files: { name: string; bytes: number; download_url: string }[];
@@ -108,6 +121,10 @@ export type SpectralLog = { key: string; step: number; from_m: number; to_m: num
 export type HoleMatch = { model: string; window_m: number; step_m: number; score: number; rho: number;
   a: { key: string; name: string; from_m: number; to_m: number; n: number }; b: { key: string; name: string; from_m: number; to_m: number; n: number };
   links: { a_m: number; b_m: number; sim: number }[] };
+/** A model's unusual score for every 10 cm token of a hole: the per-metre `anom` of ModelView is the maximum of these
+ * over the metre. `bin` is the depth in 10 cm (bin 123 = 12.3–12.4 m), `anom` the State percentile, `anom_raw` the
+ * contrast against ±15 m; a metre is flagged when its highest token reaches both `flag_at` and `flag_raw`. */
+export type TokenScores = { run: string; step_m: 0.1; n: number; flag_at: number | null; flag_raw: number | null; bin: number[]; anom: number[]; anom_raw: number[] };
 export type Metres = { m: number[]; gs: string[]; ms: string[]; gt: string[]; lith: string[]; lith_raw: string[]; au: (number | null)[] };
 
 export type HoleDetail = HoleRow & {
@@ -209,6 +226,9 @@ export const coreScan = {
     json<SpectralLog>(`/holes/${enc(key)}/spectral-log/?step=${step}${from !== undefined && to !== undefined ? `&from=${from}&to=${to}` : ""}`),
   /** Hole A's metres linked to their likeliest metres of hole B by the model's fingerprints; 404 until the platform has it. */
   match: (a: string, b: string, run: string) => json<HoleMatch>(`/holes/${enc(a)}/match/?with=${enc(b)}${run ? `&model=${enc(run)}` : ""}`),
+  /** A model's unusual score per 10 cm token: the whole hole, or a depth window in metres. 404 while a hole has none. */
+  tokenScores: (key: string, run: string, from?: number, to?: number) =>
+    json<TokenScores>(`/holes/${enc(key)}/models/${enc(run)}/tokens/${from !== undefined && to !== undefined ? `?from=${from}&to=${to}` : ""}`),
   /** One bin's own mean spectra. */
   bin: (key: string, bin: number) => json<BinSpectra>(`/holes/${enc(key)}/bins/${bin}/`),
   /** The holes within `km` of this one, nearest first, each with its distance. */
@@ -221,6 +241,7 @@ export const coreScan = {
   unreview: (key: string, body: Omit<ReviewBody, "verdict">) => json<void>(`/holes/${enc(key)}/reviews/`, { method: "DELETE", body: JSON.stringify(body), headers: { "Content-Type": "application/json" } }),
   /** 404 when the scan names no report. */
   report: (key: string) => json<HoleReport>(`/holes/${enc(key)}/report/`),
+  documents: (key: string) => json<HoleDocuments>(`/holes/${enc(key)}/documents/`),
   model: (key: string, run: string) => json<ModelView>(`/holes/${enc(key)}/models/${enc(run)}/`).then((v) => v.model ? { ...v, model: { ...v.model, name: modelName(v.model.name) } } : v),
   metre: (key: string, m: number, run: string) => json<MetreView>(`/holes/${enc(key)}/metres/${m}/?model=${enc(run)}`),
   /** Core like a stretch of this hole: the 2 m at a metre, or a window; where to look is the scope. */

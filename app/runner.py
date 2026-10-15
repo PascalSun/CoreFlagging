@@ -10,7 +10,8 @@ The package is plain data, so the platform can write it to its database without 
   models      per model: per-metre outputs, auto log, summaries, timing
   spectral_log  group shares per 0.1 m and 1 m interval, SWIR and TIR (app/spectral.py), or None
   tokens      path of the .npz with the 10 cm tokens (spectra as float16)
-  arrays      path of the .npz with per-metre arrays per model: tir__<run> (rebuilt TIR), fp__<run> (fingerprint)
+  arrays      path of the .npz with per-metre arrays per model: tir__<run> (rebuilt TIR), fp__<run> (fingerprint),
+              and per-token arrays: anom__<run>, raw__<run> (the unusual score of every 10 cm token, in token order)
 """
 from __future__ import annotations
 
@@ -69,6 +70,10 @@ class Runner:
         self.trays[key] = {k: v for k, v in self.trays[key].items() if k in kept}
         return out
 
+    def forget(self, key: str) -> None:
+        """The hole's processed files and every engine's memory of it: the platform is the record."""
+        self.ws.remove(key); self.models.forget(key)
+
     def run_models(self, key: str, runs: list[str] | None = None, progress: Progress = lambda *a: None) -> dict:
         """Every model on a processed hole -> the package."""
         ws = self.ws; M = ws.meta(key); pkg = {"hole": M["meta"], "report": {k: v for k, v in M["report"].items() if k != "qc"}, "qc": M["report"]["qc"],
@@ -83,6 +88,7 @@ class Runner:
             if pkg["metres"] is None:
                 pkg["metres"] = {k: v[k] for k in PER_METRE_SHARED}; pkg["metres"]["why"] = extras.metre_why(eng, key)
             tir, fp = extras.metre_arrays(eng, key); arrays[f"tir__{run}"] = tir.astype("<f2"); arrays[f"fp__{run}"] = fp.astype("<f4")
+            arrays[f"anom__{run}"], arrays[f"raw__{run}"] = extras.token_arrays(eng, key)
             pkg["models"][run] = {**{k: v[k] for k in PER_METRE_MODEL}, **{k: v[k] for k in PER_MODEL}, "summary": eng.summary(key), "seconds": round(time.time() - t0, 1)}
         np.savez_compressed(ws.proc / f"{key}.arrays.npz", **arrays); pkg["arrays"] = str(ws.proc / f"{key}.arrays.npz")
         return labels.package(pkg, self.models)

@@ -75,7 +75,7 @@ class Worker:
         except Exception as e:                                # noqa: BLE001 - NAS hiccup, platform restart: try again later
             log.error("job %s error:\n%s", job["job"], traceback.format_exc()); self._fail(job, f"{type(e).__name__}: {e}", transient=True)
         finally:
-            done.set(); shutil.rmtree(tmp, ignore_errors=True); self.runner.ws.remove(key)
+            done.set(); shutil.rmtree(tmp, ignore_errors=True); self.runner.forget(key)
         return True
 
     def photos(self, job: dict, key: str, zips: list[Path], tmp: Path, state: dict) -> None:
