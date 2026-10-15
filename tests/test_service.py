@@ -232,30 +232,30 @@ def test_models_forget_drops_a_hole_from_every_engines_cache():
     assert e.cache == {"H2": {}} and e.timing == {} and e.locks == {}
 
 
-def test_metre_vectors_max_pool_the_representation_over_each_metre_and_sit_on_the_unit_sphere():
+def test_metre_vectors_are_the_2m_fingerprints_standardised_against_the_library():
     from app.pipeline.engine import metre_vectors, window_vector
-    depth = np.array([10.0, 10.3, 10.7, 11.2, 11.9, 13.5], "f4")                 # metres 10, 11 and 13; nothing at 12
-    E = np.array([[1, 0, 0], [0, 2, 0], [0, 0, 3], [4, 0, 0], [0, 5, 0], [0, 0, 6]], "f4")
-    R = {"depth": depth, "E": E, "metres": np.array([10, 11, 13])}
-    um, V = metre_vectors(R)
-    assert um.tolist() == [10, 11, 13] and V.shape == (3, 3)
+    depth = np.arange(0, 4.0, 0.1, dtype="f4")                                  # 40 tokens: metres 0-3
+    F = np.zeros((40, 3), "f4"); F[:, 0] = np.arange(40); F[:, 1] = 1.0           # a ramp and a constant
+    R = {"depth": depth, "F": F, "order": np.arange(40), "metres": np.array([0, 1, 2, 3])}
+    H = {"i_mu": np.array([10.0, 1.0, 0.0], "f4"), "i_sd": np.array([5.0, 1.0, 1.0], "f4")}
+    um, V = metre_vectors(R, H)
+    assert um.tolist() == [0, 1, 2, 3] and V.shape == (4, 3)
     np.testing.assert_allclose(np.linalg.norm(V, axis=1), 1.0, atol=1e-5)
-    np.testing.assert_allclose(V[0] * np.sqrt(14), [1, 2, 3], atol=1e-4)          # max over the three tokens of metre 10
-    np.testing.assert_allclose(V[1] * np.sqrt(41), [4, 5, 0], atol=1e-4)
-    # a metre asked for that has no token gives a zero vector rather than infinities
-    _, W = metre_vectors(R, [10, 12]); assert W[1].tolist() == [0, 0, 0]
-    # a one-metre window is the metre's own vector; a wider window pools everything in it
-    np.testing.assert_allclose(window_vector(R, 10, 11), V[0], atol=1e-5)
-    np.testing.assert_allclose(window_vector(R, 10, 12) * np.sqrt(16 + 25 + 9), [4, 5, 3], atol=1e-4)
-    assert np.isfinite(window_vector(R, 50, 51)).all()                           # an empty window falls back to the nearest tokens
+    # metre 1: tokens 10..29 (the 2 m from 1.0 m), mean of the ramp 19.5 -> (19.5-10)/5 = 1.9; the constant standardises to 0
+    np.testing.assert_allclose(V[1] * np.hypot(1.9, 0), [1.9, 0, 0], atol=1e-4)
+    # the last metre cannot start a full 2 m window: it slides back so the window still holds 20 tokens (as the search does)
+    np.testing.assert_allclose(V[3], V[2], atol=1e-5)
+    # a window asked for by depth: [1, 3) is exactly metre 1's window; a window shorter than 2 m widens to 2 m from its start
+    np.testing.assert_allclose(window_vector(R, H, 1, 3), V[1], atol=1e-5)
+    np.testing.assert_allclose(window_vector(R, H, 1, 1.5), V[1], atol=1e-5)
 
 
 def test_metre_arrays_fingerprint_is_the_metre_vector(monkeypatch):
     from app import extras
-    depth = np.array([5.0, 5.5, 6.0, 6.5], "f4"); E = np.array([[1, 0], [0, 1], [2, 0], [0, 0.5]], "f4")
-    R = {"depth": depth, "E": E, "metres": np.array([5, 6]), "tir_pred": np.ones((4, 2), "f4")}
-    eng = SimpleNamespace(compute=lambda key: R)
+    depth = np.arange(0, 4.0, 0.1, dtype="f4"); F = np.zeros((40, 2), "f4"); F[:, 0] = np.arange(40)
+    R = {"depth": depth, "F": F, "order": np.arange(40), "metres": np.array([0, 1, 2, 3]), "tir_pred": np.ones((40, 2), "f4")}
+    H = {"i_mu": np.array([0.0, 0.0], "f4"), "i_sd": np.array([1.0, 1.0], "f4")}
+    eng = SimpleNamespace(compute=lambda key: R, H=H)
     tir, fp = extras.metre_arrays(eng, "h")
-    assert tir.shape == (2, 2) and fp.shape == (2, 2)
-    np.testing.assert_allclose(fp[0], [1, 1] / np.sqrt(2), atol=1e-5)             # max over (1,0) and (0,1)
-    np.testing.assert_allclose(fp[1], [2, 0.5] / np.sqrt(4.25), atol=1e-5)
+    assert tir.shape == (4, 2) and fp.shape == (4, 2)
+    np.testing.assert_allclose(fp[0], [1, 0], atol=1e-5)                       # the ramp only: unit vector along it

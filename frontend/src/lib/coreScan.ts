@@ -239,7 +239,7 @@ export const coreScan = {
   documents: (key: string) => json<HoleDocuments>(`/holes/${enc(key)}/documents/`),
   model: (key: string, run: string) => json<ModelView>(`/holes/${enc(key)}/models/${enc(run)}/`).then((v) => v.model ? { ...v, model: { ...v.model, name: modelName(v.model.name) } } : v),
   metre: (key: string, m: number, run: string) => json<MetreView>(`/holes/${enc(key)}/metres/${m}/?model=${enc(run)}`),
-  /** Core like a stretch of this hole: one metre, or a window; where to look is the scope. */
+  /** Core like a stretch of this hole: the 2 m at a metre, or a window; where to look is the scope. */
   similar: (key: string, at: { m: number } | { from: number; to: number }, run: string, scope: SimilarScope = "state", km = 10) =>
     json<SimilarView>(`/holes/${enc(key)}/similar/?${"m" in at ? `m=${at.m}` : `from=${at.from}&to=${at.to}`}&model=${enc(run)}&scope=${scope}&km=${km}`),
   /** Holes like this one as a whole, metre by metre on the model's representation; 404 when the hole has no metre vectors yet. */

@@ -13,9 +13,6 @@ services:
       CORETRACE_NVCL_ROOT: /nvcl/NVCL/tsg
       CORETRACE_CATALOGUE: /nvcl/_catalog/all_datasets.json
       CORETRACE_NVCL_STORE: /nvclstore
-      # the Similar-core library, one row per metre of every WA hole, built by `app.cli build-library` and copied
-      # into the work volume; until the file is there the engine falls back to the library bundled with the model
-      CORETRACE_LIBRARY: /work/library_1m_v2.npz
     volumes:
       - coretrace_work:/work
       - ${NVCL_MIRROR:-/mnt/qnap/WAGeoData/WAGeoDataPublic/geossdi.dmp.wa.gov.au}:/nvcl:ro
