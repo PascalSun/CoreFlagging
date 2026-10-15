@@ -1,4 +1,4 @@
-// Core scans (CoreTrace): the platform's core_scan API.
+// Core scans (Core Flagging): the platform's core_scan API.
 //
 // Reads are public for NVCL holes; a signed-in caller also sees their own uploads, so a
 // token is sent when there is one. Uploading needs a verified session.

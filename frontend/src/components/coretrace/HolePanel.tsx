@@ -256,7 +256,7 @@ function Report({ hole, models, mvw, run, trays }: { hole: HoleDetail; models: C
   const pdf = async () => {
     if (!docRef.current) return;
     setMaking(true);
-    try { await downloadReportPdf(docRef.current, `CoreTrace_${safe(hole.name)}_report.pdf`, `CoreTrace scan report · ${hole.name} · ${models.find((m) => m.run === run)?.name ?? run}`); }
+    try { await downloadReportPdf(docRef.current, `CoreFlagging_${safe(hole.name)}_report.pdf`, `Core Flagging scan report · ${hole.name} · ${models.find((m) => m.run === run)?.name ?? run}`); }
     finally { setMaking(false); }
   };
   const exportSegs = async () => save(await coreScan.segmentsCsv(hole.key, run), `${safe(hole.name)}_${run}_auto_log.csv`);
@@ -349,12 +349,12 @@ export function HolePanel({ holeKey, tab: tabProp, onTab, models, run, metre, on
     </div>
   );
 
-  // One model only. The other runs (three CoreTrace training variants and the conventional-methods baseline)
+  // One model only. The other runs (three Core Flagging training variants and the conventional-methods baseline)
   // still exist in the service for the research, and a deep link with ?run= still opens one, but the page
   // no longer offers to switch: the picker confused readers more than it helped.
   const defaultRun = models.find((m) => m.default)?.run ?? runs[0];
   const modelPicker = runs.length > 0 && (
-    <p className="text-[11px] text-slate-500">Read by <b className="font-semibold text-slate-800">{useRun === defaultRun ? "CoreTrace" : models.find((m) => m.run === useRun)?.name ?? useRun}</b>{useRun === defaultRun ? ", a foundation model for core spectra" : ""}</p>
+    <p className="text-[11px] text-slate-500">Read by <b className="font-semibold text-slate-800">{useRun === defaultRun ? "Core Flagging" : models.find((m) => m.run === useRun)?.name ?? useRun}</b>{useRun === defaultRun ? ", a foundation model for core spectra" : ""}</p>
   );
 
   let body: React.ReactNode;

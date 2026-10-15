@@ -1,4 +1,4 @@
-# CoreTrace
+# Core Flagging
 
 The **core-scan service** behind the Geo Research Platform ([Groundwork](../Groundwork)).
 It reads HyLogger drill-core scans (TSG files), cleans them into 10 cm bins, runs the
@@ -17,10 +17,10 @@ core-spectra models over them and hands the platform everything it found:
 
 ## How it fits together
 
-CoreTrace keeps **no data of its own**. The platform's database is the record.
+Core Flagging keeps **no data of its own**. The platform's database is the record.
 
 ```
-Groundwork (platform)                         CoreTrace (this repo)
+Groundwork (platform)                         Core Flagging (this repo)
   core_scan tables, uploads,   ──jobs──▶        worker: fetch scan → clean → models
   object storage, the map      ◀─results──      (tokens, per-metre results, tray photographs)
                                ──fingerprint──▶ /api/v1/similar  (the State library lives here)
@@ -162,7 +162,7 @@ uv run pytest
 
 ## Frontend
 
-`frontend/` is CoreTrace's website (coretrace.nlp-tlp.org): the landing page, the map with every scanned
+`frontend/` is Core Flagging's website (coretrace.nlp-tlp.org): the landing page, the map with every scanned
 hole, the hole pages, the assistant and the PDF report. It is a Next.js app of its own, built and run by the
 `frontend` service in `docker-compose.yml` (host port 3003). It never reaches this service or the database
 directly: everything it shows comes from the platform's public API (`https://platform.nlp-tlp.org/api/docs/`),

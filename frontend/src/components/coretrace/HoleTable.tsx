@@ -54,7 +54,7 @@ export function HoleTable({ holes, q, onQ, look, typeName, onOpen, onAsk, loadin
       const got = await coreScan.lookAgain(sheet?.state ?? "", sheet?.q ?? "");
       const blob = new Blob([csvSheet(got.model, got.rows)], { type: "text/csv" });
       const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
-      a.download = `CoreTrace_look_again_${sheet?.state || "all"}${sheet?.q ? "_" + sheet.q.replace(/[^A-Za-z0-9]+/g, "_") : ""}.csv`; a.click(); URL.revokeObjectURL(a.href);
+      a.download = `CoreFlagging_look_again_${sheet?.state || "all"}${sheet?.q ? "_" + sheet.q.replace(/[^A-Za-z0-9]+/g, "_") : ""}.csv`; a.click(); URL.revokeObjectURL(a.href);
     } finally { setExporting(false); }
   };
   const rows = useMemo(() => {

@@ -1,4 +1,4 @@
-# CoreTrace frontend image — bun build → Next standalone server. It serves CoreTrace alone and talks to
+# Core Flagging frontend image — bun build → Next standalone server. It serves Core Flagging alone and talks to
 # the platform only through the platform's public API.
 # NEXT_PUBLIC_* are inlined at BUILD time, so they MUST be passed as --build-arg.
 FROM oven/bun:1.3 AS deps

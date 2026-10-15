@@ -78,7 +78,7 @@ export function LookAgain({ hole, mv, run, metre, onJump, onSimilar }: { hole: H
   const verdictOf = (kind: ReviewKind, from: number, to: number) => reviews.find((r) => r.mine && r.kind === kind && Math.abs(r.from_m - from) < 0.05 && Math.abs(r.to_m - to) < 0.05)?.verdict ?? "";
   const exportCsv = () => {
     const blob = new Blob([csvRows(hole.name, run, ds, flags, verdictOf, (from, to) => chemistryOver(pkg, from, to))], { type: "text/csv" });
-    const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `CoreTrace_${hole.name.replace(/[^A-Za-z0-9_-]+/g, "_")}_look_again.csv`; a.click(); URL.revokeObjectURL(a.href);
+    const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `CoreFlagging_${hole.name.replace(/[^A-Za-z0-9_-]+/g, "_")}_look_again.csv`; a.click(); URL.revokeObjectURL(a.href);
   };
   const on = (d: { from_m: number; to_m: number }) => metre !== null && metre >= d.from_m && metre < d.to_m;
   return (

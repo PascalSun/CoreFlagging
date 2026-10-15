@@ -14,7 +14,7 @@ import { groupColor, groupName } from "@/components/coretrace/palette";
 import { coretraceBase, coretraceChrome } from "@/lib/sites";
 import { cn } from "@/lib/utils";
 
-// CoreTrace's landing page, in the platform landing's language: a full-bleed picture with the lockup at
+// Core Flagging's landing page, in the platform landing's language: a full-bleed picture with the lockup at
 // its foot, a two-column statement, large picture cards, the team, and the footer revealed underneath.
 // The picture here is the thing itself: a real tray of core, with what the scan read under each row.
 
@@ -58,7 +58,7 @@ export function CoreHero() {
   const still = useReducedMotion();
   return (
     // the navbar's glass sits on paper, as on the platform's landing; the core table fills the rest of the screen
-    <section id="top" aria-label="CoreTrace" className="bg-paper pt-[72px] md:pt-[80px]">
+    <section id="top" aria-label="Core Flagging" className="bg-paper pt-[72px] md:pt-[80px]">
     <div className="relative h-[calc(100dvh-72px)] min-h-[560px] overflow-hidden bg-ink text-white md:h-[calc(100dvh-80px)]">
       <style>{`@keyframes ct-reveal{from{clip-path:inset(0 100% 0 0)}to{clip-path:inset(0 0 0 0)}}.ct-reveal{animation:ct-reveal 2.8s cubic-bezier(.4,0,.2,1) .6s both}@media (prefers-reduced-motion:reduce){.ct-reveal{animation:none}}`}</style>
       {/* the tray: wider than the screen, so the core reads large; drifts very slowly sideways */}
@@ -86,7 +86,7 @@ export function CoreHero() {
             <h1 className="mt-1.5 font-display text-[34px] font-semibold leading-[1.1] tracking-tight md:mt-2.5 md:text-6xl md:leading-tight">
               <span className="bg-linear-to-r from-white from-40% to-cyan bg-clip-text text-transparent">A second opinion on every metre of core.</span>
             </h1>
-            <p className="mt-2 max-w-3xl font-display text-base font-medium text-white/75 md:mt-3 md:text-2xl">CoreTrace reads HyLogger scans the same way for every hole, and shows where the core and the geologist&rsquo;s log tell different stories.</p>
+            <p className="mt-2 max-w-3xl font-display text-base font-medium text-white/75 md:mt-3 md:text-2xl">Core Flagging reads HyLogger scans the same way for every hole, and shows where the core and the geologist&rsquo;s log tell different stories.</p>
             <div className="mt-5 flex flex-wrap items-center gap-2.5 md:mt-7 md:gap-3">
               <Link href={`${base}/map`} className="flex h-11 items-center gap-2 rounded-full bg-white px-5 font-display text-[15px] font-bold md:h-12 md:px-6 text-ink transition-colors hover:bg-cyan focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan">
                 Open the map<ArrowRight className="size-4" />
@@ -188,7 +188,7 @@ function TrayPicture({ offset }: { offset: number }) {
 
 const FEATURES: { title: string; body: string; offset: number; tint: string; to: "map" | "findings" }[] = [
   { title: "Every hole, one map", body: "About 6,600 scanned holes from every State's core library, coloured by what each was drilled for \u2014 gold, copper, nickel \u2014 or by what the core is made of.", offset: 0.05, tint: "#0d3a4c", to: "map" },
-  { title: "The log next to the scan", body: "Open a hole: the log from the whole hole down to 10 cm, the tray photographs and the line scan, the minerals every 10 cm and CoreTrace's reading, beside the geologist's log.", offset: 0.3, tint: "#173523", to: "map" },
+  { title: "The log next to the scan", body: "Open a hole: the log from the whole hole down to 10 cm, the tray photographs and the line scan, the minerals every 10 cm and Core Flagging's reading, beside the geologist's log.", offset: 0.3, tint: "#173523", to: "map" },
   { title: "Where they disagree", body: "The intervals where the core and the log tell different stories, each with its photograph, to look at again \u2014 and core like them, in the hole, nearby or across the State.", offset: 0.55, tint: "#3b2916", to: "findings" },
   { title: "Ask about the core", body: "An assistant that answers from the same data, in plain words, and opens the hole it is talking about.", offset: 0.15, tint: "#2a2446", to: "map" },
 ];
@@ -238,7 +238,7 @@ export function CoreRun({ rows, caption }: { rows: string[]; caption: string }) 
 }
 
 const NOTES: [string, string][] = [
-  ["A second opinion, not a replacement.", "CoreTrace points at intervals worth another look. A geologist, the tray photograph and the core decide."],
+  ["A second opinion, not a replacement.", "Core Flagging points at intervals worth another look. A geologist, the tray photograph and the core decide."],
   ["Checked in Western Australia.", "Against the logs and the chemistry in GSWA's drillhole database. Holes from other States are read the same way but not yet checked."],
   ["It is wrong sometimes.", "Some intervals it reads as ultramafic are basalt by their chemistry, and weathering clays hide the rock they came from."],
   ["Not a targeting tool.", "We make no claim about gold or nickel. Differing from the log points at the rock, not at grade."],
@@ -342,7 +342,7 @@ export function CoreHow() {
 }
 
 const FOUND: [string, string][] = [
-  ["74%", "When CoreTrace and the log disagree, the chemistry backs CoreTrace in 74% of cases, against 51% by chance."],
+  ["74%", "When Core Flagging and the log disagree, the chemistry backs Core Flagging in 74% of cases, against 51% by chance."],
   ["79 intervals", "Ultramafic rock in WA logged as something else, confirmed by the scanner's own minerals."],
   ["5,846 holes", "Read across Australia. Checked against logs and chemistry in Western Australia."],
 ];
@@ -381,7 +381,7 @@ export function CoreClosing() {
       <div className="container-site">
         <Reveal>
           <p className="max-w-4xl font-display text-[26px] font-medium leading-snug tracking-tight text-balance text-ink md:text-[40px]">
-            CoreTrace doesn&rsquo;t replace the geologist. It reads every metre the geologist didn&rsquo;t have time to, and where the core and the log disagree, it asks for another pair of eyes.
+            Core Flagging doesn&rsquo;t replace the geologist. It reads every metre the geologist didn&rsquo;t have time to, and where the core and the log disagree, it asks for another pair of eyes.
           </p>
         </Reveal>
       </div>

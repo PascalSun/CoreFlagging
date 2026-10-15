@@ -27,7 +27,7 @@ import { cn } from "@/lib/utils";
 
 const glass = "rounded-2xl border border-white/60 bg-white/80 shadow-glass backdrop-blur-xl";
 
-/** The CoreTrace map: every scanned hole in the State, and the way into any one of them.
+/** The Core Flagging map: every scanned hole in the State, and the way into any one of them.
  * What is open lives in the address (?hole=&m=&model=&full=1), so a view can be shared. */
 export function CoreTraceMap() {
   const pathname = usePathname(); const sp = useSearchParams(); const qc = useQueryClient();
@@ -72,7 +72,7 @@ export function CoreTraceMap() {
   useEffect(() => { setAuthed(isAuthed()); }, []);
 
   // What is open lives in the query string, changed in place with the browser's own history (Next keeps
-  // useSearchParams in step). Not router.replace: on CoreTrace's own host /map is a rewrite of /coretrace/map,
+  // useSearchParams in step). Not router.replace: on Core Flagging's own host /map is a rewrite of /coretrace/map,
   // and the router took a query-only change there for the same page and kept the old query, so a hole could
   // not be closed. The path is the one in the address bar for the same reason.
   const set = (patch: Record<string, string | null>) => {
@@ -135,7 +135,7 @@ export function CoreTraceMap() {
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { if (!mobile && !holeKey && hq.data && !tourSeen()) setTouring(true); }, [hq.data]);   // eslint-disable-line react-hooks/exhaustive-deps
   const tour: TourStep[] = [
-    { title: "Welcome to CoreTrace", body: `Every HyLogger-scanned drillhole in Australia's core libraries, ${holes.length ? holes.length.toLocaleString() + " of them, " : ""}read metre by metre by a model trained on scanned drill core. Five quick steps.` },
+    { title: "Welcome to Core Flagging", body: `Every HyLogger-scanned drillhole in Australia's core libraries, ${holes.length ? holes.length.toLocaleString() + " of them, " : ""}read metre by metre by a model trained on scanned drill core. Five quick steps.` },
     { target: "legend", title: "Each point is a drillhole", body: "Colour is what the hole was drilled for \u2014 gold, copper, nickel\u2026 from the survey's record of the hole in WA, SA and Victoria, from its exploration report or the nearest known deposit elsewhere (a hatched fill). A square is a scan the models could not read. Hover a row in the key to show only those holes or hide them, by core type, commodity, source or model reading; every count follows what is shown." },
     { target: "tabs", title: "Map, or every hole as a table", body: "The Table tab lists every hole: search by name, company or region and sort by depth or gold. The map key on the left decides which holes the map draws." },
     ...(chatOpen && !mobile ? [{ target: "chat", title: "Ask in plain words", body: "\u201cHoles with gold in NSW\u201d, \u201cwhat is unusual in MND036?\u201d. The assistant answers from the same data, and opens the holes it talks about on the map." }] : []),
@@ -177,12 +177,13 @@ export function CoreTraceMap() {
   useEffect(() => { const f = () => { setVw(window.innerWidth); setVh(window.innerHeight); }; f(); window.addEventListener("resize", f); return () => window.removeEventListener("resize", f); }, []);
   // the top bar's room: the screen less the chat column; pickers and labels fold away as it narrows
   const barW = vw - chatW;
-  const panelW = !holeKey ? 0 : wide ? Math.max(560, Math.min(1180, vw - chatW - 60 - 24)) : 420;
+  const ctlW = view === "map" && !mobile ? 38 + 8 : 0;   // the zoom and basemap buttons keep the right edge; the hole's panel sits left of them
+  const panelW = !holeKey ? 0 : wide ? Math.max(560, Math.min(1180, vw - chatW - ctlW - 60 - 24)) : 420;
 
   return (
     <div className="fixed inset-0 overflow-hidden bg-slate-50 text-slate-900">
       <div className="absolute inset-0 z-0"><CoreMap holes={drawn} basemap={basemap} colour={colour} card={(h) => holeCard(h, colour(h), typeName, "Target")} selected={selected} ringKm={ringKm} overlays={overlays} onSelect={(k) => set({ hole: k, m: null, full: null })}
-        padRight={mobile ? 0 : panelW + chatW} padLeft={!mobile && view === "map" && holes.length > 0 && !keyFolded ? PANEL_W + 22 : 6} padBottom={mobile && holeKey ? Math.round(vh * 0.56) : 0} apiRef={mapApi} /></div>
+        padRight={mobile ? 0 : panelW + chatW + ctlW} padLeft={!mobile && view === "map" && holes.length > 0 && !keyFolded ? PANEL_W + 22 : 6} padBottom={mobile && holeKey ? Math.round(vh * 0.56) : 0} apiRef={mapApi} /></div>
 
       {/* the key: a single column down the left edge; every row can be shown alone or hidden, and every count
           follows what the other sections let through */}
@@ -190,17 +191,17 @@ export function CoreTraceMap() {
         <MapKey {...keyBody} shown={drawn.filter((h) => h.status === "ready").length} waiting={waitingN} folded={keyFolded} onFold={setKeyFolded} onReset={resetKey} />
       )}
 
-      {/* zoom, and under it the basemap behind a layers button, bottom right of the map; on a phone the map is
-          pinched and the basemap lives in the key's sheet */}
+      {/* zoom, and under it the basemap behind a layers button, at the right edge whether or not a hole is open; on a
+          phone the map is pinched and the basemap lives in the key's sheet */}
       {view === "map" && !mobile && (
-        <div className="absolute bottom-3 z-10 flex flex-col items-end gap-2" style={{ right: (holeKey ? panelW + 24 : 12) + chatW }}>
+        <div className="absolute bottom-3 z-10 flex flex-col items-end gap-2" style={{ right: 12 + chatW }}>
           <div className={cn(glass, "flex flex-col overflow-hidden rounded-xl")} role="group" aria-label="Zoom">
             <button type="button" onClick={() => mapApi.current?.zoomIn()} aria-label="Zoom in" className="grid size-9 place-items-center text-slate-700 hover:bg-white hover:text-slate-900"><Plus size={15} /></button>
             <button type="button" onClick={() => mapApi.current?.zoomOut()} aria-label="Zoom out" className="grid size-9 place-items-center border-t border-slate-900/[0.08] text-slate-700 hover:bg-white hover:text-slate-900"><Minus size={15} /></button>
           </div>
           <div className="relative">
             <button type="button" onClick={() => setLayersOpen((o) => !o)} aria-label="Basemap" aria-expanded={layersOpen} data-tip="Basemap" data-tip-left=""
-              className={cn(glass, "grid size-9 place-items-center rounded-xl text-slate-700 hover:bg-white hover:text-slate-900", layersOpen && "bg-white text-slate-900")}><Layers size={16} /></button>
+              className={cn(glass, "grid size-[38px] place-items-center rounded-xl text-slate-700 hover:bg-white hover:text-slate-900", layersOpen && "bg-white text-slate-900")}><Layers size={16} /></button>
             {layersOpen && <>
               <button type="button" aria-label="Close" onClick={() => setLayersOpen(false)} className="fixed inset-0 z-0 cursor-default" />
               <div role="radiogroup" aria-label="Basemap" className={cn(glass, "absolute right-[calc(100%+8px)] bottom-0 z-10 flex gap-2 bg-white/90 p-2")}>
@@ -232,13 +233,13 @@ export function CoreTraceMap() {
       {/* top bar: brand left, session right */}
       <div className="pointer-events-none absolute top-0 left-0 z-20 flex items-start justify-between gap-2 p-3 sm:gap-3" style={{ right: chatW }}>
         {/* on a phone the mark alone, as a round button; on a wide screen the mark and the name in a pill */}
-        <Link href={base || "/"} aria-label="CoreTrace home" className="pointer-events-auto flex-none rounded-full shadow-glass sm:hidden">
+        <Link href={base || "/"} aria-label="Core Flagging home" className="pointer-events-auto flex-none rounded-full shadow-glass sm:hidden">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/brand/coretrace-mark.svg" alt="CoreTrace" className="size-11 rounded-full ring-1 ring-white/60" />
+          <img src="/brand/coretrace-mark.svg" alt="Core Flagging" className="size-11 rounded-full ring-1 ring-white/60" />
         </Link>
         <Link href={base || "/"} className={cn(glass, "pointer-events-auto hidden h-11 flex-none items-center gap-2 rounded-full pr-4 pl-1.5 font-display text-sm font-bold tracking-tight text-ink sm:flex")}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/brand/coretrace-mark.svg" alt="" className="size-8 rounded-full" />CORETRACE
+          <img src="/brand/coretrace-mark.svg" alt="" className="size-8 rounded-full" />CORE FLAGGING
         </Link>
         <div className="pointer-events-auto mr-auto flex min-w-0 items-center gap-2">
           <div data-tour="tabs" className={cn(glass, "flex h-11 items-center gap-0.5 rounded-full p-1")} role="tablist" aria-label="View">
@@ -283,7 +284,7 @@ export function CoreTraceMap() {
 
       {/* the hole: a panel at the right on a wide screen, a bottom sheet on a phone */}
       {holeKey && !mobile && (
-        <aside className="absolute z-30 overflow-hidden rounded-2xl border border-white/60 bg-white/90 shadow-glass backdrop-blur-xl" style={{ top: 68, bottom: 12, width: panelW, right: chatW + 12 }}>
+        <aside className="absolute z-30 overflow-hidden rounded-2xl border border-white/60 bg-white/90 shadow-glass backdrop-blur-xl" style={{ top: 68, bottom: 12, width: panelW, right: chatW + ctlW + 12 }}>
           <HolePanel key={holeKey} holeKey={holeKey} tab={tab} onTab={(t) => set({ tab: t === "metre" ? null : t })} models={models} run={run} metre={metre} onMetre={(m) => set({ m: m === null ? null : String(m) })}
             wide={wide} onWide={(w) => set({ full: w ? "1" : null })} onClose={() => set({ hole: null, m: null, full: null, tab: null, w: null })} win={win} onWindow={(r) => set({ w: r ? `${r[0]}-${r[1]}` : null, full: r ? "1" : null, tab: r ? "window" : null })}
             onOpenHole={(k, m) => set({ hole: k, m: m === undefined ? null : String(m), full: "1" })}

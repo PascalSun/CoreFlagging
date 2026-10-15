@@ -1,4 +1,4 @@
-"""CoreTrace service.
+"""Core Flagging service.
 
 It keeps no data of its own. It takes scans from the platform's queue, turns each into cleaned 10 cm tokens and the
 models' readings, and hands those back; the platform stores and serves them. The one question it answers live is
@@ -48,7 +48,7 @@ async def lifespan(app: FastAPI):
         state["worker"].stop.set()
 
 
-app = FastAPI(title="CoreTrace", version="0.1.0", lifespan=lifespan)
+app = FastAPI(title="Core Flagging", version="0.1.0", lifespan=lifespan)
 
 
 @app.get("/health")

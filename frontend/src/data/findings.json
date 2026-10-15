@@ -43,7 +43,7 @@
   "metres": 1651,
   "minerals": [
    {
-    "label": "Logged basalt, CoreTrace agrees",
+    "label": "Logged basalt, Core Flagging agrees",
     "share": 0.017,
     "ci": [
      0.0107,
@@ -51,7 +51,7 @@
     ]
    },
    {
-    "label": "Logged basalt, gabbro or sediment; CoreTrace reads ultramafic",
+    "label": "Logged basalt, gabbro or sediment; Core Flagging reads ultramafic",
     "share": 0.639,
     "ci": [
      0.5195,
@@ -60,7 +60,7 @@
     "highlight": true
    },
    {
-    "label": "Logged ultramafic, CoreTrace agrees",
+    "label": "Logged ultramafic, Core Flagging agrees",
     "share": 0.819,
     "ci": [
      0.7783,

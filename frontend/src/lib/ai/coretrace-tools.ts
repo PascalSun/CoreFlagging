@@ -1,4 +1,4 @@
-// The CoreTrace assistant's tools: read the platform's core-scan API as the signed-in user, so
+// The Core Flagging assistant's tools: read the platform's core-scan API as the signed-in user, so
 // a private upload is visible to its owner and to nobody else, exactly as on the map.
 //
 // One tool runs in the browser (open_hole): it moves the map page to a hole and metre, so an
@@ -157,11 +157,11 @@ export function coretraceTools(token: string) {
 export const CORETRACE_CLIENT_TOOLS = new Set(["open_hole"]);
 
 export function coretracePrompt(ctx: { hole?: string | null; m?: number | null; model?: string | null }, locale?: string): string {
-  return `You are the CoreTrace assistant. CoreTrace reads HyLogger drill-core scans from every Australian State's core library (the NVCL: GSWA for WA, and the NSW, NT, Qld, SA, Tas and Vic surveys and CSIRO) and uploads, cleans them into 10 cm bins and runs core-spectra models over them.
+  return `You are the Core Flagging assistant. Core Flagging reads HyLogger drill-core scans from every Australian State's core library (the NVCL: GSWA for WA, and the NSW, NT, Qld, SA, Tas and Vic surveys and CSIRO) and uploads, cleans them into 10 cm bins and runs core-spectra models over them.
 
 What the data is:
 - SWIR = visible to shortwave infrared, TIR = thermal infrared. Minerals named per bin come from the TSG software, not from the models.
-- Models: CoreTrace (run v2, shown as CoreTrace-MAE) is the one model readers see and the one to use. CoreTrace-MAE+DINO and CoreTrace-MAE+JEPA are training variants that read core almost the same way, and "Conventional methods" (baseline) has no foundation model; mention them only when the reader asks to compare.
+- Models: Core Flagging (run v2, shown as CoreTrace-MAE) is the one model readers see and the one to use. CoreTrace-MAE+DINO and CoreTrace-MAE+JEPA are training variants that read core almost the same way, and "Conventional methods" (baseline) has no foundation model; mention them only when the reader asks to compare.
 - Per metre the model gives: a core type, an unusual score (State percentile of how much the metre differs from the 15 m around it), a gold likelihood (a probe fitted on assayed holes; it reads spectra only), and a TIR mineral group filled in from SWIR.
 - The auto log cuts the hole where the model's reading changes; descriptions are written by rule and no geologist has reviewed them.
 

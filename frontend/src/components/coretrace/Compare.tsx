@@ -84,7 +84,7 @@ export function Compare() {
       </div>
       <div className="hidden print:block mb-3">
         <div className="font-display text-lg font-semibold text-slate-900">{a.hole && b.hole ? `${a.hole.name} and ${b.hole.name}, side by side` : "Two holes side by side"}</div>
-        <div className="text-[11px] text-slate-500">CoreTrace comparison · {today} · one depth axis for both logs · coretrace.nlp-tlp.org/compare?a={a.hole?.key ?? ""}&amp;b={b.hole?.key ?? ""}</div>
+        <div className="text-[11px] text-slate-500">Core Flagging comparison · {today} · one depth axis for both logs · coretrace.nlp-tlp.org/compare?a={a.hole?.key ?? ""}&amp;b={b.hole?.key ?? ""}</div>
         <div className="text-[10px] text-slate-400">The model&rsquo;s readings are suggestions to check against the core, an assay or a geologist, not findings. Data: the State surveys&rsquo; HyLogger libraries (CC BY 4.0).</div>
       </div>
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 print:grid-cols-2">

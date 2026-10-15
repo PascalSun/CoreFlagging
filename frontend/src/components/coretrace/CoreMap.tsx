@@ -257,7 +257,7 @@ export function CoreMap({ holes, colour, card, selected, onSelect, padRight, pad
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fitTo]);
 
-  // A deep link from another app (the Geo Data Platform's "Explore in CoreTrace"): ?bbox=w,s,e,n
+  // A deep link from another app (the Geo Data Platform's "Explore in Core Flagging"): ?bbox=w,s,e,n
   // fits that box, else ?lon&lat(&z) flies there. Applied once, after the first view.
   useEffect(() => {
     const map = mapRef.current; if (!map) return;

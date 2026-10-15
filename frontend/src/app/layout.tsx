@@ -13,7 +13,7 @@ const manrope = Manrope({ variable: "--font-manrope", subsets: ["latin"] });
 const jakarta = Plus_Jakarta_Sans({ variable: "--font-jakarta", subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "CoreTrace — Australia's scanned drill core, read metre by metre",
+  title: "Core Flagging — Australia's scanned drill core, read metre by metre",
   description: "Every HyLogger-scanned drillhole in Australia's core libraries, read by a core-spectra model.",
 };
 

@@ -3,7 +3,7 @@ import { convertToModelMessages, stepCountIs, streamText, type UIMessage } from 
 import { chatModel } from "@/lib/ai/provider";
 import { coretracePrompt, coretraceTools } from "@/lib/ai/coretrace-tools";
 
-// The CoreTrace assistant. Same sign-in rule and usage log as the platform's assistant
+// The Core Flagging assistant. Same sign-in rule and usage log as the platform's assistant
 // (/api/chat); its own tools read the core-scan API with the reader's token.
 
 export const runtime = "nodejs";

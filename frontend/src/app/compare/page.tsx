@@ -4,7 +4,7 @@ import { Compare } from "@/components/coretrace/Compare";
 
 export const metadata: Metadata = {
   icons: { icon: "/brand/coretrace-mark.svg", apple: "/brand/coretrace-mark.svg" },
-  title: "CoreTrace — Two holes side by side",
+  title: "Core Flagging — Two holes side by side",
   description: "Two scanned drillholes on one depth axis: what was logged, what the model reads, and where the two disagree.",
 };
 
