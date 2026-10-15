@@ -108,10 +108,12 @@ function ring(lon: number, lat: number, km: number) {
   return { type: "FeatureCollection", features: [{ type: "Feature", geometry: { type: "Polygon", coordinates: [pts] }, properties: {} }] };
 }
 
-export function CoreMap({ holes, colour, card, selected, onSelect, padRight, padBottom = 0, fitTo, basemap = "satellite", ringKm = null, overlays = {} }: {
+export function CoreMap({ holes, colour, card, selected, onSelect, padRight, padBottom = 0, fitTo, basemap = "satellite", ringKm = null, overlays = {}, cluster = true }: {
   holes: HoleRow[]; selected: HoleRow | null; onSelect: (key: string | null) => void; padRight: number;
   /** which context layers are shown */
   overlays?: Partial<Record<Overlay, boolean>>;
+  /** holes that crowd are added up into donuts (default), or every hole is its own mark at every zoom */
+  cluster?: boolean;
   /** a ring of this many km around the selected hole (its neighbours), or none */
   ringKm?: number | null;
   /** room taken at the foot by a bottom sheet: the selected hole is framed above it */
@@ -130,6 +132,8 @@ export function CoreMap({ holes, colour, card, selected, onSelect, padRight, pad
   const holesRef = useRef(holes); const fitted = useRef(false); const colourRef = useRef(colour); const cardRef = useRef(card);
   const classesRef = useRef<ClusterClass[]>([]); const dropClustersRef = useRef<() => void>(() => {});
   useEffect(() => { cardRef.current = card; }, [card]);
+  const clusterRef = useRef(cluster); const rebuildRef = useRef<() => void>(() => {});
+  useEffect(() => { if (clusterRef.current === cluster) return; clusterRef.current = cluster; if (readyRef.current) rebuildRef.current(); }, [cluster]);
   const overlaysRef = useRef(overlays);
   useEffect(() => {
     overlaysRef.current = overlays; const map = mapRef.current; if (!map || !readyRef.current) return;
@@ -158,12 +162,61 @@ export function CoreMap({ holes, colour, card, selected, onSelect, padRight, pad
       const tip = new mapboxgl.Popup({ closeButton: false, closeOnClick: false, className: "ct-popup", offset: 12, maxWidth: "none" });
       // the holes' layers go on whichever basemap is showing: a change of basemap replaces the whole style, so they
       // are added again each time a style has loaded (the click and hover handlers, bound by layer id, carry over)
+      // The holes' source and the layers drawn from it. Kept apart from the rest so that a change of the cluster
+      // setting (Mapbox fixes it when the source is made) can rebuild just these, under the picked-hole ring.
+      const D = ["==", ["get", "dim"], 1], R = ["!=", ["get", "ring"], ""], HOV = ["boolean", ["feature-state", "hover"], false];
+      // zoom outermost, the hover case inside each stop
+      const size = (k: number) => ["interpolate", ["linear"], ["zoom"], ...[[3, 3], [6, 4.2], [9, 6], [12, 8]].flatMap(([z, r]) => [z, ["case", HOV, r * k, r]])];
+      const HOLE_LAYERS = ["holes-halo", "holes-cluster", "holes-badge", "holes-pt", "holes-sym-far", "holes-pt-plain", "holes-sym"];
+      const addHoleSource = () => {
+        const built = features(holesRef.current, colourRef.current); classesRef.current = built.classes;
+        map.addSource("holes", { type: "geojson", data: built.fc, promoteId: "key", cluster: clusterRef.current, clusterRadius: 44, clusterMaxZoom: 7, clusterProperties: CLUSTER_PROPS });
+      };
+      const addHoleLayers = () => {
+        const before = map.getLayer("picked-ring") ? "picked-ring" : undefined;
+        map.addLayer({ id: "holes-halo", type: "circle", source: "holes", filter: ["==", ["get", "wait"], 0], paint: {
+          "circle-radius": ["interpolate", ["linear"], ["zoom"], 3, 5, 6, 6.5, 9, 9, 12, 12],
+          "circle-color": "#020617", "circle-blur": 0.9, "circle-opacity": ["case", D, 0.03, 0.4] } }, before);
+        map.addLayer({ id: "holes-cluster", type: "symbol", source: "holes", filter: ["has", "point_count"], layout: {
+          "icon-image": CLUSTER_ICON, "icon-allow-overlap": true, "icon-ignore-placement": true, "symbol-sort-key": ["-", 0, ["get", "point_count"]] } }, before);
+        // a mark with letters is a dot or its shape until BADGE_FROM, a badge from there on
+        const G = ["!=", ["get", "glyph"], ""];
+        map.addLayer({ id: "holes-badge", type: "symbol", source: "holes", minzoom: BADGE_FROM, filter: ["all", ["==", ["get", "wait"], 0], G], layout: {
+          "icon-image": ["get", "badge"], "icon-allow-overlap": true, "icon-ignore-placement": true, "symbol-sort-key": ["get", "z"],
+          "icon-size": ["interpolate", ["linear"], ["zoom"], 5.5, 0.6, 8, 0.78, 11, 0.95, 14, 1.15] },
+          paint: { "icon-opacity": ["case", D, 0.12, 1] } }, before);
+        map.addLayer({ id: "holes-pt", type: "circle", source: "holes", maxzoom: BADGE_FROM, filter: ["all", ["==", ["get", "wait"], 0], G, ["==", ["get", "shape"], "circle"]],
+          layout: { "circle-sort-key": ["get", "z"] }, paint: {
+            "circle-radius": size(1.45), "circle-color": ["case", R, "#ffffff", ["get", "color"]], "circle-opacity": ["case", D, 0.12, 1],
+            "circle-stroke-width": ["case", R, 1.6, ["==", ["get", "mine"], 1], 1.8, 1], "circle-stroke-color": ["case", ["==", ["get", "mine"], 1], "#111111", R, ["get", "ring"], "#ffffff"],
+            "circle-stroke-opacity": ["case", D, 0.08, R, 1, 0.9] } }, before);
+        map.addLayer({ id: "holes-sym-far", type: "symbol", source: "holes", maxzoom: BADGE_FROM, filter: ["all", ["==", ["get", "wait"], 0], G, ["!=", ["get", "shape"], "circle"]], layout: {
+          "icon-image": ["get", "icon"], "icon-allow-overlap": true, "icon-ignore-placement": true, "symbol-sort-key": ["get", "z"],
+          "icon-size": ["interpolate", ["linear"], ["zoom"], 3, 0.72, 6, 0.95] }, paint: { "icon-opacity": ["case", D, 0.12, 1] } }, before);
+        map.addLayer({ id: "holes-pt-plain", type: "circle", source: "holes", filter: ["all", ["==", ["get", "wait"], 0], ["==", ["get", "glyph"], ""], ["==", ["get", "shape"], "circle"]],
+          layout: { "circle-sort-key": ["get", "z"] }, paint: {
+            "circle-radius": size(1.45),
+            "circle-color": ["case", R, "#ffffff", ["get", "color"]],
+            "circle-opacity": ["case", D, 0.12, 1],
+            "circle-stroke-width": ["case", R, 1.6, ["==", ["get", "mine"], 1], 1.8, 1],
+            "circle-stroke-color": ["case", ["==", ["get", "mine"], 1], "#111111", R, ["get", "ring"], "#ffffff"],
+            "circle-stroke-opacity": ["case", D, 0.08, R, 1, 0.9],
+            "circle-radius-transition": { duration: 120 } } }, before);
+        map.addLayer({ id: "holes-sym", type: "symbol", source: "holes", filter: ["all", ["==", ["get", "wait"], 0], ["==", ["get", "glyph"], ""], ["!=", ["get", "shape"], "circle"]], layout: {
+          "icon-image": ["get", "icon"], "icon-allow-overlap": true, "icon-ignore-placement": true, "symbol-sort-key": ["get", "z"],
+          "icon-size": ["interpolate", ["linear"], ["zoom"], 3, 0.72, 6, 0.95, 9, 1.3, 12, 1.7] },
+          paint: { "icon-opacity": ["case", D, 0.12, 1] } }, before);
+      };
+      rebuildRef.current = () => {
+        if (!map.getSource("holes")) return;
+        for (const id of HOLE_LAYERS) if (map.getLayer(id)) map.removeLayer(id);
+        map.removeSource("holes"); addHoleSource(); addHoleLayers();
+      };
       const addLayers = () => {
         if (map.getSource("holes")) return;
           // holes that crowd cluster through zoom 7 (the country, a State, a field); from 8 each is its own mark, and
           // a hole on its own is a mark at any zoom
-          const built = features(holesRef.current, colourRef.current); classesRef.current = built.classes;
-          map.addSource("holes", { type: "geojson", data: built.fc, promoteId: "key", cluster: true, clusterRadius: 44, clusterMaxZoom: 7, clusterProperties: CLUSTER_PROPS });
+          addHoleSource();
           map.addSource("holes-waiting", { type: "geojson", data: waiting(holesRef.current), promoteId: "key" });
           map.addSource("picked", { type: "geojson", data: pickedRef.current });
           // context layers under the holes: hidden until toggled, so they cost nothing by default
@@ -184,44 +237,10 @@ export function CoreMap({ holes, colour, card, selected, onSelect, padRight, pad
           // markers: a small coloured dot with a fine white edge, lifted off the imagery by a soft dark halo; a dot grows
           // under the pointer. Holes still waiting are faint pinpricks underneath. A class picked in the legend leaves
           // the rest faint. (Zoom must be the outer expression in Mapbox.)
-          const D = ["==", ["get", "dim"], 1], R = ["!=", ["get", "ring"], ""], HOV = ["boolean", ["feature-state", "hover"], false];
-          // zoom outermost, the hover case inside each stop
-          const size = (k: number) => ["interpolate", ["linear"], ["zoom"], ...[[3, 3], [6, 4.2], [9, 6], [12, 8]].flatMap(([z, r]) => [z, ["case", HOV, r * k, r]])];
           map.addLayer({ id: "holes-wait", type: "circle", source: "holes-waiting", paint: {
             "circle-radius": ["interpolate", ["linear"], ["zoom"], 3, 1.2, 6, 2, 9, 3, 12, 4.5],
             "circle-color": "#f8fafc", "circle-opacity": ["case", D, 0.1, 0.45] } });
-          map.addLayer({ id: "holes-halo", type: "circle", source: "holes", filter: ["==", ["get", "wait"], 0], paint: {
-            "circle-radius": ["interpolate", ["linear"], ["zoom"], 3, 5, 6, 6.5, 9, 9, 12, 12],
-            "circle-color": "#020617", "circle-blur": 0.9, "circle-opacity": ["case", D, 0.03, 0.4] } });
-          map.addLayer({ id: "holes-cluster", type: "symbol", source: "holes", filter: ["has", "point_count"], layout: {
-            "icon-image": CLUSTER_ICON, "icon-allow-overlap": true, "icon-ignore-placement": true, "symbol-sort-key": ["-", 0, ["get", "point_count"]] } });
-          // a mark with letters is a dot or its shape until BADGE_FROM, a badge from there on
-          const G = ["!=", ["get", "glyph"], ""];
-          map.addLayer({ id: "holes-badge", type: "symbol", source: "holes", minzoom: BADGE_FROM, filter: ["all", ["==", ["get", "wait"], 0], G], layout: {
-            "icon-image": ["get", "badge"], "icon-allow-overlap": true, "icon-ignore-placement": true, "symbol-sort-key": ["get", "z"],
-            "icon-size": ["interpolate", ["linear"], ["zoom"], 5.5, 0.6, 8, 0.78, 11, 0.95, 14, 1.15] },
-            paint: { "icon-opacity": ["case", D, 0.12, 1] } });
-          map.addLayer({ id: "holes-pt", type: "circle", source: "holes", maxzoom: BADGE_FROM, filter: ["all", ["==", ["get", "wait"], 0], G, ["==", ["get", "shape"], "circle"]],
-            layout: { "circle-sort-key": ["get", "z"] }, paint: {
-              "circle-radius": size(1.45), "circle-color": ["case", R, "#ffffff", ["get", "color"]], "circle-opacity": ["case", D, 0.12, 1],
-              "circle-stroke-width": ["case", R, 1.6, ["==", ["get", "mine"], 1], 1.8, 1], "circle-stroke-color": ["case", ["==", ["get", "mine"], 1], "#111111", R, ["get", "ring"], "#ffffff"],
-              "circle-stroke-opacity": ["case", D, 0.08, R, 1, 0.9] } });
-          map.addLayer({ id: "holes-sym-far", type: "symbol", source: "holes", maxzoom: BADGE_FROM, filter: ["all", ["==", ["get", "wait"], 0], G, ["!=", ["get", "shape"], "circle"]], layout: {
-            "icon-image": ["get", "icon"], "icon-allow-overlap": true, "icon-ignore-placement": true, "symbol-sort-key": ["get", "z"],
-            "icon-size": ["interpolate", ["linear"], ["zoom"], 3, 0.72, 6, 0.95] }, paint: { "icon-opacity": ["case", D, 0.12, 1] } });
-          map.addLayer({ id: "holes-pt-plain", type: "circle", source: "holes", filter: ["all", ["==", ["get", "wait"], 0], ["==", ["get", "glyph"], ""], ["==", ["get", "shape"], "circle"]],
-            layout: { "circle-sort-key": ["get", "z"] }, paint: {
-              "circle-radius": size(1.45),
-              "circle-color": ["case", R, "#ffffff", ["get", "color"]],
-              "circle-opacity": ["case", D, 0.12, 1],
-              "circle-stroke-width": ["case", R, 1.6, ["==", ["get", "mine"], 1], 1.8, 1],
-              "circle-stroke-color": ["case", ["==", ["get", "mine"], 1], "#111111", R, ["get", "ring"], "#ffffff"],
-              "circle-stroke-opacity": ["case", D, 0.08, R, 1, 0.9],
-              "circle-radius-transition": { duration: 120 } } });
-          map.addLayer({ id: "holes-sym", type: "symbol", source: "holes", filter: ["all", ["==", ["get", "wait"], 0], ["==", ["get", "glyph"], ""], ["!=", ["get", "shape"], "circle"]], layout: {
-            "icon-image": ["get", "icon"], "icon-allow-overlap": true, "icon-ignore-placement": true, "symbol-sort-key": ["get", "z"],
-            "icon-size": ["interpolate", ["linear"], ["zoom"], 3, 0.72, 6, 0.95, 9, 1.3, 12, 1.7] },
-            paint: { "icon-opacity": ["case", D, 0.12, 1] } });
+          addHoleLayers();
           map.addLayer({ id: "picked-ring", type: "circle", source: "picked", paint: {
             "circle-radius": ["interpolate", ["linear"], ["zoom"], 4, 10, 12, 16], "circle-color": "rgba(0,196,245,0.12)", "circle-stroke-width": 2.5, "circle-stroke-color": "#00c4f5" } });
       };

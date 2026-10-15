@@ -15,6 +15,8 @@ type ShapeEntry = { shape: Shape; n: number };
 export function LegendSheet<C extends string, B extends string>(p: {
   modes: { id: C; label: string }[]; mode: C; onMode: (m: C) => void;
   basemaps: { id: B; label: string }[]; basemap: B; onBasemap: (b: B) => void;
+  /** holes that crowd are added up into one mark, or every hole is shown */
+  grouped: boolean; onGrouped: (g: boolean) => void;
   legend: [string, Entry][]; shapes: [string, ShapeEntry][]; focus: string | null; onFocus: (f: string | null) => void;
   /** context layers that can be shown under the holes */
   overlays?: { id: string; label: string; color: string; on: boolean }[]; onOverlay?: (id: string) => void;
@@ -63,6 +65,12 @@ export function LegendSheet<C extends string, B extends string>(p: {
                 <p className="mb-2 text-xs font-semibold text-slate-500">Basemap</p>
                 <div className="grid grid-cols-2 gap-1 rounded-xl bg-slate-100 p-1">
                   {p.basemaps.map((b) => <button key={b.id} type="button" onClick={() => p.onBasemap(b.id)} className={cn("rounded-lg py-2 text-[13px] font-semibold", p.basemap === b.id ? "bg-white text-slate-900 shadow-sm" : "text-slate-500")}>{b.label}</button>)}
+                </div>
+              </section>
+              <section>
+                <p className="mb-2 text-xs font-semibold text-slate-500">Holes that crowd</p>
+                <div className="grid grid-cols-2 gap-1 rounded-xl bg-slate-100 p-1">
+                  {[[true, "Grouped"], [false, "All holes"]].map(([g, label]) => <button key={String(g)} type="button" onClick={() => p.onGrouped(g as boolean)} className={cn("rounded-lg py-2 text-[13px] font-semibold", p.grouped === g ? "bg-white text-slate-900 shadow-sm" : "text-slate-600")}>{label as string}</button>)}
                 </div>
               </section>
               <section>
