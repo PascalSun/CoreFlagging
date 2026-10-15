@@ -480,9 +480,9 @@ export function HolePanel({ holeKey, tab: tabProp, onTab, models, run, metre, on
           <div className="p-4 lg:min-h-0 lg:flex-1 lg:overflow-y-auto">
             {displayOnly && <p className="mb-4 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs leading-relaxed text-slate-700">{hole.message}</p>}
             {tab === "window" && (win ? <DepthLens hole={hole} mv={mvw} win={win} onWindow={(w) => onWindow?.(w)} trays={trays} metre={metre} onMetre={openMetre} typeName={typeName}
-              spectralFine={fineWin ? slf.data : undefined} order={order}
+              spectral={slq.data} spectralFine={fineWin ? slf.data : undefined} order={order}
               metreDetail={<MetreTab hole={hole} metre={shown} previewing={false} mv={eq.data} loading={eq.isLoading || eq.isPlaceholderData} trays={trays} onMetre={openMetre} typeName={typeName} />} />
-              : <WindowStart hole={hole} mv={mvw} onWindow={(w) => onWindow?.(w)} />)}
+              : <WindowStart hole={hole} mv={mvw} onWindow={(w) => onWindow?.(w)} spectral={slq.data} typeName={typeName} />)}
             {tab === "log" && (mvw ? (
               <div className="flex flex-col gap-3">
                 <p className="text-xs leading-relaxed text-slate-600">The model cuts the hole where its reading of the spectra changes, then each piece is described from the TSG software&rsquo;s minerals. {mvw.segments.length} segments, typically {fmt(mvw.segments.map((s) => s.length_m).sort((a, b) => a - b)[Math.floor(mvw.segments.length / 2)], 1)} m long. Click a row to go there.</p>

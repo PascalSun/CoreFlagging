@@ -13,20 +13,20 @@ import { LEVELS, MIN_SPAN, fmtSpan, fmtWindow, levelOf, windowAt, type Window } 
 export { LEVELS, MIN_SPAN, levelOf, type Window };
 
 const H4 = ({ children }: { children: React.ReactNode }) => <h4 className="pb-1.5 font-display text-[14px] font-semibold text-slate-900">{children}</h4>;
-const th = "border-b border-slate-200 px-2 py-1.5 text-left text-[11px] font-medium text-slate-500";
-const td = "border-b border-slate-100 px-2 py-1.5 align-top text-xs text-slate-700";
 
 /** One window of a hole, read at the level its length calls for: a long window lists what the model found in
  * it; a metre shows everything about that metre (`metreDetail`: the model's reading, the photograph, the spectra
  * against the core around it) and its 10 cm bins; the finest shows the bins and the photographs.
  * The model's reading never goes below the metre it was made at. */
-export function DepthLens({ hole, mv, win, onWindow, trays, metre, onMetre, typeName, metreDetail, spectralFine, order = [] }: {
+export function DepthLens({ hole, mv, win, onWindow, trays, metre, onMetre, typeName, metreDetail, spectral, spectralFine, order = [] }: {
   hole: HoleDetail; mv: ModelView | undefined; win: Window; onWindow: (w: Window | null) => void; trays: Tray[];
   metre: number | null; onMetre: (m: number) => void; typeName: (k: number) => string;
   /** shown at the 1 m level: the old "This metre" page, for the metre in the window */
   metreDetail?: React.ReactNode;
   /** the window's 0.1 m group make-up, and the order the groups stack in (the whole hole's) */
   spectralFine?: SpectralLog; order?: string[];
+  /** the whole hole's 1 m group make-up, for the 10 m summary */
+  spectral?: SpectralLog;
 }) {
   const [from, to] = win; const span = to - from; const level = levelOf(win);
   const d0 = hole.metres.m[0] ?? 0, d1 = (hole.metres.m[hole.metres.m.length - 1] ?? 0) + 1;
@@ -38,7 +38,6 @@ export function DepthLens({ hole, mv, win, onWindow, trays, metre, onMetre, type
   const metres = useMemo(() => { const out: number[] = []; for (let m = Math.floor(from); m < to; m++) if (hole.metres.m.includes(m)) out.push(m); return out; }, [from, to, hole.metres.m]);
   const midx = useMemo(() => new Map((mv?.m ?? []).map((m, i) => [m, i])), [mv]);
   const inWin = (a: number, b: number) => b > from && a < to;
-  const segs = (mv?.segments ?? []).filter((s) => inWin(s.from_m, s.to_m));
   const flags = (mv?.anomaly.runs ?? []).filter((r) => inWin(r.from_m, r.to_m));
   const again = (mv?.summary.again?.intervals ?? []).filter((d) => inWin(d.from_m, d.to_m));
   const nm = (v: number) => `${Math.round(v)}`, um = (v: number) => (v / 1000).toFixed(1);
@@ -72,18 +71,7 @@ export function DepthLens({ hole, mv, win, onWindow, trays, metre, onMetre, type
                 <li key={d.from_m}><button type="button" onClick={() => onWindow([d.from_m, d.to_m])} className="text-left hover:underline"><span className="font-mono">{d.from_m}–{d.to_m} m</span> · log: {d.logged || d.logged_class} · reads: {d.reads}</button></li>))}</ul>
             </section>
           )}
-          <section>
-            <H4>The model&rsquo;s auto log in this window</H4>
-            {segs.length ? (
-              <table className="w-full border-collapse">
-                <thead><tr>{["From–to (m)", "Rock Classification", "SWIR minerals"].map((h) => <th key={h} className={th}>{h}</th>)}</tr></thead>
-                <tbody>{segs.map((s) => (
-                  <tr key={s.seg} onClick={() => onWindow([round1(Math.max(from, s.from_m)), round1(Math.min(to, s.to_m))])} className="cursor-pointer hover:bg-slate-50">
-                    <td className={cn(td, "font-mono whitespace-nowrap")}>{s.from_m.toFixed(1)}–{s.to_m.toFixed(1)}</td>
-                    <td className={td}><span className="flex items-center gap-1.5"><i className="inline-block h-2.5 w-2.5 flex-none rounded-[2px]" style={{ background: coreTypeColor(s.core_type_name) }} />{s.core_type_name}</span></td>
-                    <td className={td}>{s.swir_minerals.slice(0, 3).map(([c, , p]) => `${mineralName(c)} ${pct(p)}`).join(", ") || "—"}</td></tr>))}</tbody>
-              </table>) : <p className="text-xs text-slate-500">No model reading in this window.</p>}
-          </section>
+          <TenMetres hole={hole} mv={mv} spectral={spectral} from={from} to={to} typeName={typeName} onWindow={onWindow} />
           {flags.length > 0 && (
             <section>
               <H4>Metres that stand out, in this window</H4>
@@ -136,6 +124,61 @@ export function DepthLens({ hole, mv, win, onWindow, trays, metre, onMetre, type
 }
 
 const round1 = (v: number) => Math.round(v * 10) / 10;
+
+const th10 = "border-b border-slate-200 px-2 py-1.5 text-left text-[11px] font-medium text-slate-500";
+const td10 = "border-b border-slate-100 px-2 py-1.5 align-top text-xs text-slate-700";
+
+/** The leading entries of a tally, as "Chlorite 62%, Invalid 21%". */
+function leading(tally: Map<string, number>, n: number, name: (k: string) => string): { k: string; text: string }[] {
+  const tot = [...tally.values()].reduce((a, b) => a + b, 0); if (!tot) return [];
+  return [...tally.entries()].sort((a, b) => b[1] - a[1]).slice(0, n).map(([k, v]) => ({ k, text: `${name(k)} ${pct(v / tot)}` }));
+}
+
+/** The window in 10 m steps (on the tens: 300–310, 310–320 …), each with what the three readings say: the TSG
+ * groups of SWIR and TIR (weighted by the software's fit, from the spectral log; the leading group per metre
+ * without one) and HyFormer's rock classification (the class read most, by metre). Click a row to open it. */
+function TenMetres({ hole, mv, spectral, from, to, typeName, onWindow }: {
+  hole: HoleDetail; mv: ModelView | undefined; spectral?: SpectralLog; from: number; to: number; typeName: (k: number) => string; onWindow: (w: Window) => void;
+}) {
+  const rows = useMemo(() => {
+    const spec = new Map((spectral?.rows ?? []).map((r) => [Math.round(r.from_m), r]));
+    const midx = new Map((mv?.m ?? []).map((m, i) => [m, i]));
+    const bins = new Map<number, { sw: Map<string, number>; tr: Map<string, number>; rc: Map<string, number>; n: number }>();
+    hole.metres.m.forEach((m, i) => {
+      if (m + 1 <= from || m >= to) return;
+      const k = Math.floor(m / 10) * 10; let b = bins.get(k);
+      if (!b) { b = { sw: new Map(), tr: new Map(), rc: new Map(), n: 0 }; bins.set(k, b); }
+      b.n++;
+      const add = (t: Map<string, number>, g: string, v: number) => { if (g && g !== "nan") t.set(g, (t.get(g) ?? 0) + v); };
+      const r = spec.get(m);
+      if (r?.swir?.n_result) for (const [g, v] of Object.entries(r.swir.mix)) add(b.sw, g, v * r.swir.n_result); else add(b.sw, hole.metres.gs[i], 1);
+      if (r?.tir?.n_result) for (const [g, v] of Object.entries(r.tir.mix)) add(b.tr, g, v * r.tir.n_result); else if (!spectral) add(b.tr, hole.metres.gt[i], 1);
+      const j = midx.get(m); if (j !== undefined && mv) add(b.rc, String(mv.core[j]), 1);
+    });
+    return [...bins.entries()].sort((a, b) => a[0] - b[0]).map(([k, b]) => ({ k, n: b.n,
+      sw: leading(b.sw, 2, groupName), tr: leading(b.tr, 2, groupName), rc: leading(b.rc, 1, (c) => typeName(Number(c))) }));
+  }, [hole, mv, spectral, from, to, typeName]);
+  if (!rows.length) return null;
+  const sw = (xs: { k: string; text: string }[], colour: (k: string) => string) => xs.length
+    ? <span className="flex flex-col gap-0.5">{xs.map((x) => <span key={x.k} className="flex items-center gap-1.5"><i className="inline-block h-2.5 w-2.5 flex-none rounded-[2px]" style={{ background: colour(x.k) }} />{x.text}</span>)}</span>
+    : <span className="text-slate-400">—</span>;
+  return (
+    <section>
+      <H4>Every 10 m: what each reading says</H4>
+      <table className="w-full border-collapse">
+        <thead><tr>{["Depth (m)", "SWIR", "TIR", "Rock Classification"].map((h) => <th key={h} className={th10}>{h}</th>)}</tr></thead>
+        <tbody>{rows.map((r) => (
+          <tr key={r.k} onClick={() => onWindow([r.k, r.k + 10])} className="cursor-pointer hover:bg-slate-50" title={`Open ${r.k}–${r.k + 10} m`}>
+            <td className={cn(td10, "font-mono whitespace-nowrap")}>{r.k}–{r.k + 10}{r.n < 10 ? <span className="ml-1 font-sans text-[10px] text-slate-400">({r.n} m of core)</span> : null}</td>
+            <td className={td10}>{sw(r.sw, groupColor)}</td>
+            <td className={td10}>{sw(r.tr, groupColor)}</td>
+            <td className={td10}>{sw(r.rc, (c) => coreTypeColor(typeName(Number(c))))}</td>
+          </tr>))}</tbody>
+      </table>
+      <p className="pt-1 text-[10.5px] text-slate-400">SWIR and TIR: the share of each mineral group the scanner&rsquo;s TSG software reads, over the 10 m. Rock Classification: the class HyFormer reads in most of its metres, and in what share of them.</p>
+    </section>
+  );
+}
 
 /** One photograph per tray the window touches: the first metre of the window on each tray (a tray holds ~3.5 m). */
 function trayMetres(trays: Tray[], metres: number[]): number[] {
@@ -206,7 +249,7 @@ function BinStrip({ bins, from, to, pick, hover, onHover, onPick, onZoom, log, o
 
 /** The Window tab before a window is chosen: what the scale ladder is for, and places to start from — the
  * metres that stand out and where the model disagrees with the log, each a window one click away. */
-export function WindowStart({ hole, mv, onWindow }: { hole: HoleDetail; mv: ModelView | undefined; onWindow: (w: Window) => void }) {
+export function WindowStart({ hole, mv, onWindow, spectral, typeName }: { hole: HoleDetail; mv: ModelView | undefined; onWindow: (w: Window) => void; spectral?: SpectralLog; typeName: (k: number) => string }) {
   const d0 = hole.metres.m[0] ?? 0, d1 = (hole.metres.m[hole.metres.m.length - 1] ?? 0) + 1;
   const flags = [...(mv?.anomaly.runs ?? [])].sort((a, b) => b.raw - a.raw).slice(0, 6);
   const again = (mv?.summary.again?.intervals ?? []).slice(0, 6);
@@ -215,7 +258,7 @@ export function WindowStart({ hole, mv, onWindow }: { hole: HoleDetail; mv: Mode
     <div className="flex flex-col gap-5">
       <section>
         <H4>Read the hole at any scale</H4>
-        <p className="text-xs leading-relaxed text-slate-600">The log on the left is the whole hole. Zoom with the wheel or double-click a depth, pick a level above it, or drag the box in the narrow column beside it. Each level shows what there is at that scale: the auto log and the photographs over 10 m; at 1 m, everything about the metre (the model&rsquo;s reading, the photograph, the spectra against the core around it) and its 10 cm bins; at 10 cm, the bins and their spectra.</p>
+        <p className="text-xs leading-relaxed text-slate-600">The log on the left is the whole hole. Zoom with the wheel or double-click a depth, pick a level above it, or drag the box in the narrow column beside it. Each level shows what there is at that scale: where the model disagrees with the log, the metres that stand out and the photographs over 10 m; at 1 m, everything about the metre (the model&rsquo;s reading, the photograph, the spectra against the core around it) and its 10 cm bins; at 10 cm, the bins and their spectra.</p>
         <div className="mt-2 flex flex-wrap gap-1.5">{levels.map((l) => <button key={l.label} type="button" onClick={() => onWindow(windowAt(l.label === "10 m" ? "10m" : l.label === "1 m" ? "1m" : "10cm", (d0 + d1) / 2, d0, d1) as Window)} className="rounded-full bg-slate-900 px-3 py-1 text-[11px] font-medium text-white hover:bg-slate-700">Open {l.label} at the middle</button>)}</div>
       </section>
       {flags.length > 0 && (
@@ -230,6 +273,7 @@ export function WindowStart({ hole, mv, onWindow }: { hole: HoleDetail; mv: Mode
           <ul className="flex flex-col gap-1 text-xs text-slate-700">{again.map((d) => (
             <li key={d.from_m}><button type="button" onClick={() => onWindow([d.from_m, d.to_m])} className="text-left hover:underline"><span className="font-mono">{d.from_m}–{d.to_m} m</span> · log: {d.logged || d.logged_class} · reads: {d.reads}</button></li>))}</ul>
         </section>)}
+      <TenMetres hole={hole} mv={mv} spectral={spectral} from={d0} to={d1} typeName={typeName} onWindow={onWindow} />
     </div>
   );
 }
