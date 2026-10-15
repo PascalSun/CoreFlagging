@@ -1,5 +1,5 @@
 "use client";
-// The findings page: Core Flagging's reading of every WA metre set beside the geologist's log.
+// The findings page: CoreFlagging's reading of every WA metre set beside the geologist's log.
 // Numbers are aggregates from the analysis (src/data/findings.json); the strip and the tray
 // photographs are fetched live from the platform, so no scan data is kept in this repository.
 import { useEffect, useState } from "react";
@@ -54,7 +54,7 @@ function Hero() {
         <Reveal>
           <p className="text-sm font-medium text-white/60">Findings · GSWA HyLogger Hackathon 2026, Data Crunch</p>
           <h1 className="mt-5 max-w-4xl font-display text-[40px] font-semibold leading-[1.05] tracking-tight text-balance md:text-7xl">A second opinion on every metre of WA core</h1>
-          <p className="mt-6 max-w-3xl text-lg leading-relaxed text-white/80">Core Flagging reads {fmt(h.wa_holes)} HyLogger-scanned WA holes the same way, and checks them against the geologist&rsquo;s log.</p>
+          <p className="mt-6 max-w-3xl text-lg leading-relaxed text-white/80">CoreFlagging reads {fmt(h.wa_holes)} HyLogger-scanned WA holes the same way, and checks them against the geologist&rsquo;s log.</p>
         </Reveal>
         <Reveal delay={0.1}>
           <dl className="mt-10 grid max-w-3xl grid-cols-3 gap-6 border-t border-white/15 pt-6">
@@ -63,7 +63,7 @@ function Hero() {
             <div><dt className="text-sm text-white/55">Holes read Australia-wide</dt><dd className="font-display text-3xl font-semibold md:text-4xl">~{fmt(h.au_holes_read)}</dd></div>
           </dl>
           <p className="mt-10 max-w-3xl border-l-2 pl-5 text-lg leading-relaxed text-white/90" style={{ borderColor: UM }}>
-            Core Flagging doesn&rsquo;t replace the geologist. It reads every metre the geologist didn&rsquo;t have time to, and where the core and the log disagree, it asks for another pair of eyes.
+            CoreFlagging doesn&rsquo;t replace the geologist. It reads every metre the geologist didn&rsquo;t have time to, and where the core and the log disagree, it asks for another pair of eyes.
           </p>
         </Reveal>
       </div>
@@ -90,7 +90,7 @@ function Tray({ hole, id, caption }: { hole: string; id: string; caption: string
   );
 }
 
-/** KPDDH 006 down the hole: the log, Core Flagging's type per metre (live), and the assays. */
+/** KPDDH 006 down the hole: the log, CoreFlagging's type per metre (live), and the assays. */
 function CaseStrip() {
   const c = data.case;
   const { data: model } = useQuery({ queryKey: ["findings-model", c.hole], queryFn: () => coreScan.model(c.hole, "v2"), staleTime: Infinity });
@@ -98,10 +98,10 @@ function CaseStrip() {
   const x = (mg: number) => 250 + (mg / 30) * 290;
   const metres = model ? model.m.map((m, i) => [m, model.core[i]] as const).filter(([m]) => m >= lo && m < hi) : [];
   return (
-    <svg viewBox={`0 0 ${W} ${H + 40}`} className="w-full" role="img" aria-label={`${c.hole}: logged ${c.log} from ${c.log_from} to ${c.log_to} m; Core Flagging reads its ultramafic type down to ${c.um_to} m; MgO 25.1% at 204 m and 5.7% at 320 m`}>
+    <svg viewBox={`0 0 ${W} ${H + 40}`} className="w-full" role="img" aria-label={`${c.hole}: logged ${c.log} from ${c.log_from} to ${c.log_to} m; CoreFlagging reads its ultramafic type down to ${c.um_to} m; MgO 25.1% at 204 m and 5.7% at 320 m`}>
       <g transform="translate(0,24)">
         <text x={70} y={-8} textAnchor="middle" className="fill-ink-soft text-[12px]">Geologist&rsquo;s log</text>
-        <text x={160} y={-8} textAnchor="middle" className="fill-ink-soft text-[12px]">Core Flagging</text>
+        <text x={160} y={-8} textAnchor="middle" className="fill-ink-soft text-[12px]">CoreFlagging</text>
         <text x={395} y={-8} textAnchor="middle" className="fill-ink-soft text-[12px]">MgO in the assay</text>
         {[100, 150, 200, 250, 300, 350].map((m) => (
           <g key={m}><text x={24} y={y(m) + 4} textAnchor="end" className="fill-ink-soft text-[11px] tabular-nums">{m}</text><line x1={250} x2={540} y1={y(m)} y2={y(m)} stroke="#e5e7eb" /></g>
@@ -114,7 +114,7 @@ function CaseStrip() {
         <rect x={x(18)} y={0} width={x(30) - x(18)} height={H} fill={UM} opacity={0.07} />
         <text x={x(30) - 4} y={H - 6} textAnchor="end" className="text-[11px]" fill={UM}>ultramafic range</text>
         <line x1={250} x2={540} y1={y(c.um_to + 0.5)} y2={y(c.um_to + 0.5)} stroke="#111" strokeDasharray="4 3" />
-        <text x={252} y={y(c.um_to) - 6} className="fill-ink text-[11px]">Core Flagging contact, {c.um_to} m</text>
+        <text x={252} y={y(c.um_to) - 6} className="fill-ink text-[11px]">CoreFlagging contact, {c.um_to} m</text>
         {c.assays.filter((a) => a.MgO != null).map((a) => (
           <g key={a.m}>
             <circle cx={x(a.MgO as number)} cy={y(a.m)} r={7} fill={(a.MgO as number) >= 18 ? UM : LOGGED} stroke="#fff" strokeWidth={2} />
@@ -133,7 +133,7 @@ function Case() {
   const c = data.case;
   return (
     <Section id="case" title={`One hole: ${c.hole}`} tone="white"
-      lead={<>The log that came with the scan records <b className="text-ink">&ldquo;{c.log.toLowerCase()}&rdquo; from {c.log_from} to {c.log_to} m</b>. Core Flagging reads its talc&ndash;serpentine (Mg-OH) ultramafic type down to {c.um_to} m (on the map this type is labelled &ldquo;Other Mg-OH minerals + chlorite&rdquo;). Core Flagging never saw an assay; the one inside its ultramafic stretch is textbook ultramafic, and below its contact the assays are basalt.</>}>
+      lead={<>The log that came with the scan records <b className="text-ink">&ldquo;{c.log.toLowerCase()}&rdquo; from {c.log_from} to {c.log_to} m</b>. CoreFlagging reads its talc&ndash;serpentine (Mg-OH) ultramafic type down to {c.um_to} m (on the map this type is labelled &ldquo;Other Mg-OH minerals + chlorite&rdquo;). CoreFlagging never saw an assay; the one inside its ultramafic stretch is textbook ultramafic, and below its contact the assays are basalt.</>}>
       <div className="grid gap-10 lg:grid-cols-[1.2fr_1fr]">
         <Reveal><CaseStrip /></Reveal>
         <Reveal delay={0.1} className="flex flex-col gap-5">
@@ -142,7 +142,7 @@ function Case() {
               <div key={l} className="rounded-2xl bg-paper p-4"><dd className="font-display text-2xl font-semibold text-ink md:text-3xl">{n}</dd><dt className="mt-1 text-[13px] leading-snug text-ink-soft">{l}</dt></div>
             ))}
           </dl>
-          <Tray hole={c.hole} id={c.tray.id} caption={`${c.hole}, tray at ${c.tray.from_m}–${c.tray.to_m} m, inside the stretch Core Flagging reads as ultramafic.`} />
+          <Tray hole={c.hole} id={c.tray.id} caption={`${c.hole}, tray at ${c.tray.from_m}–${c.tray.to_m} m, inside the stretch CoreFlagging reads as ultramafic.`} />
           <Link href={holeHref(c.hole, 204)} className="inline-flex items-center gap-2 self-start rounded-full bg-ink px-5 py-2.5 text-sm font-semibold text-white">Open {c.hole} at 204 m <ArrowRight size={15} /></Link>
         </Reveal>
       </div>
@@ -161,7 +161,7 @@ function Underlogged() {
   const rows = all ? u.list : u.list.slice(0, 12);
   return (
     <Section id="underlogged" title={`Not one hole: ${u.intervals} intervals in ${u.holes} holes`}
-      lead={<>Logged as basalt, gabbro or sediment; read by Core Flagging as ultramafic ({fmt(u.metres)} m under our rule: at least 5 m, with Core Flagging&rsquo;s ultramafic type over half). The bars use the scanner&rsquo;s own mineral identification, which is separate from Core Flagging. Where assays exist, most confirm ultramafic chemistry.</>}>
+      lead={<>Logged as basalt, gabbro or sediment; read by CoreFlagging as ultramafic ({fmt(u.metres)} m under our rule: at least 5 m, with CoreFlagging&rsquo;s ultramafic type over half). The bars use the scanner&rsquo;s own mineral identification, which is separate from CoreFlagging. Where assays exist, most confirm ultramafic chemistry.</>}>
       <Reveal>
         <div className="flex flex-col gap-4 rounded-3xl bg-white p-6 md:p-8">
           <p className="text-[13px] text-ink-soft">Metres where the scanner&rsquo;s minerals include talc, serpentine or Mg-chlorite (95% interval from resampling holes)</p>
@@ -211,7 +211,7 @@ function Referee() {
   const X = (v: number) => 20 + v * 520;
   return (
     <Section id="chemistry" title="When they disagree, whom does the chemistry back?" tone="white"
-      lead={<>Over {r.n} disagreements of 10 m or more in {r.holes} WA holes (clay types excluded), the chemistry fits Core Flagging&rsquo;s reading better than the log&rsquo;s in {r.labels.observed} of cases (95% interval {r.labels.ci}). Shuffling Core Flagging&rsquo;s types between holes gives {r.labels.chance}. Intervals resample whole holes, so one long hole cannot carry the result.</>}>
+      lead={<>Over {r.n} disagreements of 10 m or more in {r.holes} WA holes (clay types excluded), the chemistry fits CoreFlagging&rsquo;s reading better than the log&rsquo;s in {r.labels.observed} of cases (95% interval {r.labels.ci}). Shuffling CoreFlagging&rsquo;s types between holes gives {r.labels.chance}. Intervals resample whole holes, so one long hole cannot carry the result.</>}>
       <Reveal>
         <svg viewBox="0 0 560 150" className="w-full max-w-4xl" role="img" aria-label={`Observed ${r.labels.observed} (95% interval ${r.labels.ci}) against ${r.labels.chance} by chance`}>
           <rect x={X(r.chance_band[0])} y={30} width={X(r.chance_band[1]) - X(r.chance_band[0])} height={50} fill={OTHER} opacity={0.6} rx={3} />
@@ -223,7 +223,7 @@ function Referee() {
           {[0, 0.25, 0.5, 0.75, 1].map((v) => <text key={v} x={X(v)} y={136} textAnchor="middle" className="fill-ink-soft text-[11px]">{pct(v)}</text>)}
         </svg>
       </Reveal>
-      <p className="max-w-3xl text-[15px] leading-relaxed text-ink-soft">In weathered clays it goes the other way: the chemistry backs Core Flagging in {pct(r.clay.observed)} of {r.clay.n} intervals, because clay keeps the parent rock&rsquo;s chemistry while the scanner sees the clay.</p>
+      <p className="max-w-3xl text-[15px] leading-relaxed text-ink-soft">In weathered clays it goes the other way: the chemistry backs CoreFlagging in {pct(r.clay.observed)} of {r.clay.n} intervals, because clay keeps the parent rock&rsquo;s chemistry while the scanner sees the clay.</p>
     </Section>
   );
 }
@@ -231,10 +231,10 @@ function Referee() {
 function Misses() {
   const m = data.misses;
   return (
-    <Section id="misses" title="Where Core Flagging is wrong"
+    <Section id="misses" title="Where CoreFlagging is wrong"
       lead="A second opinion is only useful if you know how it fails. The output is a list of places to look again, not a new log.">
       <div className="grid gap-10 lg:grid-cols-[1.3fr_1fr]">
-        <Reveal><Tray hole={m.example.hole} id={m.example.tray.id} caption={`${m.example.hole}, ${m.example.tray.from_m}–${m.example.tray.to_m} m. Core Flagging reads ultramafic from ${m.example.from_m} to ${m.example.to_m} m; the assays say basalt (MgO ${m.example.MgO}%, Ni ${m.example.Ni} ppm).`} /></Reveal>
+        <Reveal><Tray hole={m.example.hole} id={m.example.tray.id} caption={`${m.example.hole}, ${m.example.tray.from_m}–${m.example.tray.to_m} m. CoreFlagging reads ultramafic from ${m.example.from_m} to ${m.example.to_m} m; the assays say basalt (MgO ${m.example.MgO}%, Ni ${m.example.Ni} ppm).`} /></Reveal>
         <Reveal delay={0.1}>
           <ul className="flex flex-col gap-4 text-[16px] leading-relaxed text-ink-soft">
             <li><b className="text-ink">{m.example.hole}</b>: read as ultramafic, chemistry basalt. <Link href={holeHref(m.example.hole, 230)} className="text-ink underline underline-offset-4">Open it</Link>.</li>
@@ -252,13 +252,13 @@ function BeyondWA() {
   const t = b.confirmed_by_text, f = b.false_positive;
   return (
     <Section id="beyond" title="Beyond WA: candidates awaiting verification" tone="white"
-      lead={<>Core Flagging has read {fmt(b.holes_read)} holes across Australia. Outside WA it can only flag candidates. WA is the only State where we could check every claim against a log and multi-element chemistry, because GSWA&rsquo;s drillhole database compiles both.</>}>
+      lead={<>CoreFlagging has read {fmt(b.holes_read)} holes across Australia. Outside WA it can only flag candidates. WA is the only State where we could check every claim against a log and multi-element chemistry, because GSWA&rsquo;s drillhole database compiles both.</>}>
       <Reveal>
         <div className="grid gap-8 rounded-3xl bg-paper p-6 md:grid-cols-[1.2fr_1fr] md:p-8">
           <Tray hole={t.key} id={t.tray_id} caption={`${t.hole}, ${t.tray_from}–${t.tray_to} m (${t.state}, ${t.region}).`} />
           <div className="flex flex-col gap-3">
             <p className="text-[13px] font-semibold" style={{ color: UM }}>Confirmed by the log&rsquo;s own words</p>
-            <p className="text-[16px] leading-relaxed text-ink"><Link href={holeHref(t.key, t.from_m)} className="font-semibold underline-offset-4 hover:underline">{t.hole}</Link>, {t.from_m}–{t.to_m} m: the rock code says <b>&ldquo;{t.code}&rdquo;</b>; the geologist&rsquo;s description says <b>&ldquo;{t.text}&rdquo;</b>. Core Flagging reads its ultramafic type here: it agrees with the words, which the code lost.</p>
+            <p className="text-[16px] leading-relaxed text-ink"><Link href={holeHref(t.key, t.from_m)} className="font-semibold underline-offset-4 hover:underline">{t.hole}</Link>, {t.from_m}–{t.to_m} m: the rock code says <b>&ldquo;{t.code}&rdquo;</b>; the geologist&rsquo;s description says <b>&ldquo;{t.text}&rdquo;</b>. CoreFlagging reads its ultramafic type here: it agrees with the words, which the code lost.</p>
             <p className="text-[14px] text-ink-soft">{t.also}</p>
           </div>
         </div>
@@ -278,7 +278,7 @@ function BeyondWA() {
         <div className="overflow-x-auto">
           <table className="w-full min-w-[620px] text-left text-[14px]">
             <thead className="text-[12px] text-ink-soft"><tr className="border-b border-line">
-              <th className="py-2 pr-3 font-medium">State</th><th className="px-3 py-2 text-right font-medium">Scanned holes</th><th className="px-3 py-2 text-right font-medium">Read by Core Flagging</th>
+              <th className="py-2 pr-3 font-medium">State</th><th className="px-3 py-2 text-right font-medium">Scanned holes</th><th className="px-3 py-2 text-right font-medium">Read by CoreFlagging</th>
               <th className="px-3 py-2 text-right font-medium">With a log we hold</th><th className="px-3 py-2 font-medium">Multi-element chemistry</th><th className="px-3 py-2 font-medium">Can be checked today</th>
             </tr></thead>
             <tbody>{b.readiness.map((r) => (

@@ -22,7 +22,7 @@ const holeLinks = (t: string) => t.replace(/\]\(hole:([^)?\s]+)(?:\?m=(\d+))?\)/
 
 export type OpenTarget = { hole: string; m?: number; tab?: string };
 
-/** The Core Flagging assistant: ask about holes, metres and the models in plain words. It reads
+/** The CoreFlagging assistant: ask about holes, metres and the models in plain words. It reads
  * the same data as the map and moves the map to what it is describing. */
 export function CoreChat({ context, onOpen, signedIn, onSignIn }: {
   context: { hole: string | null; m: number | null; model: string | null }; onOpen: (t: OpenTarget) => boolean;

@@ -4,7 +4,7 @@ import { CoreTraceMap } from "@/components/coretrace/CoreTraceMap";
 
 export const metadata: Metadata = {
   icons: { icon: "/brand/coretrace-mark.svg", apple: "/brand/coretrace-mark.svg" },
-  title: "Core Flagging — Map of scanned drill core",
+  title: "CoreFlagging — Map of scanned drill core",
   description: "Every HyLogger-scanned drillhole in Australia's core libraries, read metre by metre by a core-spectra model. Upload your own scan.",
 };
 

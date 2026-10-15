@@ -23,8 +23,8 @@ export const groundworkChrome: Chrome = {
   wordmark: { text: "MINETRACE", emWidth: 5.75 },
 };
 
-/** "" on Core Flagging's own host, "/coretrace" when its pages are opened on the main host. */
-/** This app serves Core Flagging alone, at the root of its own host: there is no path prefix. */
+/** "" on CoreFlagging's own host, "/coretrace" when its pages are opened on the main host. */
+/** This app serves CoreFlagging alone, at the root of its own host: there is no path prefix. */
 export function coretraceBase(_pathname: string): string {
   return "";
 }
@@ -32,7 +32,7 @@ export function coretraceBase(_pathname: string): string {
 export function coretraceChrome(base: string): Chrome {
   const home = base || "/";
   return {
-    brand: ["CORE FLAGGING", ""],
+    brand: ["CoreFlagging", ""],
     mark: "/brand/coretrace-mark.svg",
     home,
     navLinks: [
@@ -55,6 +55,6 @@ export function coretraceChrome(base: string): Chrome {
     socials: footerSocials,
     contact: footerContact,
     languages: false,
-    wordmark: { text: "CORE FLAGGING", emWidth: 7.2 },
+    wordmark: { text: "CoreFlagging", emWidth: 5.86 },
   };
 }

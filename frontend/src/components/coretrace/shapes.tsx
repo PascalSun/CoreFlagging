@@ -1,4 +1,4 @@
-// Point shapes for the Core Flagging map: colour carries one attribute of a hole, shape a second. Mapbox circles
+// Point shapes for the CoreFlagging map: colour carries one attribute of a hole, shape a second. Mapbox circles
 // cannot change shape, so each (shape, fill, edge) is drawn once on a canvas the first time the map asks for it.
 
 import { useId } from "react";

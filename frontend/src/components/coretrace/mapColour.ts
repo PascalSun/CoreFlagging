@@ -1,4 +1,4 @@
-// How a hole is classed on the Core Flagging map. Colour is always the target commodity; the map key can also
+// How a hole is classed on the CoreFlagging map. Colour is always the target commodity; the map key can also
 // filter by core type, by where the target comes from (a hatched fill when inferred) and by whether the models
 // read the hole (the shape). Colours come from the shared palette, so a mineral family has the same colour on
 // the map as in the logs.

@@ -3,13 +3,13 @@ import { FooterSpacer } from "@/components/landing/footer";
 import { SmoothScroll } from "@/components/landing/smooth-scroll";
 import { CoreClosing, CoreFeatures, CoreFooter, CoreFound, CoreHero, CoreHow, CoreIntro, CoreNavbar, CoreNotes, CoreRun, CoreTeam } from "@/components/coretrace/landing";
 
-// Core Flagging's landing page. Same chrome, type and rhythm as the platform's landing page;
-// served at "/" on Core Flagging's own host (src/proxy.ts) and at /coretrace everywhere else.
+// CoreFlagging's landing page. Same chrome, type and rhythm as the platform's landing page;
+// served at "/" on CoreFlagging's own host (src/proxy.ts) and at /coretrace everywhere else.
 
 export const metadata: Metadata = {
   icons: { icon: "/brand/coretrace-mark.svg", apple: "/brand/coretrace-mark.svg" },
-  title: "Core Flagging — a second opinion on every metre of core",
-  description: "Core Flagging reads every HyLogger-scanned drillhole the same way and sets its reading beside the geologist's log, so the intervals where they disagree get another look. Checked against logs and chemistry in Western Australia.",
+  title: "CoreFlagging — a second opinion on every metre of core",
+  description: "CoreFlagging reads every HyLogger-scanned drillhole the same way and sets its reading beside the geologist's log, so the intervals where they disagree get another look. Checked against logs and chemistry in Western Australia.",
 };
 
 export default function CoreTraceHome() {
