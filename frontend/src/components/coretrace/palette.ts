@@ -35,19 +35,35 @@ export function groupName(g: string | null | undefined): string {
   return GROUP_NAME[g] ?? g.charAt(0) + g.slice(1).toLowerCase();
 }
 
-/** A model rock class is named after its minerals ("Quartz + chlorite, more dark mica");
- * it takes the colour of the first SWIR mineral in that name, grey when SWIR sees none. */
+/** A model rock class is named after its minerals ("Quartz + chlorite, more dark mica"). It takes the hue of the first
+ * SWIR mineral in its name (the rock-forming mineral's when SWIR sees none), so classes keep a geologist's colours; and
+ * classes that share that hue are told apart by the rest of the name: plagioclase-led darker, a "more X" leans 45%
+ * towards X, and a second class of the same name ("(II)") darker again. */
 const NAME_KEYS: [string, string][] = [
   ["chlorite", "CHLORITE"], ["white mica", "WHITE-MICA"], ["kaolin", "KAOLIN"], ["amphibole", "AMPHIBOLE"], ["carbonate", "CARBONATE"],
-  ["smectite", "SMECTITE"], ["dark mica", "DARK-MICA"],
+  ["smectite", "SMECTITE"], ["dark mica", "DARK-MICA"], ["other mg-oh", "OTHER-MGOH"], ["other al-oh", "OTHER-ALOH"], ["epidote", "EPIDOTE"],
+  ["serpentine", "SERPENTINE"], ["tourmaline", "TOURMALINE"], ["sulphate", "SULPHATE"], ["k-feldspar", "K-FELDSPAR"], ["pyroxene", "PYROXENE"],
 ];
+const firstMineral = (s: string): string | undefined => {
+  let best: [number, string] | undefined;
+  for (const [k, g] of NAME_KEYS) { const i = s.indexOf(k); if (i >= 0 && (!best || i < best[0])) best = [i, g]; }
+  return best?.[1];
+};
+const mix = (a: string, b: string, t: number): string => {
+  const p = (h: string, i: number) => parseInt(h.slice(1 + 2 * i, 3 + 2 * i), 16);
+  return `#${[0, 1, 2].map((i) => Math.round(p(a, i) * (1 - t) + p(b, i) * t).toString(16).padStart(2, "0")).join("")}`;
+};
 export function coreTypeColor(name: string | undefined): string {
   if (!name) return NONE;
-  const main = name.split(",")[0].toLowerCase();
-  for (const [k, g] of NAME_KEYS) if (main.includes(k)) return GROUP[g];
-  if (main.includes("plagioclase")) return GROUP.PLAGIOCLASE;
-  if (main.includes("quartz")) return GROUP.SILICA;
-  return OTHER;
+  const n = name.toLowerCase(); const comma = n.indexOf(",");
+  const head = comma < 0 ? n : n.slice(0, comma), rest = comma < 0 ? "" : n.slice(comma + 1);
+  const g = firstMineral(head);
+  let c = g ? GROUP[g] : head.includes("plagioclase") ? GROUP.PLAGIOCLASE : head.includes("quartz") ? GROUP.SILICA : OTHER;
+  if (g && head.startsWith("plagioclase")) c = mix(c, "#000000", 0.3);
+  const more = /more ([^,(]+)/.exec(rest); const mg = more && firstMineral(more[1]);
+  if (mg) c = mix(c, GROUP[mg], 0.45);
+  if (/\(ii+\)/.test(n)) c = mix(c, "#000000", 0.3);
+  return c;
 }
 
 /** Logged rock classes in GSWA's own colours. Each is the modal fill GSWA gives units of that rock type in the
