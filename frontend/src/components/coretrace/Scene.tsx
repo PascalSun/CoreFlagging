@@ -34,25 +34,26 @@ export function Scene() {
       const c0 = d.hole.collar; const mlat = 111_320, mlon = 111_320 * Math.cos((c0.lat * Math.PI) / 180);
       // every hole in metres from this hole's collar; heights from RL when both have one, else from the hole's own collar
       const rel = (t: Trace) => { const dx = (t.collar.lon - c0.lon) * mlon, dy = (t.collar.lat - c0.lat) * mlat, dz = t.collar.rl !== null && c0.rl !== null ? t.collar.rl - c0.rl : 0; return { dx, dy, dz }; };
+      // One trace per hole, coloured point by point through a discrete colour scale (one step per rock class, grey for
+      // no reading). One trace per run of the same class was 650+ traces at 10 km, which is what loses the WebGL
+      // context on a laptop and what made every hover and click slow.
+      const types = d.core_types.map((c) => c.k); const NONE = types.length;
+      const colourOf = (k: number | null) => (k === null ? "#94a3b8" : coreTypeColor(names.get(k)));
+      const steps = [...types.map((k) => colourOf(k)), "#94a3b8"]; const n = steps.length;
+      const colorscale = steps.flatMap((c, i) => [[i / n, c], [(i + 1) / n, c]]);
+      const idx = (k: number | null) => { const i = k === null ? -1 : types.indexOf(k); return i < 0 ? NONE : i; };
       const traces: any[] = [];
       const line = (t: Trace, main: boolean) => {
         const { dx, dy, dz } = rel(t); const P = t.points;
-        if (main || colourAll) {
-          // one segment per run of the same rock class, so each keeps its colour
-          let i = 0;
-          while (i < P.length - 1) {
-            let j = i + 1; while (j < P.length - 1 && P[j].k === P[i].k) j++;
-            const seg = P.slice(i, j + 1); const k = P[i].k;
-            traces.push({ type: "scatter3d", mode: "lines", x: seg.map((p) => p.e + dx), y: seg.map((p) => p.n + dy), z: seg.map((p) => p.u + dz),
-              line: { color: k === null ? "#94a3b8" : coreTypeColor(names.get(k)), width: main ? 9 : 4 }, hovertemplate: `${t.name}<br>%{text} m<br>${k === null ? "no reading" : names.get(k) ?? ""}<extra></extra>`,
-              text: seg.map((p) => p.m.toFixed(0)), customdata: seg.map((p) => [t.key, p.m]), showlegend: false, opacity: main ? 1 : 0.85 });
-            i = j;
-          }
-        } else {
-          traces.push({ type: "scatter3d", mode: "lines", x: P.map((p) => p.e + dx), y: P.map((p) => p.n + dy), z: P.map((p) => p.u + dz), line: { color: "#94a3b8", width: 3 },
-            hovertemplate: `${t.name} · ${t.km} km<br>%{text} m${t.target ? `<br>drilled for ${t.target}` : ""}${t.n_again ? `<br>look again: ${t.n_again} intervals` : ""}<extra></extra>`,
-            text: P.map((p) => p.m.toFixed(0)), customdata: P.map((p) => [t.key, p.m]), showlegend: false, opacity: 0.7 });
-        }
+        const coloured = main || colourAll;
+        // a coloured line lists each segment's two ends with the class of its top end, so a class changes sharply at a
+        // point instead of blending along the segment (Plotly shades a segment between its ends' colours)
+        const V: { p: Trace["points"][number]; k: number | null }[] = coloured ? P.flatMap((p, i) => (i < P.length - 1 ? [{ p, k: p.k }, { p: P[i + 1], k: p.k }] : [])) : P.map((p) => ({ p, k: p.k }));
+        traces.push({ type: "scatter3d", mode: "lines", x: V.map((v) => v.p.e + dx), y: V.map((v) => v.p.n + dy), z: V.map((v) => v.p.u + dz),
+          line: coloured ? { color: V.map((v) => idx(v.k)), colorscale, cmin: 0, cmax: n, width: main ? 9 : 4, showscale: false } : { color: "#94a3b8", width: 3 },
+          hovertemplate: `${t.name}${main ? "" : ` · ${t.km} km`}<br>%{text}<extra></extra>`,
+          text: V.map((v) => `${v.p.m.toFixed(0)} m${coloured ? `<br>${v.p.k === null ? "no reading" : names.get(v.p.k) ?? ""}` : ""}${!main && t.target ? `<br>drilled for ${t.target}` : ""}${!main && t.n_again ? `<br>look again: ${t.n_again} intervals` : ""}`),
+          customdata: V.map((v) => [t.key, v.p.m]), showlegend: false, opacity: main ? 1 : coloured ? 0.85 : 0.7 });
         // the collar, labelled
         traces.push({ type: "scatter3d", mode: "markers+text", x: [dx], y: [dy], z: [dz], text: [t.name], textposition: "top center", textfont: { size: main ? 12 : 10, color: main ? "#0f172a" : "#475569" },
           marker: { size: main ? 5 : 3, color: main ? "#0f172a" : "#64748b" }, hoverinfo: "skip", showlegend: false });
