@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Info } from "lucide-react";
 import type { Metres, ModelView, SpectralLog, TokenScores } from "@/lib/coreScan";
-import { GRID, INK, MUTED, SERIES, coreTypePaint, fmt, groupColor, groupName, pct } from "@/components/coretrace/palette";
+import { GRID, INK, MUTED, SERIES, coreTypeBg, coreTypePaint, fmt, groupColor, groupName, pct } from "@/components/coretrace/palette";
 import { cn } from "@/lib/utils";
 import { DepthNav } from "@/components/coretrace/DepthNav";
 import { ColourNote } from "@/components/coretrace/ColourNote";
@@ -327,6 +327,13 @@ export function StripKey({ metres, model, spectral }: { metres: Metres; model: M
     for (const g of [...metres.gs, ...metres.gt]) if (g && g !== "nan") n.set(g, (n.get(g) ?? 0) + 1);
     return [...n.entries()].sort((a, b) => b[1] - a[1]).map(([g]) => g);
   }, [metres, spectral]);
+  // the rock classes this hole has, the commonest first, each in its colour and hatch
+  const types = useMemo(() => {
+    if (!model) return [];
+    const n = new Map<number, number>(); for (const k of model.core) n.set(k, (n.get(k) ?? 0) + 1);
+    const name = new Map(model.core_types.map((c) => [c.k, c.name]));
+    return [...n.entries()].sort((a, b) => b[1] - a[1]).map(([k]) => name.get(k)).filter((x): x is string => !!x);
+  }, [model]);
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-600">
       <span className="flex items-center gap-1 font-semibold text-slate-900">Minerals<ColourNote kind="mineral" /></span>
@@ -334,10 +341,12 @@ export function StripKey({ metres, model, spectral }: { metres: Metres; model: M
       {model && <>
         <span className="h-3 w-px bg-slate-200" aria-hidden />
         <span className="flex items-center gap-1" data-keytip={TIP.bd}><span className="inline-block h-[1.5px] w-3 bg-slate-900" />boundary (BD)</span>
-        <span className="flex items-center gap-1" data-keytip={TIP.rc}>RC in its leading mineral&rsquo;s colour, hatched where types share one</span>
         <span className="flex items-center gap-1" data-keytip={TIP.unusual}><Sw c={SERIES.orange} />unusual, flagged</span>
         <span className="flex items-center gap-1"><Sw c="#9ca3af" />unusual, not flagged</span>
       </>}
+      {types.length > 0 && <span className="basis-full" aria-hidden />}
+      {types.length > 0 && <span className="flex items-center gap-1 font-semibold text-slate-900" data-keytip={TIP.rc}>Rock Classification (RC)</span>}
+      {types.map((t) => <span key={t} className="flex items-center gap-1"><Sw c={coreTypeBg(t)} />{t}</span>)}
     </div>
   );
 }
