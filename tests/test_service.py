@@ -134,7 +134,7 @@ def test_linescan_decodes_only_the_chunks_of_the_window(tmp_path, monkeypatch):
     ns, chunk, nchunks, specny = 8, 10, 4, 5                      # 40 lines, 8 samples of 5 lines each
     chunks = []
     for c in range(nchunks):                                       # each chunk a flat colour, stored upside down as TSG does
-        img = np.full((chunk, ns, 3), 40 + 50 * c, np.uint8)
+        img = np.full((chunk, ns, 3), 40 + 50 * c, np.uint8); img[..., 0] = 200      # stored BGR: 200 in the first channel is blue
         chunks.append(encode_jpeg(np.ascontiguousarray(np.flipud(img)), quality=100, colorspace="RGB"))
     offs = np.cumsum([0] + [len(c) for c in chunks]).astype(np.uint32)
     head = struct.pack(smp._CRAS_HEAD, b"CoreLog Linescan 1.1", ns, chunk * nchunks, 3, 2, 1, specny, 0, 0, 1, chunk, nchunks, 0, 0, 0, 0, 0)
@@ -150,7 +150,8 @@ def test_linescan_decodes_only_the_chunks_of_the_window(tmp_path, monkeypatch):
     import io
     im = np.asarray(Image.open(io.BytesIO(jpg)).convert("RGB"))
     assert im.shape == (10, ns, 3)
-    assert abs(int(im[0, 0, 0]) - 90) < 6 and abs(int(im[-1, 0, 0]) - 140) < 6      # top rows from chunk 1 (90), bottom from chunk 2 (140)
+    assert abs(int(im[0, 0, 1]) - 90) < 6 and abs(int(im[-1, 0, 1]) - 140) < 6      # top rows from chunk 1 (90), bottom from chunk 2 (140)
+    assert abs(int(im[0, 0, 2]) - 200) < 6 and int(im[0, 0, 0]) < 100                 # the stored first channel is blue, so it lands in B
 
 
 def test_samples_pair_each_swir_sample_with_the_nearest_tir_spectrum(tmp_path, monkeypatch):
