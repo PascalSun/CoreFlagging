@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight, Maximize2 } from "lucide-react";
 import { coreScan, type HoleDetail, type ModelView, type SpectralLog, type Tray } from "@/lib/coreScan";
 import { LINE, SpectraChart } from "@/components/coretrace/SpectraChart";
@@ -33,7 +33,8 @@ export function DepthLens({ hole, mv, win, onWindow, trays, metre, onMetre, type
   const bq = useQuery({ queryKey: ["core-bins", hole.key, Math.round(from * 10), Math.round(to * 10)], queryFn: () => coreScan.bins(hole.key, from, to), enabled: span <= 50, staleTime: 10 * 60_000 });
   const [pick, setPick] = useState<number | null>(null); const [hover, setHover] = useState<number | null>(null);
   const shownBin = hover ?? pick;
-  const sq = useQuery({ queryKey: ["core-bin", hole.key, shownBin], queryFn: () => coreScan.bin(hole.key, shownBin as number), enabled: shownBin !== null, staleTime: 10 * 60_000 });
+  // the bin's spectra; the last one stays up (faded) while the next loads, so the box below never empties and the page never jumps
+  const sq = useQuery({ queryKey: ["core-bin", hole.key, shownBin], queryFn: () => coreScan.bin(hole.key, shownBin as number), enabled: shownBin !== null, staleTime: 10 * 60_000, placeholderData: keepPreviousData });
   const step = (dir: -1 | 1) => { const d = span * 0.5 * dir; const a = Math.max(d0, Math.min(d1 - span, from + d)); onWindow([round1(a), round1(a + span)]); };
   const metres = useMemo(() => { const out: number[] = []; for (let m = Math.floor(from); m < to; m++) if (hole.metres.m.includes(m)) out.push(m); return out; }, [from, to, hole.metres.m]);
   const midx = useMemo(() => new Map((mv?.m ?? []).map((m, i) => [m, i])), [mv]);
@@ -104,14 +105,21 @@ export function DepthLens({ hole, mv, win, onWindow, trays, metre, onMetre, type
             {bq.data ? (
               <BinStrip bins={bq.data.bins} from={from} to={to} pick={pick} hover={hover} onHover={setHover} onPick={(b) => setPick(pick === b ? null : b)} onZoom={(b) => onWindow([b / 10, b / 10 + MIN_SPAN])} log={spectralFine} order={order} />
             ) : <p className="text-xs text-slate-500">{bq.isPending ? "Reading the bins…" : "No bins in this window."}</p>}
-            {shownBin !== null && sq.data && (
-              <div className="mt-3 flex flex-col gap-3 rounded-lg border border-slate-200 bg-white p-3">
-                <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-xs"><b className="font-semibold text-slate-900">{sq.data.from_m.toFixed(1)}–{(sq.data.from_m + 0.1).toFixed(1)} m</b>
-                  <span>SWIR <b className="font-medium">{mixOf(spectralFine, shownBin, "swir") ?? groupName(sq.data.gs)}</b>{sq.data.ms ? ` · ${mineralName(sq.data.ms)}` : ""}</span><span>TIR <b className="font-medium">{mixOf(spectralFine, shownBin, "tir") ?? groupName(sq.data.gt)}</b></span>
-                  <span className="text-slate-500">{sq.data.n_swir} samples{sq.data.n_tir ? `, ${sq.data.n_tir} with TIR` : ", no TIR"}</span>
-                  {hover !== null && pick !== hover && <span className="text-slate-400">· hovering; click a bin to keep it</span>}</div>
-                <SpectraChart title="SWIR, this 10 cm" unit="nm" xTicks={[500, 1000, 1500, 2000, 2500]} xFmt={nm} height={140} lines={[{ name: "this bin", color: LINE.measured, x: sq.data.swir_wl, y: sq.data.swir }]} />
-                {sq.data.tir && <SpectraChart title="TIR, this 10 cm" unit="µm" xTicks={[7000, 8000, 9000, 10000, 11000, 12000, 13000, 14000]} xFmt={um} height={140} lines={[{ name: "this bin", color: LINE.measured, x: sq.data.tir_wl, y: sq.data.tir }]} />}
+            {/* one box of one height whatever is in it (nothing yet, a bin loading, a bin with or without TIR): hovering
+                along the strip changes its contents, never its size */}
+            {bq.data && (
+              <div className="mt-3 flex flex-col gap-3 rounded-lg border border-slate-200 bg-white p-3" style={{ height: 390 }}>
+                {shownBin !== null && sq.data ? (
+                  <div className={cn("flex min-h-0 flex-col gap-3 transition-opacity", sq.isPlaceholderData && "opacity-50")}>
+                    <div className="flex items-baseline gap-x-3 overflow-hidden whitespace-nowrap text-xs"><b className="font-semibold text-slate-900">{(shownBin / 10).toFixed(1)}–{(shownBin / 10 + 0.1).toFixed(1)} m</b>
+                      <span className="truncate">SWIR <b className="font-medium">{mixOf(spectralFine, shownBin, "swir") ?? groupName(sq.data.gs)}</b>{sq.data.ms ? ` · ${mineralName(sq.data.ms)}` : ""}</span><span className="truncate">TIR <b className="font-medium">{mixOf(spectralFine, shownBin, "tir") ?? groupName(sq.data.gt)}</b></span>
+                      <span className="flex-none text-slate-500">{sq.data.n_swir} samples{sq.data.n_tir ? `, ${sq.data.n_tir} with TIR` : ", no TIR"}</span>
+                      <span className="ml-auto flex-none text-slate-400">{hover !== null && pick !== hover ? "hovering; click a bin to keep it" : pick !== null ? "kept; click it again to let go" : ""}</span></div>
+                    <SpectraChart title="SWIR, this 10 cm" unit="nm" xTicks={[500, 1000, 1500, 2000, 2500]} xFmt={nm} height={140} lines={[{ name: "this bin", color: LINE.measured, x: sq.data.swir_wl, y: sq.data.swir }]} />
+                    <SpectraChart title="TIR, this 10 cm" unit="µm" xTicks={[7000, 8000, 9000, 10000, 11000, 12000, 13000, 14000]} xFmt={um} height={140} note={sq.data.tir ? undefined : "not measured in this bin"}
+                      lines={[{ name: "this bin", color: LINE.measured, x: sq.data.tir_wl, y: sq.data.tir ?? null }]} />
+                  </div>
+                ) : <p className="m-auto text-center text-xs text-slate-400">Move over a bin above to read its spectra here; click one to keep it.</p>}
               </div>
             )}
           </section>
