@@ -14,7 +14,7 @@ import { HolePanel } from "@/components/coretrace/HolePanel";
 import { UploadDialog } from "@/components/coretrace/UploadDialog";
 import { isAuthed, isVerified } from "@/lib/auth";
 import { ACTIVE, inferred, coreScan, STATES } from "@/lib/coreScan";
-import { COLOUR_MODES, SHAPE_MODES, classify, shapeOf, type ColourMode, type ShapeMode } from "@/components/coretrace/mapColour";
+import { COLOUR_MODES, classify, shapeOf, type ColourMode } from "@/components/coretrace/mapColour";
 import { Mark, type Shape } from "@/components/coretrace/shapes";
 import { ColourNote } from "@/components/coretrace/ColourNote";
 import { HoleTable } from "@/components/coretrace/HoleTable";
@@ -129,7 +129,7 @@ export function CoreTraceMap() {
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { setRingKm(null); }, [holeKey]);
   const [mode, setMode] = useState<ColourMode>("target"); const [focus, setFocus] = useState<string | null>(null);
-  const [shapeMode, setShapeMode] = useState<ShapeMode>("gold"); const [filtersOpen, setFiltersOpen] = useState(false); const [legendOpen, setLegendOpen] = useState(true);
+  const [filtersOpen, setFiltersOpen] = useState(false); const [legendOpen, setLegendOpen] = useState(true);
   // on a phone the legend starts folded to its one line of pickers, so the map keeps the screen
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { if (mobile) setLegendOpen(false); }, [mobile]);
@@ -151,18 +151,18 @@ export function CoreTraceMap() {
     { title: "Open any hole", body: "Click a point. You get its strip log, its tray photographs, and what the model reads at each metre. Zoom the log from the whole hole down to 10 cm, open \u201cLook again\u201d for where the scan is worth a second look, and \u201cSimilar core\u201d for core like it anywhere in the State." },
   ];
   const colour = useMemo(() => (h: (typeof holes)[number]) => {
-    const c = classify(h, mode, typeName), sh = shapeOf(h, shapeMode);
+    const c = classify(h, mode, typeName), sh = shapeOf(h);
     return { ...c, shape: sh?.shape, shapeLabel: sh?.label, dim: focus !== null && c.label !== focus && sh?.label !== focus };
-  }, [mode, shapeMode, typeName, focus]);
+  }, [mode, typeName, focus]);
   const shapes = useMemo(() => {
     const c = new Map<string, { shape: Shape; n: number; order: number }>();
     for (const h of onMap) {
       if (h.lat === null) continue;
-      const k = shapeOf(h, shapeMode); if (!k) continue;
+      const k = shapeOf(h); if (!k) continue;
       const e = c.get(k.label) ?? { shape: k.shape, n: 0, order: k.order }; e.n++; c.set(k.label, e);
     }
     return [...c.entries()].sort((a, b) => a[1].order - b[1].order);
-  }, [onMap, shapeMode]);
+  }, [onMap]);
   // the legend counts what is on the map, so it changes with the State picked
   const legend = useMemo(() => {
     const c = new Map<string, { color: string; n: number; order: number; ring?: string; wait?: boolean; glyph?: string }>();
@@ -216,8 +216,6 @@ export function CoreTraceMap() {
             <div className="flex items-center gap-2 px-3 py-2">
               <span className="text-[11px] font-medium text-slate-500">Colour</span>
               <div className="w-[118px]"><Picker value={mode} label="Colour the holes by" side="top" options={COLOUR_MODES.map((m) => ({ id: m.id, label: m.label }))} onChange={(v) => { setMode(v); setFocus(null); }} /></div>
-              <span className="text-[11px] font-medium text-slate-500">Shape</span>
-              <div className="w-[104px]"><Picker value={shapeMode} label="Shape the holes by" side="top" options={SHAPE_MODES.map((m) => ({ id: m.id, label: m.short }))} onChange={(v) => { setShapeMode(v); setFocus(null); }} /></div>
               <button type="button" onClick={() => setLegendOpen((o) => !o)} aria-label={legendOpen ? "Fold the legend" : "Open the legend"} className="ml-auto grid size-6 place-items-center rounded text-slate-500 hover:bg-white">
                 {legendOpen ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
               </button>
@@ -257,7 +255,7 @@ export function CoreTraceMap() {
         </div>
       )}
       {view === "map" && mobile && !holeKey && holes.length > 0 && (
-        <LegendSheet modes={COLOUR_MODES} mode={mode} onMode={setMode} shapeModes={SHAPE_MODES} shapeMode={shapeMode} onShapeMode={setShapeMode}
+        <LegendSheet modes={COLOUR_MODES} mode={mode} onMode={setMode}
           overlays={OVERLAYS.map((o) => ({ id: o.id, label: o.label, color: o.color, on: !!overlays[o.id] }))} onOverlay={(id) => toggleOverlay(id as Overlay)}
           basemaps={[{ id: "satellite" as Basemap, label: "Satellite" }, { id: "map" as Basemap, label: "Map" }]} basemap={basemap} onBasemap={pickBasemap}
           legend={legend} shapes={shapes} focus={focus} onFocus={setFocus} />

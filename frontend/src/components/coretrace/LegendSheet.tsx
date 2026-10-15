@@ -12,9 +12,8 @@ type ShapeEntry = { shape: Shape; n: number };
 
 /** The legend on a phone: one small bar over the map, opening a bottom sheet with the basemap, what colour and
  * shape mean (as chips) and the key, where a tap on a row shows only those holes. */
-export function LegendSheet<C extends string, S extends string, B extends string>(p: {
+export function LegendSheet<C extends string, B extends string>(p: {
   modes: { id: C; label: string }[]; mode: C; onMode: (m: C) => void;
-  shapeModes: { id: S; short: string }[]; shapeMode: S; onShapeMode: (m: S) => void;
   basemaps: { id: B; label: string }[]; basemap: B; onBasemap: (b: B) => void;
   legend: [string, Entry][]; shapes: [string, ShapeEntry][]; focus: string | null; onFocus: (f: string | null) => void;
   /** context layers that can be shown under the holes */
@@ -24,7 +23,6 @@ export function LegendSheet<C extends string, S extends string, B extends string
   const [drag, setDrag] = useState(0); const start = useRef<number | null>(null);
   const shown = p.legend.filter(([, e]) => !e.wait); const waiting = p.legend.find(([, e]) => e.wait)?.[1].n ?? 0;
   const modeLabel = p.modes.find((m) => m.id === p.mode)?.label ?? "";
-  const shapeLabel = p.shapeModes.find((m) => m.id === p.shapeMode)?.short ?? "";
   const chip = (on: boolean) => cn("rounded-full px-3 py-1.5 text-[13px] font-medium ring-1 transition-colors", on ? "bg-ink text-white ring-ink" : "bg-white text-slate-700 ring-slate-200 active:bg-slate-50");
   const row = (label: string, mark: React.ReactNode, n: number) => {
     const on = p.focus === label, off = p.focus !== null && !on;
@@ -42,7 +40,7 @@ export function LegendSheet<C extends string, S extends string, B extends string
         <span className="flex -space-x-1" aria-hidden>
           {shown.slice(0, 5).map(([l, e]) => <i key={l} className="inline-block size-3 rounded-full ring-2 ring-white" style={{ background: e.ring ? "#fff" : e.color, boxShadow: e.ring ? `inset 0 0 0 1.5px ${e.ring}` : undefined }} />)}
         </span>
-        <span className="truncate text-[13px] font-semibold text-slate-800">{p.focus ?? modeLabel}{p.focus ? "" : <span className="font-normal text-slate-500"> · {shapeLabel}</span>}</span>
+        <span className="truncate text-[13px] font-semibold text-slate-800">{p.focus ?? modeLabel}</span>
         <Layers size={16} className="flex-none text-slate-500" />
       </button>
       {open && createPortal(
@@ -73,11 +71,10 @@ export function LegendSheet<C extends string, S extends string, B extends string
                 <div className="mt-2.5 grid grid-cols-2 gap-x-1">{shown.map(([l, e]) => row(l, <Mark color={e.color} ring={e.ring} glyph={e.glyph} size={12} />, e.n))}</div>
                 {(p.mode === "target" || p.mode === "type") && <ColourNote kind={p.mode === "target" ? "target" : "mineral"} className="mt-1" />}
               </section>
-              <section>
-                <p className="mb-2 text-xs font-semibold text-slate-500">Shape the holes by</p>
-                <div className="flex flex-wrap gap-1.5">{p.shapeModes.map((m) => <button key={m.id} type="button" onClick={() => { p.onShapeMode(m.id); p.onFocus(null); }} className={chip(p.shapeMode === m.id)}>{m.short}</button>)}</div>
-                {p.shapes.length > 0 && <div className="mt-2.5 grid grid-cols-2 gap-x-1">{p.shapes.map(([l, e]) => row(l, <Mark shape={e.shape} color="#64748b" size={12} />, e.n))}</div>}
-              </section>
+              {p.shapes.length > 0 && <section>
+                <p className="mb-2 text-xs font-semibold text-slate-500">Shape</p>
+                <div className="grid grid-cols-2 gap-x-1">{p.shapes.map(([l, e]) => row(l, <Mark shape={e.shape} color="#64748b" size={12} />, e.n))}</div>
+              </section>}
               {p.overlays && p.overlays.length > 0 && (
                 <section>
                   <p className="mb-2 text-xs font-semibold text-slate-500">Also show</p>
