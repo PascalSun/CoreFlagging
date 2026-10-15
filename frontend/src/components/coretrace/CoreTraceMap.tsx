@@ -177,8 +177,10 @@ export function CoreTraceMap() {
   useEffect(() => { const f = () => { setVw(window.innerWidth); setVh(window.innerHeight); }; f(); window.addEventListener("resize", f); return () => window.removeEventListener("resize", f); }, []);
   // the top bar's room: the screen less the chat column; pickers and labels fold away as it narrows
   const barW = vw - chatW;
-  const ctlW = view === "map" && !mobile ? 38 + 8 : 0;   // the zoom and basemap buttons keep the right edge; the hole's panel sits left of them
-  const panelW = !holeKey ? 0 : wide ? Math.max(560, Math.min(1180, vw - chatW - ctlW - 60 - 24)) : 420;
+  // the zoom and basemap buttons keep the right edge and the hole's panel sits left of them; the full log takes the
+  // page's whole width, over the map and its buttons
+  const ctlW = view === "map" && !mobile && !(holeKey && wide) ? 38 + 8 : 0;
+  const panelW = !holeKey ? 0 : wide ? vw - chatW - 24 : 420;
 
   return (
     <div className="fixed inset-0 overflow-hidden bg-slate-50 text-slate-900">
@@ -193,7 +195,7 @@ export function CoreTraceMap() {
 
       {/* zoom, and under it the basemap behind a layers button, at the right edge whether or not a hole is open; on a
           phone the map is pinched and the basemap lives in the key's sheet */}
-      {view === "map" && !mobile && (
+      {view === "map" && !mobile && !(holeKey && wide) && (
         <div className="absolute bottom-3 z-10 flex flex-col items-end gap-2" style={{ right: 12 + chatW }}>
           <div className={cn(glass, "flex flex-col overflow-hidden rounded-xl")} role="group" aria-label="Zoom">
             <button type="button" onClick={() => mapApi.current?.zoomIn()} aria-label="Zoom in" className="grid size-9 place-items-center text-slate-700 hover:bg-white hover:text-slate-900"><Plus size={15} /></button>
