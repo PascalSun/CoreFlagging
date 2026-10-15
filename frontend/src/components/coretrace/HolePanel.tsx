@@ -377,8 +377,9 @@ export function HolePanel({ holeKey, tab: tabProp, onTab, models, run, metre, on
   // still exist in the service for the research, and a deep link with ?run= still opens one, but the page
   // no longer offers to switch: the picker confused readers more than it helped.
   const defaultRun = models.find((m) => m.default)?.run ?? runs[0];
-  const modelPicker = runs.length > 0 && (
-    <p className="text-[11px] text-slate-500">Read by <b className="font-semibold text-slate-800">{useRun === defaultRun ? "HyFormer" : models.find((m) => m.run === useRun)?.name ?? useRun}</b>{useRun === defaultRun ? ", a foundation model for core spectra" : ""}</p>
+  // the default model goes unnamed; only a deep link to another run says which it is
+  const modelPicker = runs.length > 0 && useRun !== defaultRun && (
+    <p className="text-[11px] text-slate-500">Read by <b className="font-semibold text-slate-800">{models.find((m) => m.run === useRun)?.name ?? useRun}</b></p>
   );
 
   let body: React.ReactNode;
@@ -409,11 +410,10 @@ export function HolePanel({ holeKey, tab: tabProp, onTab, models, run, metre, on
         <div className="grid grid-cols-2 gap-2">
           <Fact k="Depth scanned" v={`${fmt(hole.depth_min, 0)}–${fmt(hole.depth_max, 0)} m`} sub={`${(hole.meta.n_tokens as number | undefined ?? 0).toLocaleString()} ten-centimetre bins`} />
           <Fact k="Instrument" v={hole.instrument || "—"} sub={hole.tir === "ok" ? "thermal infrared measured" : hole.tir === "sparse" ? "little thermal infrared" : "no thermal infrared"} />
-          <Fact k="Gold assays" v={hole.au_m ? `${hole.au_m} m` : "none in the scan"} sub={hole.au_m ? `${hole.au_pos_m} m at or above 0.1 ppm` : undefined} />
           <Fact k="Data quality" v={hole.n_issues ? `${hole.n_issues} ${hole.n_issues === 1 ? "issue" : "issues"}` : "nothing found"} sub={hole.issues[0] ? issueLabel(hole.issues[0].issue) : undefined} />
         </div>
-        {hasReport && <div><H3>Original report</H3><OriginalReport report={rq.data} loading={rq.isPending} /></div>}
         {hole.lat !== null && <div><H3>Nearby holes</H3><Nearby hole={hole} onOpen={(k) => onOpenHole(k)} onRing={onRing} onCompare={(k) => onCompare?.(k)} /></div>}
+        {hasReport && <div><H3>Original report</H3><OriginalReport report={rq.data} loading={rq.isPending} /></div>}
         {modelPicker}
         <div>
           <H3>Down the hole</H3>
@@ -425,10 +425,8 @@ export function HolePanel({ holeKey, tab: tabProp, onTab, models, run, metre, on
           <div>
             <H3>What the model found</H3>
             <ul className="flex flex-col gap-1.5 text-xs leading-relaxed text-slate-700">
-              <li><b className="font-semibold text-slate-900">{res.summary.n_segments} segments</b> in the auto log, over {res.summary.metres} m of core.</li>
               {hole.has_lith && (() => { const n = res.summary.again?.n ?? 0; return <li><b className="font-semibold text-slate-900">{n ? `${n} ${n === 1 ? "interval" : "intervals"}` : "No interval"}</b> where the model&rsquo;s reading disagrees with the log, by the ultramafic rule.{n ? <> <button type="button" className="font-medium text-slate-900 underline decoration-slate-300 underline-offset-2 hover:decoration-slate-900" onClick={() => { setTab("again"); onWide(true); }}>See them under Unusual</button></> : null}</li>; })()}
               <li><b className="font-semibold text-slate-900">{res.anomaly.n_flag_m} unusual {res.anomaly.n_flag_m === 1 ? "metre" : "metres"}</b> flagged against the core around them.</li>
-              {res.summary.gold_top !== null && <li>Highest gold likelihood at <button type="button" className="font-semibold text-slate-900 underline decoration-slate-300 underline-offset-2 hover:decoration-slate-900" onClick={() => openMetre(res.summary.gold_top as number)}>{res.summary.gold_top} m</button>{res.gold.auc !== null ? <>; against this hole&rsquo;s assays the ranking scores AUC {fmt(res.gold.auc)}</> : null}.</li>}
               {res.tir.measured && res.tir.acc !== null && <li>TIR mineral group filled in from SWIR alone agrees with the measured TIR in <b className="font-semibold text-slate-900">{pct(res.tir.acc)}</b> of bins.</li>}
               {!res.tir.measured && <li>No thermal infrared was measured; the model fills in a TIR mineral group for every metre from SWIR.</li>}
             </ul>
@@ -459,7 +457,7 @@ export function HolePanel({ holeKey, tab: tabProp, onTab, models, run, metre, on
         </div>
         <div className="@container flex min-w-0 flex-col lg:min-h-0 lg:flex-1">
           {/* on a phone the model line scrolls away; only the tabs stay */}
-          <div className="px-4 pt-3 lg:hidden">{modelPicker}</div>
+          {modelPicker && <div className="px-4 pt-3 lg:hidden">{modelPicker}</div>}
           <div className="sticky top-0 z-10 flex flex-col gap-2 border-b border-slate-200/70 bg-white/95 px-4 pt-3 backdrop-blur lg:relative lg:bg-transparent lg:backdrop-blur-none">
             {/* the next metre is on its way: a bar along the foot of the tabs, the current metre left as it is */}
             {tab === "window" && shown !== null && eq.data && eq.data.metre !== shown && (
@@ -468,7 +466,7 @@ export function HolePanel({ holeKey, tab: tabProp, onTab, models, run, metre, on
                 <style>{`@keyframes ct-slide{0%{transform:translateX(-100%)}100%{transform:translateX(300%)}}`}</style>
               </div>
             )}
-            <div className="max-lg:hidden">{modelPicker}</div>
+            {modelPicker && <div className="max-lg:hidden">{modelPicker}</div>}
             <div className="flex gap-1 max-lg:flex-wrap max-lg:gap-1.5 max-lg:pb-3 lg:overflow-x-auto lg:[scrollbar-width:none]" role="tablist">
               {TABS.filter((t) => !displayOnly || t.id === "window" || t.id === "quality" || t.id === "report").map((t) => (
                 <button key={t.id} role="tab" aria-selected={tab === t.id} type="button" onClick={() => setTab(t.id)}
