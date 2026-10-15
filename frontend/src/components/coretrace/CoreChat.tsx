@@ -8,7 +8,7 @@ import { Loader2, RotateCcw, Send } from "lucide-react";
 import { MD_COMPONENTS } from "@/components/chat/mdTable";
 import { ReportPdf } from "@/components/coretrace/ReportPdf";
 import { authToken, refreshAccessToken, refreshToken } from "@/lib/auth";
-import { platformFetch } from "@ntlp/geodata-web/fetch";
+import { PLATFORM_URL, platformFetch } from "@ntlp/geodata-web/fetch";
 import { cn } from "@/lib/utils";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -19,8 +19,15 @@ const TOOL_LABEL: Record<string, string> = {
   hole_documents: "Looked up the hole's documents", document_text: "Read the document", search_documents: "Searched the reports", open_document: "Opened the PDF",
 };
 
-/** "[MND036 120 m](hole:MND036?m=120)" → an in-page link the panel opens itself. */
-const holeLinks = (t: string) => t.replace(/\]\(hole:([^)?\s]+)(?:\?m=(\d+))?\)/g, (_, h, m) => `](#hole=${encodeURIComponent(decodeURIComponent(h))}${m ? `&m=${m}` : ""})`);
+/** "[MND036 120 m](hole:MND036?m=120)" → an in-page link the panel opens itself. A document link the model writes on
+ * its own ("[report.pdf](wamex:A77996?file=report.pdf)") becomes a link to the PDF itself rather than a blocked one. */
+const holeLinks = (t: string) => t
+  .replace(/\]\(hole:([^)?\s]+)(?:\?m=(\d+))?\)/g, (_, h, m) => `](#hole=${encodeURIComponent(decodeURIComponent(h))}${m ? `&m=${m}` : ""})`)
+  .replace(/\]\((wamex|hylogger|ebookshop|geolit):([^)?\s]+)(?:\?file=([^)\s]+))?\)/g, (_, c, k, f) => `](#doc=${c}&key=${encodeURIComponent(decodeURIComponent(k))}${f ? `&file=${encodeURIComponent(decodeURIComponent(f))}` : ""})`);
+/** Where the platform serves a document's PDF (as the open_document tool builds it). */
+const docHref = (corpus: string, key: string, file: string) => `${PLATFORM_URL}${corpus === "wamex"
+  ? `/geo/api/wamex/report/${encodeURIComponent(key)}/${encodeURIComponent(file)}`
+  : `/geo/api/doc/file/?corpus=${encodeURIComponent(corpus)}&key=${encodeURIComponent(key)}&filename=${encodeURIComponent(file)}`}`;
 
 export type OpenTarget = { hole: string; m?: number; tab?: string };
 
@@ -98,6 +105,11 @@ export function CoreChat({ context, onOpen, signedIn, onSignIn }: {
         const p = new URLSearchParams(href.slice(1));
         return <button type="button" className="font-medium text-slate-900 underline decoration-cyan decoration-2 underline-offset-2 hover:decoration-slate-900"
           onClick={() => openRef.current({ hole: p.get("hole") ?? "", m: p.get("m") ? Number(p.get("m")) : undefined })}>{children}</button>;
+      }
+      if (typeof href === "string" && href.startsWith("#doc=")) {
+        const p = new URLSearchParams(href.slice(1)); const file = p.get("file");
+        if (file) return <a href={docHref(p.get("doc") ?? "wamex", p.get("key") ?? "", file)} target="_blank" rel="noreferrer" className="underline underline-offset-2">{children}</a>;
+        return <span>{children}</span>;
       }
       return <a href={href} target="_blank" rel="noreferrer" className="underline underline-offset-2">{children}</a>;
     },
