@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, lastAssistantMessageIsCompleteWithToolCalls } from "ai";
 import { Streamdown, type Components } from "streamdown";
-import { Loader2, RotateCcw, Send } from "lucide-react";
+import { FileText, Loader2, RotateCcw, Send } from "lucide-react";
 import { MD_COMPONENTS } from "@/components/chat/mdTable";
 import { ReportPdf } from "@/components/coretrace/ReportPdf";
 import { authToken, refreshAccessToken, refreshToken } from "@/lib/auth";
@@ -30,6 +30,38 @@ const docHref = (corpus: string, key: string, file: string) => `${PLATFORM_URL}$
   : `/geo/api/doc/file/?corpus=${encodeURIComponent(corpus)}&key=${encodeURIComponent(key)}&filename=${encodeURIComponent(file)}`}`;
 
 export type OpenTarget = { hole: string; m?: number; tab?: string };
+
+type DocRow = { corpus: string; key: string; file: string; title: string; sub: string; url: string };
+
+/** What hole_documents found, as a list the reader can open: the hole's own HyLogger PDFs and the WAMEX reports it was
+ * logged in, the primary one open under the list. Drawn by the interface, so it is there whatever the model writes. */
+function DocumentList({ out }: { out: any }) {
+  const rows: DocRow[] = [
+    ...((out.wamex?.reports_this_hole_was_logged_in ?? []) as any[]).filter((r) => r.url).map((r) => ({
+      corpus: "wamex", key: r.anumber, file: r.pdf, url: r.url, title: `${r.anumber} · ${r.title ?? "WAMEX report"}`,
+      sub: [r.year, r.company, r.type, r.commodities].filter(Boolean).join(" · ") })),
+    ...((out.hole_pdfs ?? []) as any[]).map((p) => ({ corpus: p.corpus, key: p.key, file: p.file, url: p.url, title: p.title, sub: `${p.kind}${p.pages ? ` · ${p.pages} pages` : ""}` })),
+  ];
+  const [open, setOpen] = useState<string | null>(out.primary?.url ?? rows[0]?.url ?? null);
+  const covering = out.wamex?.reports_covering_the_collar_total ?? 0;
+  if (!rows.length) return null;
+  const shown = rows.find((r) => r.url === open);
+  return (
+    <div className="flex flex-col gap-1.5">
+      <ul className="flex flex-col gap-1">
+        {rows.map((r) => (
+          <li key={r.url} className={cn("flex items-center gap-2 rounded-xl border px-3 py-2 text-xs", r.url === open ? "border-slate-400 bg-white" : "border-slate-200 bg-white/70")}>
+            <FileText size={14} className="shrink-0 text-slate-500" />
+            <div className="min-w-0 flex-1"><div className="truncate font-medium text-slate-900">{r.title}</div>{r.sub && <div className="truncate text-[11px] text-slate-500">{r.sub}</div>}</div>
+            <button type="button" onClick={() => setOpen(r.url === open ? null : r.url)} className="shrink-0 rounded-full border border-slate-200 px-2 py-0.5 text-[11px] text-slate-700 hover:border-slate-400">{r.url === open ? "Close" : "Open"}</button>
+          </li>
+        ))}
+      </ul>
+      {covering > 0 && <p className="px-1 text-[11px] text-slate-500">{covering} more WAMEX {covering === 1 ? "report covers" : "reports cover"} the collar; ask for them by subject or year.</p>}
+      {shown && <ReportPdf url={shown.url} title={shown.title} subtitle={`${shown.corpus === "wamex" ? "WAMEX " : ""}${shown.key} · ${shown.file}`} />}
+    </div>
+  );
+}
 
 /** The Core Flagging assistant: ask about holes, metres and the models in plain words. It reads
  * the same data as the map and moves the map to what it is describing. */
@@ -116,8 +148,8 @@ export function CoreChat({ context, onOpen, signedIn, onSignIn }: {
   }), []);
 
   const starters = context.hole
-    ? [`What stands out in ${context.hole}?`, `Find and summarise the report for ${context.hole}`, `Summarise the auto log of ${context.hole}`, context.m !== null ? `Why is ${context.m} m in ${context.hole} flagged as unusual?` : `Where is gold most likely in ${context.hole}?`, `Which data-quality issues does ${context.hole} have?`]
-    : ["Which processed holes have gold assays?", "Find and summarise the WAMEX report for MND037", "Find holes in the Yilgarn with thermal infrared", "What does the unusual score mean?", "Which data-quality problem is most common?"];
+    ? [`Find the WAMEX reports for ${context.hole} and summarise them`, `What stands out in ${context.hole}?`, `Summarise the auto log of ${context.hole}`, context.m !== null ? `Why is ${context.m} m in ${context.hole} flagged as unusual?` : `Where is gold most likely in ${context.hole}?`, `Which data-quality issues does ${context.hole} have?`]
+    : ["Find the WAMEX reports for DRDD309 and summarise them", "What do the WAMEX reports say about MND037?", "Which reports cover KPDDH009, and what did the drilling find?", "Which processed holes have gold assays?", "What does the unusual score mean?"];
 
   if (!signedIn) {
     return (
@@ -154,6 +186,9 @@ export function CoreChat({ context, onOpen, signedIn, onSignIn }: {
                 {m.parts.map((p: any, i: number) => {
                   if (p.type === "text" && p.text) {
                     return <div key={i} className="max-w-[92%] rounded-2xl rounded-tl-sm bg-slate-100 px-3.5 py-2 text-sm leading-relaxed text-slate-700 [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 [&_h3]:mt-3 [&_h3]:mb-1 [&_h3]:font-display [&_h3]:font-semibold [&_h3]:text-slate-900 [&_li]:my-0.5 [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:my-1.5 [&_ul]:list-disc [&_ul]:pl-5"><Streamdown controls={{ table: false }} components={components}>{holeLinks(p.text)}</Streamdown></div>;
+                  }
+                  if (p.type === "tool-hole_documents" && p.state === "output-available" && p.output?.hole_pdfs) {
+                    return <div key={i} className="w-full max-w-[92%] py-1"><DocumentList out={p.output} /></div>;
                   }
                   if (p.type === "tool-open_document" && p.state === "output-available" && p.output?.url) {
                     return <div key={i} className="w-full max-w-[92%] py-1"><ReportPdf url={p.output.url} title={p.output.title} page={p.output.page ?? undefined} subtitle={`${p.output.corpus === "wamex" ? "WAMEX " : ""}${p.output.key} · ${p.output.file}`} /></div>;
