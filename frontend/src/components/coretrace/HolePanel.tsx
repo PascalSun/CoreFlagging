@@ -22,7 +22,7 @@ export type Tab = "window" | "metre" | "again" | "log" | "gold" | "similar" | "q
 // "gold" and "log" (Auto log) are hidden: their views are kept below, but no tab opens them and a link with
 // ?tab=gold or ?tab=log falls back to Window. The auto log still shows as the BD column and in Window at 10 m.
 const TABS: { id: Tab; label: string }[] = [
-  { id: "window", label: "Window" }, { id: "again", label: "Look again" },
+  { id: "window", label: "Window" }, { id: "again", label: "Unusual" },
   { id: "similar", label: "Similar core" }, { id: "quality", label: "Data quality" }, { id: "report", label: "Report" },
 ];
 
@@ -296,7 +296,7 @@ export function HolePanel({ holeKey, tab: tabProp, onTab, models, run, metre, on
 }) {
   const qc = useQueryClient();
   // the open tab lives in the address, so a link (or the assistant) can open a hole on any tab
-  // "unusual" was Look again's old name; "metre" (This metre) became the Window tab's 1 m level
+  // the "again" tab reads "Unusual" ("unusual" in a link is its older id); "metre" (This metre) became the Window tab's 1 m level
   const tab: Tab = tabProp === "unusual" ? "again" : TABS.some((t) => t.id === tabProp) ? (tabProp as Tab) : "window";
   const setTab = onTab;
   const hq = useQuery({ queryKey: ["core-hole", holeKey], queryFn: () => coreScan.hole(holeKey), refetchInterval: (q) => (q.state.data && ACTIVE.includes(q.state.data.status) ? 2500 : false),
@@ -426,7 +426,7 @@ export function HolePanel({ holeKey, tab: tabProp, onTab, models, run, metre, on
             <H3>What the model found</H3>
             <ul className="flex flex-col gap-1.5 text-xs leading-relaxed text-slate-700">
               <li><b className="font-semibold text-slate-900">{res.summary.n_segments} segments</b> in the auto log, over {res.summary.metres} m of core.</li>
-              {hole.has_lith && (() => { const n = res.summary.again?.n ?? 0; return <li><b className="font-semibold text-slate-900">{n ? `${n} ${n === 1 ? "interval" : "intervals"}` : "No interval"}</b> where the model&rsquo;s reading disagrees with the log, by the ultramafic rule.{n ? <> <button type="button" className="font-medium text-slate-900 underline decoration-slate-300 underline-offset-2 hover:decoration-slate-900" onClick={() => { setTab("again"); onWide(true); }}>Look again</button></> : null}</li>; })()}
+              {hole.has_lith && (() => { const n = res.summary.again?.n ?? 0; return <li><b className="font-semibold text-slate-900">{n ? `${n} ${n === 1 ? "interval" : "intervals"}` : "No interval"}</b> where the model&rsquo;s reading disagrees with the log, by the ultramafic rule.{n ? <> <button type="button" className="font-medium text-slate-900 underline decoration-slate-300 underline-offset-2 hover:decoration-slate-900" onClick={() => { setTab("again"); onWide(true); }}>See them under Unusual</button></> : null}</li>; })()}
               <li><b className="font-semibold text-slate-900">{res.anomaly.n_flag_m} unusual {res.anomaly.n_flag_m === 1 ? "metre" : "metres"}</b> flagged against the core around them.</li>
               {res.summary.gold_top !== null && <li>Highest gold likelihood at <button type="button" className="font-semibold text-slate-900 underline decoration-slate-300 underline-offset-2 hover:decoration-slate-900" onClick={() => openMetre(res.summary.gold_top as number)}>{res.summary.gold_top} m</button>{res.gold.auc !== null ? <>; against this hole&rsquo;s assays the ranking scores AUC {fmt(res.gold.auc)}</> : null}.</li>}
               {res.tir.measured && res.tir.acc !== null && <li>TIR mineral group filled in from SWIR alone agrees with the measured TIR in <b className="font-semibold text-slate-900">{pct(res.tir.acc)}</b> of bins.</li>}

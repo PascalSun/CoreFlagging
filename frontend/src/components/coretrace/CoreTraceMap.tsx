@@ -149,7 +149,7 @@ export function CoreTraceMap() {
     { target: "tabs", title: "Map, or every hole as a table", body: "The Table tab lists every hole: search by name, company or region and sort by depth or gold. The map key on the left decides which holes the map draws." },
     ...(chatOpen && !mobile ? [{ target: "chat", title: "Ask in plain words", body: "\u201cHoles with gold in NSW\u201d, \u201cwhat is unusual in MND036?\u201d. The assistant answers from the same data, and opens the holes it talks about on the map." }] : []),
     { target: "upload", title: "Bring your own scan", body: "Upload a TSG package from a HyLogger: it gets the same checks, log and model reading as the library holes, and stays private to you." },
-    { title: "Open any hole", body: "Click a point. You get its strip log, its tray photographs, and what the model reads at each metre. Zoom the log from the whole hole down to 10 cm, open \u201cLook again\u201d for where the scan is worth a second look, and \u201cSimilar core\u201d for core like it anywhere in the State." },
+    { title: "Open any hole", body: "Click a point. You get its strip log, its tray photographs, and what the model reads at each metre. Zoom the log from the whole hole down to 10 cm, open \u201cUnusual\u201d for where the scan is worth a second look, and \u201cSimilar core\u201d for core like it anywhere in the State." },
   ];
   // colour is always the target commodity; shape is whether the models read the hole
   const colour = useMemo(() => (h: (typeof holes)[number]) => {
