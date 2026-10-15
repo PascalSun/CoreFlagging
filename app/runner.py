@@ -70,6 +70,10 @@ class Runner:
         self.trays[key] = {k: v for k, v in self.trays[key].items() if k in kept}
         return out
 
+    def forget(self, key: str) -> None:
+        """The hole's processed files and every engine's memory of it: the platform is the record."""
+        self.ws.remove(key); self.models.forget(key)
+
     def run_models(self, key: str, runs: list[str] | None = None, progress: Progress = lambda *a: None) -> dict:
         """Every model on a processed hole -> the package."""
         ws = self.ws; M = ws.meta(key); pkg = {"hole": M["meta"], "report": {k: v for k, v in M["report"].items() if k != "qc"}, "qc": M["report"]["qc"],

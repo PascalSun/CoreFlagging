@@ -17,7 +17,8 @@ log = logging.getLogger("coretrace.token_scores")
 
 
 def one(key: str, runner, pf: Platform, force: bool = False) -> str:
-    """One hole, start to finish. The processed files are removed again: the platform is the record."""
+    """One hole, start to finish. The processed files and the engines' memory of the hole are dropped again: the platform
+    is the record (and 1,500 holes kept in memory were what the OOM killer took on 2026-10-15)."""
     ws = runner.ws; h = pf.hole(key)
     if h is None:
         return "not on the platform"
@@ -36,7 +37,7 @@ def one(key: str, runner, pf: Platform, force: bool = False) -> str:
         np.savez_compressed(ws.proc / f"{key}.arrays.npz", **arrays)
         return "sent" if pf.token_scores(key, ws.proc / f"{key}.arrays.npz") else "not on the platform"
     finally:
-        ws.remove(key)
+        runner.forget(key)
 
 
 def backfill(keys: list[str], runner, force: bool = False) -> dict:
