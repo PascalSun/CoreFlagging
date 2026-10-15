@@ -124,6 +124,29 @@ def _spectra_of(d: Path, dataset: str):
     return sp
 
 
+_tir: OrderedDict[str, object] = OrderedDict()       # dataset -> pytsg Spectra of the TIR file, or None when it has none
+
+
+def _tir_of(d: Path, dataset: str):
+    """The dataset's TIR spectra, when the package has the TIR pair; None otherwise. Cached like the SWIR."""
+    with _guard:
+        if dataset in _tir:
+            _tir.move_to_end(dataset); return _tir[dataset]
+    f = _files(d)
+    sp = None
+    if "tir_tsg" in f and "tir_bip" in f:
+        from pytsg import parse_tsg as p
+        try:
+            sp = p.read_tsg_bip_pair(str(f["tir_tsg"]), str(f["tir_bip"]), "tir")
+        except Exception:        # noqa: BLE001 - a damaged TIR file loses the TIR, not the samples
+            sp = None
+    with _guard:
+        _tir[dataset] = sp; _tir.move_to_end(dataset)
+        while len(_tir) > 4:
+            _tir.popitem(last=False)
+    return sp
+
+
 def _window(sp, lo: float, hi: float) -> tuple[int, int, np.ndarray]:
     D = sp.sampleheaders["D"].astype(float).to_numpy()
     i0, i1 = int(np.searchsorted(D, lo)), int(np.searchsorted(D, hi))
@@ -137,6 +160,53 @@ def _col(sp, *names: str):
     return None
 
 
+_TSA = re.compile(r"^(Min|Grp|Wt)([123]) ([su])(TSAS|jCLST|TSAT)$")
+
+
+def _tsa_columns(sp) -> dict[str, object]:
+    """The TSA (SWIR) or jCLST/TSAT (TIR) result columns of a file: the system run when it has one, else the
+    user's. Keys "Min1", "Grp1", "Wt1" … "Wt3"."""
+    found: dict[str, dict[str, object]] = {"s": {}, "u": {}}
+    for c in sp.scalars.columns:
+        m = _TSA.match(c)
+        if m: found[m.group(3)][m.group(1) + m.group(2)] = sp.scalars[c]
+    return found["s"] if "Min1" in found["s"] else found["u"]
+
+
+def _class_table(sp, want: str) -> dict[int, str]:
+    """The class table whose name holds `want` ("Groups" or "Minerals" of the TSA run): a coded column reads
+    through it. pytsg exposes the file's class headers by index."""
+    for ch in (getattr(sp, "classes", None) or {}).values():
+        name = str(getattr(ch, "name", "")); table = getattr(ch, "classes", None)
+        if want in name and isinstance(table, dict): return {int(k): str(v) for k, v in table.items()}
+    return {}
+
+
+def _tsa_reader(sp):
+    """A function i -> [[group, mineral, weight], …] (up to three, heaviest first) for sample i, or [] when the run
+    read nothing there. Coded groups or minerals (floats) resolve through the class tables."""
+    cols = _tsa_columns(sp)
+    groups = _class_table(sp, "Groups"); minerals = _class_table(sp, "Minerals")
+    def name(col, i, table):
+        if col is None: return ""
+        v = col.iloc[i]
+        if v is None: return ""
+        if isinstance(v, (float, np.floating)):
+            if not np.isfinite(v) or v < -1e30: return ""
+            return table.get(int(round(float(v))), "")
+        return str(v).strip()
+    def read(i):
+        out = []
+        for n in "123":
+            g, mn, w = name(cols.get("Grp" + n), i, groups), name(cols.get("Min" + n), i, minerals), cols.get("Wt" + n)
+            wt = None if w is None else float(w.iloc[i])
+            if wt is not None and (not np.isfinite(wt) or wt < -1e30): wt = None
+            if not (g or mn): continue
+            out.append([g, mn, None if wt is None else round(wt, 3)])
+        return out
+    return read
+
+
 def samples(refs: list[str], dataset: str, lo: float, hi: float, spectra: bool = False) -> dict:
     """One row per spectrum sample in [lo, hi): depth, tray, section, mm along the section, the TSG mineral and
     group read there (SWIR), the laser height (mm), and the SWIR spectrum when asked. At most 2,000 samples."""
@@ -144,7 +214,7 @@ def samples(refs: list[str], dataset: str, lo: float, hi: float, spectra: bool =
     i0, i1, D = _window(sp, lo, hi)
     i1 = min(i1, i0 + 2000)
     sh = sp.sampleheaders.iloc[i0:i1]
-    min1 = _col(sp, "Min1 sTSAS", "Min1 uTSAS"); grp1 = _col(sp, "Grp1 sTSAS", "Grp1 uTSAS"); wt1 = _col(sp, "Wt1 sTSAS", "Wt1 uTSAS")
+    swir_tsa = _tsa_reader(sp)
     height = None
     f = _files(d)
     if "hires" in f:
@@ -153,22 +223,36 @@ def samples(refs: list[str], dataset: str, lo: float, hi: float, spectra: bool =
             h = p.read_hires_dat(str(f["hires"]), per_spectra=True); height = h[i0:i1]
         except Exception:        # noqa: BLE001 - a damaged profile is not worth failing the samples for
             height = None
-    def cls(col, i):
-        if col is None: return ""
-        v = col.iloc[i]
-        return "" if v is None or (isinstance(v, float) and np.isnan(v)) else str(v)
+    tir = _tir_of(d, dataset)
+    tirD = tir.sampleheaders["D"].astype(float).to_numpy() if tir is not None else None
+    tir_tsa = _tsa_reader(tir) if tir is not None else None
+    def tir_index(depth: float):
+        """the TIR sample measured within 5 mm of this depth, or None (the TIR file has its own sample list)"""
+        if tirD is None or len(tirD) == 0: return None
+        k = int(np.searchsorted(tirD, depth)); k = min(max(k, 0), len(tirD) - 1)
+        if k > 0 and abs(tirD[k - 1] - depth) < abs(tirD[k] - depth): k -= 1
+        return None if abs(tirD[k] - depth) > 0.005 else k
+    def tir_at(depth: float):
+        k = tir_index(depth)
+        if k is None: return None
+        v = tir.spectra[k]
+        return None if not np.isfinite(v).any() else [round(float(x), 4) for x in v]
     rows = []
     for j, i in enumerate(range(i0, i1)):
+        sw = swir_tsa(i); k = tir_index(float(D[i])); tw = tir_tsa(k) if (tir_tsa is not None and k is not None) else []
+        first = sw[0] if sw else ["", "", None]; tfirst = tw[0] if tw else ["", "", None]
         r = {"i": int(i), "depth": round(float(D[i]), 4), "tray": str(sh["T"].iloc[j]), "section": int(float(sh["L"].iloc[j])) if str(sh["L"].iloc[j]).strip() else None,
-             "x_mm": round(float(sh["X"].iloc[j]), 1), "mineral": cls(min1, i), "group": cls(grp1, i),
-             "weight": None if wt1 is None or np.isnan(float(wt1.iloc[i])) else round(float(wt1.iloc[i]), 3),
-             "height_mm": None if height is None or np.isnan(height[j]) else round(float(height[j]), 2)}
+             "x_mm": round(float(sh["X"].iloc[j]), 1), "mineral": first[1], "group": first[0], "weight": first[2],
+             "height_mm": None if height is None or np.isnan(height[j]) else round(float(height[j]), 2),
+             "swir_mix": sw, "tir_mineral": tfirst[1], "tir_group": tfirst[0], "tir_mix": tw}
         if spectra:
             r["swir"] = [round(float(x), 4) for x in sp.spectra[i]]
+            r["tir"] = tir_at(float(D[i]))
         rows.append(r)
     out = {"dataset": dataset, "from_m": lo, "to_m": hi, "n": len(rows), "step_mm": round(float(np.median(np.diff(D[i0:i1])) * 1000), 2) if i1 - i0 > 2 else None, "samples": rows}
     if spectra:
         out["swir_wl"] = [round(float(x), 1) for x in sp.wavelength]
+        out["tir_wl"] = [round(float(x), 1) for x in tir.wavelength] if tir is not None else None
     return out
 
 
@@ -199,7 +283,8 @@ def linescan(refs: list[str], dataset: str, lo: float, hi: float, width: int = 6
         parts = []
         for c in range(c0, c1 + 1):
             fh.seek(base + int(offs[c])); chunk = fh.read(int(offs[c + 1] - offs[c]))
-            parts.append(np.ascontiguousarray(np.flipud(decode_jpeg(chunk, colorspace="RGB"))))
+            # TSG writes the chunks with the channels in BGR order: decoded as RGB, a pink label comes out blue
+            parts.append(np.ascontiguousarray(np.flipud(decode_jpeg(chunk, colorspace="RGB")[..., ::-1])))
     img = np.concatenate(parts, axis=0)[r0 - c0 * chunksize: r1 - c0 * chunksize]
     im = Image.fromarray(img)
     if width and width < im.width:

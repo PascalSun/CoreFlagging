@@ -8,6 +8,7 @@ The package is plain data, so the platform can write it to its database without 
   qc          data-quality issues found in this hole
   metres      per metre, the same for every model: software minerals, logged rock, gold assay
   models      per model: per-metre outputs, auto log, summaries, timing
+  spectral_log  group shares per 0.1 m and 1 m interval, SWIR and TIR (app/spectral.py), or None
   tokens      path of the .npz with the 10 cm tokens (spectra as float16)
   arrays      path of the .npz with per-metre arrays per model: tir__<run> (rebuilt TIR), fp__<run> (fingerprint)
 """
@@ -19,7 +20,7 @@ import numpy as np
 from pathlib import Path
 from typing import Callable
 
-from . import extras, labels
+from . import extras, labels, spectral
 from .pipeline import tsg
 from .pipeline.engine import Models
 from .pipeline.preprocess import preprocess_hole
@@ -49,6 +50,7 @@ class Runner:
         from .pipeline import config as C
         self.ws = ws or Workspace(); self.models = Models(bundle or C.BUNDLE, self.ws)
         self.trays: dict[str, dict[str, list[dict]]] = {}        # per hole key: tray index of each dataset, from its last clean()
+        self.logs: dict[str, dict | None] = {}                    # per hole key: the spectral log (group shares per interval), from its last clean()
 
     def clean(self, key: str, hole: str, folders: list[Path], meta: dict[str, dict] | None = None, ref: dict | None = None,
               source: str = "TSG files", progress: Progress = lambda *a: None, lenient: bool = False) -> dict:
@@ -60,6 +62,7 @@ class Runner:
         self.trays[key] = {d["name"]: d.get("trays", []) for d in json.loads((hd / "manifest.json").read_text())["datasets"]}
         try:
             out = preprocess_hole(hd, ws.proc, ref if ref is not None else ws.ref_for(hole), lambda msg, frac=None: progress("cleaning", "Cleaning and binning to 10 cm", frac), lenient=lenient)
+            self.logs[key] = spectral.from_raw(hd)
         finally:
             shutil.rmtree(hd, ignore_errors=True)
         kept = {d["dataset"] for d in out["report"]["datasets"] if d.get("kept")}
@@ -116,5 +119,8 @@ class Runner:
             if not str(e).startswith("No usable core scan"):
                 raise
             self.clean(key, hole, folders, lenient=True, **kw)
-            return self.display_package(key, str(e))
-        return self.run_models(key, progress=progress)
+            pkg = self.display_package(key, str(e))
+        else:
+            pkg = self.run_models(key, progress=progress)
+        pkg["spectral_log"] = self.logs.pop(key, None)            # the platform stores it beside the result
+        return pkg
