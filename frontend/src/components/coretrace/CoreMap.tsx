@@ -67,6 +67,18 @@ function ring(lon: number, lat: number, km: number) {
 }
 
 /** The map of scanned holes, on satellite imagery or a terrain map; each hole has a white edge so its colour reads on any ground. A point is a hole; clicking one selects it. */
+/** fitBounds without the padding staying behind: mapbox keeps a camera's padding after the move, and maxBounds is then
+ * held against the padded view, which pinned the map to one side. The padding only places the bounds; the move itself
+ * is a plain centre and zoom. */
+function fit(map: mapboxgl.Map, bounds: mapboxgl.LngLatBoundsLike, opts: { padding: number | mapboxgl.PaddingOptions; maxZoom?: number; duration: number }) {
+  // maxZoom only when given: an undefined one turns the zoom to NaN and no camera comes back
+  const cam = map.cameraForBounds(bounds, opts.maxZoom === undefined ? { padding: opts.padding } : { padding: opts.padding, maxZoom: opts.maxZoom });
+  if (!cam) return;
+  // cameraForBounds centres on the bounds whatever the padding; uneven padding moves them off the middle by half the difference
+  const p = typeof opts.padding === "number" ? { top: 0, bottom: 0, left: 0, right: 0 } : { top: 0, bottom: 0, left: 0, right: 0, ...opts.padding };
+  map.easeTo({ center: cam.center, zoom: cam.zoom, offset: [(p.left - p.right) / 2, (p.top - p.bottom) / 2], duration: opts.duration });
+}
+
 export function CoreMap({ holes, colour, card, selected, onSelect, padRight, padLeft = 0, padBottom = 0, fitTo, basemap = "satellite", ringKm = null, overlays = {}, apiRef }: {
   holes: HoleRow[]; selected: HoleRow | null; onSelect: (key: string | null) => void; padRight: number;
   /** room taken at the left by the map key: the scale bar sits just right of it */
@@ -249,9 +261,9 @@ export function CoreMap({ holes, colour, card, selected, onSelect, padRight, pad
     const apply = () => {
       const wide = map.getContainer().clientWidth > 900;
       const pts = holesRef.current.filter((h) => h.lon !== null && h.lat !== null && !h.offshore);
-      if (!fitTo || !pts.length) { map.easeTo({ center: HOME, zoom: MIN_ZOOM, padding: { right: padRight, left: 0, top: 0, bottom: 0 }, duration: 900 }); return; }
+      if (!fitTo || !pts.length) { map.easeTo({ center: HOME, zoom: MIN_ZOOM, offset: [-padRight / 2, 0], duration: 900 }); return; }
       const xs = pts.map((h) => h.lon as number), ys = pts.map((h) => h.lat as number);
-      map.fitBounds([[Math.min(...xs), Math.min(...ys)], [Math.max(...xs), Math.max(...ys)]], { padding: wide ? { top: 60, bottom: 60, left: padLeftRef.current + 40, right: padRight + 40 } : 24, maxZoom: 8, duration: 900 });
+      fit(map, [[Math.min(...xs), Math.min(...ys)], [Math.max(...xs), Math.max(...ys)]], { padding: wide ? { top: 60, bottom: 60, left: padLeftRef.current + 40, right: padRight + 40 } : 24, maxZoom: 8, duration: 900 });
     };
     if (readyRef.current) apply(); else map.once("load", apply);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -264,7 +276,7 @@ export function CoreMap({ holes, colour, card, selected, onSelect, padRight, pad
     const q = new URLSearchParams(window.location.search);
     const bbox = q.get("bbox")?.split(",").map(Number); const lon = Number(q.get("lon")), lat = Number(q.get("lat"));
     const go = () => {
-      if (bbox && bbox.length === 4 && bbox.every(Number.isFinite)) map.fitBounds([[bbox[0], bbox[1]], [bbox[2], bbox[3]]], { padding: 40, maxZoom: 11, duration: 0 });
+      if (bbox && bbox.length === 4 && bbox.every(Number.isFinite)) fit(map, [[bbox[0], bbox[1]], [bbox[2], bbox[3]]], { padding: 40, maxZoom: 11, duration: 0 });
       else if (Number.isFinite(lon) && Number.isFinite(lat) && q.has("lon")) map.jumpTo({ center: [lon, lat], zoom: Number(q.get("z")) || 9 });
     };
     if (readyRef.current) go(); else map.once("load", go);
@@ -278,7 +290,7 @@ export function CoreMap({ holes, colour, card, selected, onSelect, padRight, pad
       map.getSource("ring")?.setData(ringRef.current);
       if (ringKm && lon !== null && lat !== null) {
         const dLat = ringKm / 110.574, dLon = ringKm / (111.32 * Math.cos((lat * Math.PI) / 180));
-        map.fitBounds([[lon - dLon, lat - dLat], [lon + dLon, lat + dLat]], { padding: { right: padRight + 40, left: 40, top: 40, bottom: padBottom + 40 }, duration: 700 });
+        fit(map, [[lon - dLon, lat - dLat], [lon + dLon, lat + dLat]], { padding: { right: padRight + 40, left: 40, top: 40, bottom: padBottom + 40 }, duration: 700 });
       }
     };
     if (readyRef.current) apply(); else map.once("load", apply);
@@ -289,7 +301,10 @@ export function CoreMap({ holes, colour, card, selected, onSelect, padRight, pad
       pickedRef.current = { type: "FeatureCollection", features: lon !== null && lat !== null
         ? [{ type: "Feature", geometry: { type: "Point", coordinates: [lon, lat] }, properties: {} }] : [] };
       map.getSource("picked")?.setData(pickedRef.current);
-      if (lon !== null && lat !== null) map.easeTo({ center: [lon, lat], zoom: Math.max(map.getZoom(), 8.2), padding: { right: padRight, left: 0, top: padBottom ? 60 : 0, bottom: padBottom }, duration: 900 });   // close enough that the hole's neighbours are badges
+      // close enough that the hole's neighbours are badges, and in the middle of the map the panels leave open. An offset,
+      // not `padding`: mapbox keeps a camera's padding after the move, and maxBounds is then held against the padded
+      // view, which pinned the map to its east half once a hole had been opened
+      if (lon !== null && lat !== null) map.easeTo({ center: [lon, lat], zoom: Math.max(map.getZoom(), 8.2), offset: [(padLeftRef.current - padRight) / 2, padBottom ? (60 - padBottom) / 2 : 0], duration: 900 });
     };
     if (readyRef.current) apply(); else map.once("load", apply);
   }, [key, lon, lat, padRight, padBottom]);
