@@ -496,7 +496,7 @@ export function HolePanel({ holeKey, tab: tabProp, onTab, models, run, metre, on
                       <td className={td}>{s.tir_groups.slice(0, 2).map(([c, , p]) => `${groupName(c)} ${pct(p)}`).join(", ") || "—"}</td></tr>); })}</tbody>
                 </table>
               </div>) : <Empty>Loading…</Empty>)}
-            {tab === "again" && (mvw ? <LookAgain hole={hole} mv={mvw} run={useRun} metre={metre} onJump={(m, to) => { jump(m); if (to !== undefined && onWindow) onWindow([m, to]); }} /> : <Empty>Loading…</Empty>)}
+            {tab === "again" && (mvw ? <LookAgain mv={mvw} metre={metre} onJump={(m, to) => { jump(m); if (to !== undefined && onWindow) onWindow([m, to]); }} /> : <Empty>Loading…</Empty>)}
             {tab === "gold" && (mvw ? (
               <div className="flex flex-col gap-3">
                 <p className="text-xs leading-relaxed text-slate-600">The likelihood comes from a probe fitted on assayed training holes; it reads the spectra only. {hole.au_m ? `This hole has ${hole.au_m} assayed metres (${hole.au_pos_m} at or above 0.1 ppm)${mvw.gold_summary.auc !== null ? `; the model ranks them with AUC ${fmt(mvw.gold_summary.auc)}` : ""}${mvw.gold_summary.top10_share !== undefined ? `, and ${pct(mvw.gold_summary.top10_share)} of its top tenth carry gold against ${pct(mvw.gold_summary.base_share)} overall` : ""}.` : "This scan carries no assays, so the ranking cannot be checked here."}</p>

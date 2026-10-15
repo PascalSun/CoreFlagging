@@ -1,22 +1,10 @@
 // "Look again" sheets as CSV. The rule itself lives on the platform (`core_scan/look_again.py`), so the
 // map, the list and the hole page read one answer; this file only writes it out.
 
-import type { AgainInterval, AgainRow, ModelView } from "@/lib/coreScan";
-import type { Chem } from "@/lib/package";
+import type { AgainInterval, AgainRow } from "@/lib/coreScan";
 
 const esc = (v: unknown) => { const s = v === null || v === undefined ? "" : String(v); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
 const kind = (d: AgainInterval) => (d.direction === "model_ultramafic" ? "model reads ultramafic, log does not" : "log says ultramafic, model does not");
-
-/** One hole's sheet: its disagreements and its flagged metres. */
-export function csvRows(hole: string, run: string, ds: AgainInterval[], flags: ModelView["anomaly"]["runs"],
-  chem: (from: number, to: number) => Chem = () => ({ n: 0, mgo: null, ni: null, cr: null, au: null, cu: null })): string {
-  const head = ["hole", "model", "kind", "from_m", "to_m", "length_m", "logged", "model_reads", "share", "um_minerals", "assays_n", "assay_max_ppm", "wamex_samples", "mgo_pct_median", "ni_ppm_median", "cr_ppm_median", "flagged_m"];
-  const rows: unknown[][] = [
-    ...ds.map((d) => { const c = chem(d.from_m, d.to_m); return [hole, run, kind(d), d.from_m, d.to_m, d.length_m, d.logged, d.reads, d.share.toFixed(2), d.um_minerals === null ? "" : d.um_minerals.toFixed(2), d.assays.n, d.assays.max ?? "", c.n, c.mgo ?? "", c.ni ?? "", c.cr ?? "", d.flagged]; }),
-    ...flags.map((r) => { const c = chem(r.from_m, r.to_m); return [hole, run, "stands out from its surroundings", r.from_m, r.to_m, r.to_m - r.from_m, "", "", "", "", "", "", c.n, c.mgo ?? "", c.ni ?? "", c.cr ?? "", r.to_m - r.from_m]; }),
-  ];
-  return [head, ...rows].map((r) => r.map(esc).join(",")).join("\n") + "\n";
-}
 
 /** The cross-hole sheet: every disagreement in a State or a project, holes with the most metres first. */
 export function csvSheet(model: string, rows: AgainRow[]): string {
