@@ -233,7 +233,8 @@ def linescan(refs: list[str], dataset: str, lo: float, hi: float, width: int = 6
         parts = []
         for c in range(c0, c1 + 1):
             fh.seek(base + int(offs[c])); chunk = fh.read(int(offs[c + 1] - offs[c]))
-            parts.append(np.ascontiguousarray(np.flipud(decode_jpeg(chunk, colorspace="RGB"))))
+            # TSG writes the chunks with the channels in BGR order: decoded as RGB, a pink label comes out blue
+            parts.append(np.ascontiguousarray(np.flipud(decode_jpeg(chunk, colorspace="RGB")[..., ::-1])))
     img = np.concatenate(parts, axis=0)[r0 - c0 * chunksize: r1 - c0 * chunksize]
     im = Image.fromarray(img)
     if width and width < im.width:
