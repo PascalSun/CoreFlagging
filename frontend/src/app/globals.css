@@ -226,3 +226,19 @@ body {
 .ct-card-cls svg { flex: none; }
 .ct-card-wait { margin-top: 8px; color: #64748b; font-size: 11.5px; }
 .ct-card-hint { margin-top: 9px; padding-top: 7px; border-top: 1px solid #f1f5f9; color: #0891b2; font-size: 11px; font-weight: 600; }
+
+/* The map key's year range: two range inputs laid over one track, only their thumbs taking the pointer. */
+.ct-range::before { content: ""; position: absolute; left: 0; right: 0; top: 8px; height: 2px; border-radius: 2px; background: rgba(15, 23, 42, 0.1); }
+.ct-range input { position: absolute; inset: 0; width: 100%; margin: 0; background: none; pointer-events: none; -webkit-appearance: none; appearance: none; }
+.ct-range input::-webkit-slider-runnable-track { background: none; }
+.ct-range input::-webkit-slider-thumb { -webkit-appearance: none; pointer-events: auto; width: 14px; height: 14px; border-radius: 50%; background: #fff; border: 2px solid #0f172a; box-shadow: 0 1px 3px rgba(15, 23, 42, 0.25); cursor: grab; }
+.ct-range input::-moz-range-thumb { pointer-events: auto; width: 10px; height: 10px; border-radius: 50%; background: #fff; border: 2px solid #0f172a; cursor: grab; }
+
+/* The scale bar, without a box: a white rule and white figures, each with a soft dark halo, so it reads on the
+   satellite imagery and on the light terrain map alike (Mapbox ships a translucent grey box, muddy on satellite). */
+.mapboxgl-ctrl-bottom-left .mapboxgl-ctrl-scale {
+  margin: 0 0 12px 0; padding: 0 6px 1px; min-height: 16px; background: none;
+  border: 2px solid #fff; border-top: 0; border-radius: 0 0 2px 2px;
+  filter: drop-shadow(0 0 1.5px rgba(2, 6, 23, 0.85)) drop-shadow(0 1px 2px rgba(2, 6, 23, 0.4));
+  color: #fff; font: 600 10.5px/1.4 var(--font-mono), ui-monospace, monospace; letter-spacing: 0.02em;
+}

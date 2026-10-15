@@ -1,0 +1,748 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Map Legend Panel</title>
+<!--
+  CoreTrace map: high-fidelity mock-up of the redesigned legend panel (design only, not wired to the app).
+  Marks are drawn by a port of frontend/src/components/coretrace/shapes.tsx (drawIcon), and the commodity
+  colours and symbols are TARGET_COLOUR from mapColour.ts, unchanged. The holes are illustrative, placed
+  round the Eastern Goldfields; their counts, core types and years are not the real catalogue.
+  Open the file in a browser (needs the network for Leaflet and the Esri imagery).
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&family=Manrope:wght@600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><style>
+  :root {
+    color-scheme: light;
+    --ink: #111111; --cyan: #00c4f5;
+    --slate-900: #0f172a; --slate-800: #1e293b; --slate-700: #334155; --slate-600: #475569; --slate-500: #64748b;
+    --slate-400: #94a3b8; --slate-300: #cbd5e1; --slate-200: #e2e8f0; --slate-100: #f1f5f9;
+    --glass-bg: rgba(255,255,255,0.80); --glass-edge: rgba(255,255,255,0.60);
+    --shadow-glass: 0 8px 40px rgba(15,23,42,0.12);
+    --panel-w: 300px; --gap: 12px; --top: 68px;
+    --sans: "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Helvetica, sans-serif;
+    --mono: "Geist Mono", ui-monospace, monospace;
+    --display: "Manrope", var(--sans);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: #f8fafc; color: var(--slate-900); font: 13px/1.45 var(--sans); }
+  button { font: inherit; color: inherit; cursor: pointer; }
+  #map { position: fixed; inset: 0; background: #1f2a1f; }
+
+  .glass { border-radius: 16px; border: 1px solid var(--glass-edge); background: var(--glass-bg); box-shadow: var(--shadow-glass); backdrop-filter: blur(24px) saturate(1.4); -webkit-backdrop-filter: blur(24px) saturate(1.4); }
+
+  /* ---------- top bar (as the app has it, for context only) ---------- */
+  .topbar { position: fixed; top: var(--gap); left: var(--gap); right: var(--gap); z-index: 1000; display: flex; gap: 8px; align-items: center; pointer-events: none; }
+  .topbar > * { pointer-events: auto; }
+  .brand { display: flex; align-items: center; gap: 8px; height: 44px; padding: 0 14px; font: 700 15px/1 var(--display); letter-spacing: -0.01em; }
+  .brand i { width: 10px; height: 10px; border-radius: 3px; background: var(--cyan); }
+  .pill { display: flex; align-items: center; gap: 6px; height: 44px; padding: 0 14px; font-weight: 600; font-size: 13px; color: var(--slate-700); }
+  .pill .k { color: var(--slate-500); font-weight: 500; }
+  .notes-btn { margin-left: auto; height: 36px; padding: 0 14px; border-radius: 999px; font-weight: 600; font-size: 12.5px; background: var(--ink); color: #fff; border: 0; box-shadow: var(--shadow-glass); }
+
+  /* ---------- the legend panel ---------- */
+  .panel { position: fixed; z-index: 1000; left: var(--gap); top: var(--top); bottom: var(--gap); width: var(--panel-w); max-width: calc(100vw - 2 * var(--gap)); display: flex; flex-direction: column; overflow: hidden; }
+  .panel.folded { bottom: auto; }
+  .p-head { display: flex; align-items: center; gap: 8px; padding: 8px 8px 8px 16px; border-bottom: 1px solid rgba(255,255,255,0.75); }
+  .p-title { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 8px; }
+  .p-title > b { font: 700 14px/1.3 var(--display); letter-spacing: -0.01em; white-space: nowrap; }
+  .p-title span { margin-left: auto; font-size: 11.5px; color: var(--slate-500); white-space: nowrap; }
+  .p-title span b { display: inline; font: 600 11.5px var(--mono); color: var(--slate-700); }
+  .icon-btn { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 8px; border: 0; background: transparent; color: var(--slate-500); }
+  .icon-btn:hover { background: #fff; color: var(--slate-900); }
+  .p-body { flex: 1; overflow-y: auto; padding: 2px 0 6px; scrollbar-width: thin; }
+  .panel.folded .p-body, .panel.folded .p-foot { display: none; }
+
+  section.sec { padding: 12px 8px 8px; border-top: 1px solid rgba(255,255,255,0.75); }
+  section.sec:first-child { border-top: 0; }
+  .sec-h { display: flex; align-items: center; gap: 6px; padding: 0 8px 6px; }
+  .sec-h h3 { margin: 0; font: 600 10.5px/1 var(--display); letter-spacing: 0.12em; text-transform: uppercase; color: var(--slate-800); }
+  .sec-h .lvl { font: 500 10px var(--mono); color: var(--slate-400); }
+  .sec-h .reset { margin-left: auto; border: 0; background: none; padding: 0; font-size: 11px; font-weight: 600; color: var(--slate-600); }
+  .sec-h .reset:hover { color: var(--slate-900); text-decoration: underline; }
+
+  /* a row: mark + name on the left, the count on the right */
+  .row { position: relative; display: flex; align-items: center; gap: 9px; min-height: 32px; padding: 4px 8px; border-radius: 8px; }
+  .row:hover { background: rgba(255,255,255,0.9); }
+  .row .mk { flex: none; display: grid; place-items: center; width: 28px; height: 28px; }
+  .row .mk.pair { width: 50px; grid-template-columns: 1fr 1fr; gap: 2px; }
+  .row .mk img { display: block; }
+  .row .txt { flex: 1; min-width: 0; }
+  .row .lab { display: flex; align-items: center; gap: 5px; font-size: 13px; font-weight: 500; color: var(--slate-800); white-space: nowrap; }
+  .row .lab > span { overflow: hidden; text-overflow: ellipsis; }
+  .row .hint { display: block; margin-top: 1px; font-size: 11px; line-height: 1.35; color: var(--slate-500); }
+  .row .n { flex: none; font: 500 11.5px var(--mono); font-variant-numeric: tabular-nums; color: var(--slate-500); }
+  .row.off .mk, .row.off .txt, .row.off .barline { opacity: .32; }
+  .row.off .lab > span { text-decoration: line-through; text-decoration-color: rgba(15,23,42,.35); }
+  .row.off .n { color: var(--slate-300); }
+  .row.zero .mk, .row.zero .txt, .row.zero .top .lab, .row.zero .barline { opacity: .4; }
+  .row.zero .n { color: var(--slate-300); }
+  .row.expand { cursor: pointer; }
+  .row .chev { flex: none; width: 14px; height: 14px; color: var(--slate-400); transition: transform .15s; }
+  .row.open .chev { transform: rotate(180deg); }
+  .info { flex: none; display: inline-grid; place-items: center; width: 16px; height: 16px; border-radius: 50%; color: var(--slate-400); cursor: help; }
+  .info:hover { color: var(--slate-800); background: var(--slate-100); }
+
+  /* a bar row (core type): name and count on one line, a line under them at the share of the largest */
+  .row.bars { display: block; padding: 6px 8px 8px; }
+  .row.bars .top { display: flex; align-items: baseline; gap: 8px; }
+  .row.bars .lab { flex: 1; min-width: 0; }
+  .barline { margin-top: 5px; height: 2px; border-radius: 2px; background: rgba(15,23,42,0.08); }
+  .barline i { display: block; height: 100%; border-radius: 2px; background: var(--slate-500); }
+
+  /* hover actions: float over the row, covering whatever is under them */
+  .act { position: absolute; z-index: 3; right: 6px; top: 50%; transform: translateY(-50%); display: none; gap: 2px; padding: 3px; border-radius: 10px; background: #fff; box-shadow: 0 0 0 1px rgba(15,23,42,0.08), 0 4px 14px rgba(15,23,42,0.16); }
+  .row:hover .act, .row:focus-within .act { display: flex; }
+  .act button { display: grid; place-items: center; width: 30px; height: 26px; border: 0; border-radius: 7px; background: none; color: var(--slate-600); }
+  .act button:hover { background: var(--slate-100); color: var(--slate-900); }
+  .act button.on { background: var(--slate-900); color: #fff; }
+
+  .others { margin: 0 8px 4px 45px; padding: 2px 0 2px 10px; border-left: 1px solid var(--slate-200); font-size: 11.5px; color: var(--slate-600); display: none; }
+  .others.open { display: block; }
+  .others div { display: flex; justify-content: space-between; padding: 1px 0; }
+  .others span:last-child { font-family: var(--mono); color: var(--slate-400); }
+
+  .more { display: flex; align-items: center; gap: 4px; margin: 2px 8px 0; padding: 4px 0; border: 0; background: none; font-size: 12px; font-weight: 600; color: var(--slate-600); }
+  .more:hover { color: var(--slate-900); }
+  .more svg { transition: transform .15s; }
+  .more.open svg { transform: rotate(180deg); }
+
+  .note { padding: 4px 8px 0; }
+  .note-btn { display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px; border-radius: 999px; border: 0; background: none; font-size: 11px; font-weight: 500; color: var(--slate-500); }
+  .note-btn:hover, .note-btn[aria-expanded="true"] { background: #fff; color: var(--slate-800); }
+  .note-pop { display: none; margin: 6px 0 4px; padding: 12px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.7); background: rgba(255,255,255,0.94); box-shadow: var(--shadow-glass); font-size: 12px; line-height: 1.6; color: var(--slate-700); }
+  .note-pop.open { display: block; }
+  .note-pop b { display: block; margin-bottom: 4px; color: var(--slate-900); }
+  .note-pop p { margin: 0; }
+  .note-pop a { display: inline-block; margin-top: 6px; font-weight: 500; color: var(--slate-900); text-decoration: underline; text-decoration-color: var(--slate-300); text-underline-offset: 2px; }
+
+  /* year drilled: a histogram with a two-handled range */
+  .hist { padding: 0 8px; }
+  .hist .ymax { font: 500 10.5px var(--mono); color: var(--slate-400); }
+  .hist .bars { display: flex; align-items: flex-end; gap: 1px; height: 64px; margin-top: 4px; }
+  .hist .bars i { flex: 1; min-height: 2px; border-radius: 1px 1px 0 0; background: var(--slate-500); transition: opacity .1s; }
+  .hist .bars i.out { opacity: .2; }
+  .range { position: relative; height: 18px; margin-top: 2px; }
+  .range::before { content: ""; position: absolute; left: 0; right: 0; top: 8px; height: 2px; border-radius: 2px; background: rgba(15,23,42,0.1); }
+  .range .fill { position: absolute; top: 8px; height: 2px; border-radius: 2px; background: var(--slate-900); }
+  .range input { position: absolute; inset: 0; width: 100%; margin: 0; background: none; pointer-events: none; -webkit-appearance: none; appearance: none; }
+  .range input::-webkit-slider-thumb { -webkit-appearance: none; pointer-events: auto; width: 14px; height: 14px; border-radius: 50%; background: #fff; border: 2px solid var(--slate-900); box-shadow: 0 1px 3px rgba(15,23,42,.25); cursor: grab; }
+  .range input::-moz-range-thumb { pointer-events: auto; width: 10px; height: 10px; border-radius: 50%; background: #fff; border: 2px solid var(--slate-900); cursor: grab; }
+  .range input::-webkit-slider-runnable-track { background: none; }
+  .hist .ends { display: flex; justify-content: space-between; margin-top: 2px; font: 500 11.5px var(--mono); color: var(--slate-700); }
+
+  .seg { display: grid; grid-template-columns: 1fr 1fr; gap: 2px; margin: 0 8px; padding: 3px; border-radius: 10px; background: rgba(15,23,42,0.06); }
+  .seg button { height: 28px; border: 0; border-radius: 8px; background: none; font-size: 12px; font-weight: 600; color: var(--slate-600); }
+  .seg button[aria-checked="true"] { background: #fff; color: var(--slate-900); box-shadow: 0 1px 2px rgba(15,23,42,0.12); }
+
+  .chk { display: flex; align-items: center; gap: 9px; padding: 5px 8px; border-radius: 8px; font-size: 13px; color: var(--slate-800); cursor: pointer; }
+  .chk:hover { background: rgba(255,255,255,0.9); }
+  .chk input { width: 14px; height: 14px; margin: 0; accent-color: var(--slate-900); }
+  .chk i { width: 10px; height: 10px; border-radius: 50%; }
+  .chk em { margin-left: auto; font-style: normal; font-size: 10.5px; color: var(--slate-400); }
+
+  .p-foot { display: flex; align-items: center; gap: 8px; padding: 9px 16px 11px; border-top: 1px solid rgba(255,255,255,0.75); font-size: 11.5px; color: var(--slate-500); }
+  .p-foot .wait { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #f8fafc; box-shadow: 0 0 0 1px var(--slate-300); }
+  .p-foot button { margin-left: auto; border: 0; background: none; padding: 0; font-weight: 600; color: var(--slate-800); }
+  .p-foot button:hover { text-decoration: underline; }
+
+  /* one tooltip for the whole page, fixed so the panel's scrolling never clips it */
+  #tip { position: fixed; z-index: 3000; max-width: 250px; padding: 6px 10px; border-radius: 8px; background: #0f172a; color: #fff; font: 500 12px/1.45 var(--sans); pointer-events: none; opacity: 0; transition: opacity .08s; box-shadow: 0 6px 20px rgba(2,6,23,.3); }
+  #tip.show { opacity: 1; }
+
+  /* ---------- map chrome: zoom + basemap bottom right, scale to the right of the panel ---------- */
+  .br { position: fixed; z-index: 1000; right: var(--gap); bottom: 26px; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+  .zoom { display: flex; flex-direction: column; overflow: hidden; border-radius: 12px; }
+  .zoom button { display: grid; place-items: center; width: 36px; height: 36px; border: 0; background: none; color: var(--slate-700); }
+  .zoom button + button { border-top: 1px solid rgba(15,23,42,0.08); }
+  .zoom button:hover { background: #fff; color: var(--slate-900); }
+  .basemap { display: flex; gap: 2px; padding: 4px; border-radius: 999px; }
+  .basemap button { padding: 4px 12px; border-radius: 999px; border: 0; background: none; font-size: 12px; font-weight: 600; color: var(--slate-600); }
+  .basemap button[aria-checked="true"] { background: var(--ink); color: #fff; }
+
+  /* the grid key, shown only while the map is zoomed out to the grid view; it sits over the scale bar */
+  .gridkey { position: fixed; z-index: 1000; left: calc(var(--gap) + var(--panel-w) + 10px); bottom: 40px; width: 232px; padding: 9px 12px 10px; display: none; }
+  .gridkey.show { display: block; }
+  body.panel-folded .gridkey { left: var(--gap); }
+  .gridkey b { display: block; font: 600 12px/1.3 var(--sans); color: var(--slate-900); }
+  .gridkey .sw { display: flex; gap: 12px; margin-top: 7px; font-size: 11px; color: var(--slate-600); }
+  .gridkey .sw span { display: flex; align-items: center; gap: 5px; }
+  .gridkey .sw i { width: 14px; height: 14px; border-radius: 2px; box-shadow: inset 0 0 0 1px rgba(255,255,255,.6); }
+  .gridkey p { margin: 6px 0 0; font-size: 11px; line-height: 1.4; color: var(--slate-500); }
+
+  .leaflet-container { font: 11px var(--sans); background: #1f2a1f; }
+  .leaflet-bottom.leaflet-left { left: calc(var(--gap) + var(--panel-w) + 10px); bottom: 14px; }
+  body.panel-folded .leaflet-bottom.leaflet-left { left: var(--gap); }
+  .leaflet-control-scale { margin: 0 !important; }
+  .leaflet-control-scale-line { border: 2px solid rgba(255,255,255,0.9); border-top: 0; background: rgba(15,23,42,0.35); color: #fff; font: 500 10.5px var(--mono); padding: 1px 6px; text-shadow: 0 1px 2px rgba(0,0,0,.5); backdrop-filter: blur(6px); }
+  .leaflet-control-attribution { background: rgba(255,255,255,0.65) !important; font-size: 10px; border-radius: 6px 0 0 0; }
+  .leaflet-tooltip.ct-tip { padding: 0; border: 1px solid rgba(255,255,255,.7); border-radius: 12px; background: rgba(255,255,255,0.96); box-shadow: 0 10px 28px rgba(15,23,42,0.14); color: var(--slate-700); }
+  .leaflet-tooltip.ct-tip::before { display: none; }
+  .ct-card { width: 240px; padding: 10px 12px 9px; font: 12px/1.45 var(--sans); white-space: normal; }
+  .ct-card .nm { display: flex; align-items: center; gap: 8px; font: 600 14px/1.25 var(--display); color: var(--slate-900); }
+  .ct-card dl { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; margin: 7px 0 0; }
+  .ct-card dt { color: var(--slate-500); }
+  .ct-card dd { margin: 0; color: var(--slate-800); font-weight: 500; }
+
+  /* ---------- design notes drawer ---------- */
+  .notes { position: fixed; z-index: 1100; top: var(--top); right: var(--gap); bottom: 120px; width: 400px; max-width: calc(100vw - 2 * var(--gap)); display: none; flex-direction: column; overflow: hidden; background: rgba(255,255,255,0.94); }
+  .notes.open { display: flex; }
+  .notes header { display: flex; align-items: center; padding: 14px 14px 10px 18px; border-bottom: 1px solid var(--slate-200); }
+  .notes header b { flex: 1; font: 700 15px var(--display); }
+  .notes .body { overflow-y: auto; padding: 6px 18px 16px; font-size: 12.5px; line-height: 1.6; color: var(--slate-700); }
+  .notes h4 { margin: 14px 0 4px; font: 600 10.5px var(--display); letter-spacing: .12em; text-transform: uppercase; color: var(--slate-900); }
+  .notes ol, .notes ul { margin: 0; padding-left: 18px; }
+  .notes li { margin: 3px 0; }
+  .notes code { font: 11.5px var(--mono); background: var(--slate-100); padding: 0 4px; border-radius: 4px; }
+  .notes table { width: 100%; border-collapse: collapse; margin-top: 4px; font-size: 12px; }
+  .notes td, .notes th { text-align: left; padding: 4px 6px 4px 0; border-bottom: 1px solid var(--slate-100); vertical-align: top; }
+  .notes th { font-weight: 600; color: var(--slate-500); font-size: 11px; }
+  .tag { display: inline-block; padding: 0 6px; border-radius: 999px; font: 600 10px/16px var(--sans); background: #e0f7fe; color: #0369a1; }
+  .tag.same { background: var(--slate-100); color: var(--slate-600); }
+  .tag.api { background: #fef3c7; color: #92400e; }
+
+  @media (max-width: 640px) {
+    :root { --panel-w: calc(100vw - 24px); --top: 64px; }
+    .panel { top: auto; height: 46vh; }
+    .panel.folded { height: auto; }
+    .leaflet-bottom.leaflet-left { left: var(--gap); bottom: calc(46vh + 22px); }
+    .br { bottom: calc(46vh + 22px); }
+    .pill:not(.keep), .brand span { display: none; }
+  }
+</style>
+</head>
+<body>
+<div id="map" aria-label="Map of drillholes"></div>
+<div id="tip" role="tooltip"></div>
+
+<div class="topbar">
+  <div class="glass brand"><i></i><span>CoreTrace</span></div>
+  <div class="glass pill keep"><span class="k">State</span> WA <svg width="10" height="10" viewBox="0 0 10 10"><path d="M2 3.5 5 6.5 8 3.5" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></div>
+  <div class="glass pill"><span class="k">Find a hole</span></div>
+  <button class="notes-btn" type="button" id="notesBtn" aria-expanded="false">Design notes</button>
+</div>
+
+<!-- ======================= the legend panel ======================= -->
+<aside class="panel glass" id="panel" aria-label="Map key">
+  <div class="p-head">
+    <div class="p-title"><b>Drillholes</b><span id="headSub"></span></div>
+    <button class="icon-btn" type="button" id="fold" aria-label="Fold the key" data-tip="Fold the key">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M10 2.5v3.5h3.5M6 13.5V10H2.5M13.5 2.5 10 6M2.5 13.5 6 10"/></svg>
+    </button>
+  </div>
+  <div class="p-body">
+    <section class="sec" aria-labelledby="h-core">
+      <div class="sec-h"><h3 id="h-core">Core type</h3><span class="info" data-tip="The core type the models read most often down the hole, by its leading mineral. Raw-scan holes have no model reading and so no core type: they show while every core type is on, and drop out once any is hidden.">ⓘ</span><button class="reset" type="button" data-reset="core" hidden>Show all</button></div>
+      <div id="cores"></div>
+      <button class="more" type="button" id="moreCore"><span></span><svg width="10" height="10" viewBox="0 0 10 10"><path d="M2 3.5 5 6.5 8 3.5" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></button>
+    </section>
+
+    <section class="sec" aria-labelledby="h-target">
+      <div class="sec-h"><h3 id="h-target">Target commodity</h3><span class="lvl">colour</span><button class="reset" type="button" data-reset="target" hidden>Show all</button></div>
+      <div id="targets"></div>
+      <button class="more" type="button" id="moreTarget"><span></span><svg width="10" height="10" viewBox="0 0 10 10"><path d="M2 3.5 5 6.5 8 3.5" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></button>
+      <div id="targetsTail"></div>
+      <div class="note">
+        <button class="note-btn" type="button" id="noteBtn" aria-expanded="false">
+          <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="8" cy="8" r="6.5"/><path d="M8 7.2V11.5M8 4.6v.1" stroke-linecap="round"/></svg>How the colours are chosen
+        </button>
+        <div class="note-pop" id="notePop" role="dialog" aria-label="Commodity colours and symbols">
+          <b>Commodity colours and symbols</b>
+          <p>A solid rim is the hole's own record: WA from the DMIRS HyLogger drillhole package (DASC), South Australia from SARIG, Victoria from the Earth Resources bores database. A dashed rim (≈ in the list) is an inference, because the survey records no target on the hole: Queensland and the NT take the commodities of the exploration report or permit the hole belongs to; NSW and Tasmania take the nearest known mineral deposit within 5 km (Geoscience Australia), the project's namesake first. The colours are CoreTrace's own, with the chemical symbol (Au, Cu, Ni…) on each mark so the colour need not be remembered.</p>
+          <a href="https://dasc.dmirs.wa.gov.au/" target="_blank" rel="noreferrer">DASC: Datasets › Interim data › Drillholes › HyLogger drillhole package ↗</a>
+        </div>
+      </div>
+    </section>
+
+    <section class="sec" aria-labelledby="h-source">
+      <div class="sec-h"><h3 id="h-source">Where the target comes from</h3><span class="lvl">fill</span><button class="reset" type="button" data-reset="source" hidden>Show all</button></div>
+      <div id="sources"></div>
+    </section>
+
+    <section class="sec" aria-labelledby="h-model">
+      <div class="sec-h"><h3 id="h-model">Model reading</h3><span class="lvl">shape</span><button class="reset" type="button" data-reset="shape" hidden>Show all</button></div>
+      <div id="shapes"></div>
+    </section>
+
+    <section class="sec" aria-labelledby="h-year">
+      <div class="sec-h"><h3 id="h-year">Year drilled</h3><span class="info" id="yearInfo">ⓘ</span><button class="reset" type="button" id="yearReset" hidden>Show all</button></div>
+      <div class="hist">
+        <span class="ymax" id="ymax"></span>
+        <div class="bars" id="ybars"></div>
+        <div class="range"><span class="fill" id="yfill"></span><input type="range" id="y0" aria-label="From year"><input type="range" id="y1" aria-label="To year"></div>
+        <div class="ends"><span id="y0t"></span><span id="y1t"></span></div>
+      </div>
+    </section>
+
+    <section class="sec" aria-labelledby="h-ctx">
+      <div class="sec-h"><h3 id="h-ctx">Context layers</h3></div>
+      <label class="chk" data-tip="921 open pits seen in 2023–24 imagery, by how full they were (DMIRS interim data)."><input type="checkbox"><i style="background:#0284c7"></i>Open pit lakes<em>interim</em></label>
+      <label class="chk" data-tip="169 core samples from the Officer Basin sediment-hosted copper study, coloured by Cu ppm (DMIRS interim data)."><input type="checkbox"><i style="background:#c2410c"></i>Officer Basin copper samples<em>interim</em></label>
+    </section>
+  </div>
+  <div class="p-foot"><i class="wait"></i><span id="waitTxt"></span><button type="button" id="resetAll" hidden>Show every hole</button></div>
+</aside>
+
+<div class="gridkey glass" id="gridkey" aria-live="polite">
+  <b>Commodity grid</b>
+  <div class="sw"><span><i style="background:#f5c518"></i>One commodity</span><span><i style="background:#f5c518;opacity:.4"></i>Mixed</span></div>
+  <p>Each cell, <span id="cellKm"></span> across, takes the colour of the commodity most of its holes were drilled for. The paler the cell, the more mixed its holes. The filters in the key still apply. Zoom in to see single holes.</p>
+</div>
+
+<div class="br">
+  <div class="zoom glass" role="group" aria-label="Zoom">
+    <button type="button" id="zin" aria-label="Zoom in"><svg width="14" height="14" viewBox="0 0 14 14"><path d="M7 2v10M2 7h10" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></button>
+    <button type="button" id="zout" aria-label="Zoom out"><svg width="14" height="14" viewBox="0 0 14 14"><path d="M2 7h10" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></button>
+  </div>
+  <div class="basemap glass" role="radiogroup" aria-label="Basemap">
+    <button type="button" role="radio" aria-checked="true" data-bm="sat">Satellite</button>
+    <button type="button" role="radio" aria-checked="false" data-bm="map">Map</button>
+  </div>
+</div>
+
+<!-- ======================= design notes ======================= -->
+<aside class="notes glass" id="notes" aria-label="Design notes">
+  <header><b>Design notes</b><button class="icon-btn" type="button" id="notesX" aria-label="Close">✕</button></header>
+  <div class="body">
+    <p>This page is a mock-up of the map's key. The marks are drawn by the same canvas code as the app (<code>shapes.tsx</code>), and the commodity colours and symbols come from <code>TARGET_COLOUR</code> unchanged. The holes, core types and years are made up: the holes are placed round the Eastern Goldfields, and their mix is invented so that every class has holes to show.</p>
+
+    <h4>Layout</h4>
+    <ol>
+      <li>The key is a single column pinned to the left edge. It runs from under the top bar to the bottom of the map, scrolls inside, and folds down to its title (⤡).</li>
+      <li>The zoom buttons move to the bottom right, stacked over the basemap switch. In the app they keep the basemap's offset, <code>panelW + chatW</code>.</li>
+      <li>The scale bar stays as Mapbox's <code>bottom-left</code> control, pushed right with a margin of the panel's width.</li>
+      <li>Sections from top to bottom: Core type · Target commodity · Where the target comes from · Model reading · Year drilled · Context layers.</li>
+    </ol>
+
+    <h4>Three views by zoom</h4>
+    <table>
+      <tr><th>Scale bar</th><th>Leaflet / Mapbox zoom</th><th>Holes drawn as</th></tr>
+      <tr><td>200 km and beyond</td><td>≤ 6 / ≤ 5</td><td>a commodity grid of the holes that pass the filters</td></tr>
+      <tr><td>about 100 km</td><td>7 / 6</td><td>dots: colour, fill and shape</td></tr>
+      <tr><td>50 km and closer</td><td>≥ 8 / ≥ 7</td><td>badges: the same, plus the symbol</td></tr>
+    </table>
+    <ul>
+      <li>The grid replaces "Holes that crowd". Grouping, with its donut clusters, goes, and so does the switch in the key.</li>
+      <li>The holes are binned into square cells of a fixed size on the ground: about 40 km at the switch, doubling with each step out. A cell takes the colour of the commodity most of its holes were drilled for, a named commodity ahead of Other and Unknown. Its opacity is that commodity's share of the cell, so a mixed cell is paler. Hovering over a cell lists its top four commodities.</li>
+      <li>The filters apply: "Show only this" on Gold leaves only the cells with gold holes.</li>
+      <li>A key for the grid appears over the scale bar only while the map is in that view.</li>
+      <li>In the app the cells are computed in the browser from the hole list, which is already loaded, and drawn as a GeoJSON <code>fill</code> layer with <code>maxzoom</code> at the switch, recomputed when the filters change. An alternative is H3 hexagons, if square cells look too much like a raster.</li>
+      <li>This shows what was drilled for, not prospectivity. A true prospectivity map needs a score per cell (from a model, or from the platform's prospectivity scoring), which can later fill the same cells.</li>
+    </ul>
+
+    <h4>What the mark encodes</h4>
+    <table>
+      <tr><th>Level</th><th>Encodes</th><th>Section</th></tr>
+      <tr><td>Colour + symbol</td><td>target commodity</td><td>Target commodity</td></tr>
+      <tr><td>Fill</td><td><code>target_source</code>: survey is plain; report or deposit is hatched</td><td>Where the target comes from</td></tr>
+      <tr><td>Shape</td><td><code>h.message</code>: empty means circle, set means square</td><td>Model reading</td></tr>
+      <tr><td>—</td><td>core type and year are filters only; they are not drawn on the mark</td><td>Core type, Year drilled</td></tr>
+    </table>
+
+    <h4>Rows</h4>
+    <ul>
+      <li>Each row shows a mark, a name and a count of real holes, whatever is in view. The counts are faceted: a section counts the holes that pass the other sections' filters. Its own filter is left out, so a hidden row still says how many holes it would bring back. "Show only this" on Plagioclase only, for example, turns every other section into a breakdown of those holes. The year histogram follows the same rule.</li>
+      <li>Raw-scan holes have no core type. They show while every core type is on, and drop out as soon as any core type is hidden. Showing only Plagioclase only gives exactly its 39 holes, and "Raw scan only" falls to 0.</li>
+      <li>A row whose count falls to 0 under the other filters is greyed. Rows keep the order of the State's totals, so they do not jump as the counts change.</li>
+      <li>On hover, two actions float over the right end of the row: <b>Show only this</b> and <b>Hide</b> (or <b>Show</b> once the row is hidden). They cover the name and the count rather than pushing them aside. "Show only this" a second time brings every row back.</li>
+      <li>The filters combine across sections.</li>
+    </ul>
+
+    <h4>What changes</h4>
+    <ul>
+      <li><span class="tag">new</span> An inferred target is a <b>hatched fill</b> instead of a dashed rim. It shows on the dot as well as on the badge.</li>
+      <li><span class="tag">new</span> "Where the target comes from" is keyed with a plain white disc and a hatched white disc. "Model reading" is keyed with the two badge shapes in neutral grey. Neither carries a symbol, so no commodity is implied.</li>
+      <li><span class="tag">new</span> Other commodities and Target unknown explain themselves through an ⓘ next to the name.</li>
+      <li><span class="tag">new</span> A raw-scan badge is a rounded square, so the shape survives zooming in.</li>
+      <li><span class="tag">new</span> The "Colour by" picker goes. The colour is always the commodity, and core type becomes a filter section in the style of a bar list.</li>
+      <li><span class="tag">new</span> Year drilled is a histogram with a two-handled range.</li>
+      <li><span class="tag">new</span> Zoomed out to a 200 km scale, the holes become a commodity grid (see above).</li>
+      <li><span class="tag">new</span> The marks in the key are drawn flat, with no shadow, as the fill marks are. On the map they keep the shadow that lifts them off the imagery.</li>
+      <li><span class="tag same">kept</span> Every commodity colour and symbol, and <b>How the colours are chosen</b>.</li>
+    </ul>
+
+    <h4>Needed from the data</h4>
+    <ul>
+      <li><span class="tag api">api</span> <b>Year drilled.</b> <code>drill_date</code> is in the hole's meta (<code>app/pipeline/preprocess.py</code>), but <code>HoleRow</code> does not carry it. The hole list needs a <code>drilled</code> year, or null.</li>
+      <li><span class="tag api">api</span> <b>Core type</b> is worked out from <code>h.strip</code>, as <code>mainType</code> does now. No new field is needed.</li>
+    </ul>
+
+    <h4>Text to change elsewhere</h4>
+    <ul>
+      <li>The tour text at <code>CoreTraceMap.tsx:149</code> still says "Shape is whether its assays found gold".</li>
+      <li><code>COLOUR_NOTES.target</code> speaks of a "dashed rim". With the hatched fill it should read "a hatched fill". This is the only change to that note.</li>
+    </ul>
+
+    <h4>Still open</h4>
+    <ul>
+      <li>Whether "Inferred" splits into two rows, report and nearest deposit.</li>
+    </ul>
+  </div>
+</aside>
+
+<script>
+// ---------------------------------------------------------------- marks: a port of shapes.tsx drawIcon
+const PX = 2, SIZE = 17, BADGE = 30;
+function inkOn(fill) {
+  const m = /^#([0-9a-f]{6})$/i.exec(fill); if (!m) return "#ffffff";
+  const v = parseInt(m[1], 16), r = v >> 16, g = (v >> 8) & 255, b = v & 255;
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b > 150 ? "#0f172a" : "#ffffff";
+}
+function path(ctx, shape, c, r) {
+  if (shape === "circle") { ctx.arc(c, c, r, 0, Math.PI * 2); return; }
+  if (shape === "square") { const s = r * 0.86; ctx.rect(c - s, c - s, 2 * s, 2 * s); return; }
+}
+// a badge's body: a disc, or (proposed) a rounded square for a raw scan
+function body(ctx, c, r, sq) {
+  if (!sq) { ctx.arc(c, c, r, 0, Math.PI * 2); return; }
+  const s = r * 0.9, k = r * 0.34; ctx.roundRect(c - s, c - s, 2 * s, 2 * s, k);
+}
+// an inferred target: white diagonal stripes over the fill, clipped to the mark
+function hatch(ctx, n, fill, gap, width = 1.3 * PX) {
+  const ink = "rgba(255,255,255,0.9)";   // white stripes, whatever the fill
+  ctx.save(); ctx.clip(); ctx.strokeStyle = ink; ctx.lineWidth = width;
+  // stripes set off half a gap from the centre, so they fall evenly either side of it
+  ctx.beginPath(); for (let x = gap / 2 - Math.ceil(n / gap) * gap; x < n; x += gap) { ctx.moveTo(x, n); ctx.lineTo(x + n, 0); } ctx.stroke(); ctx.restore();
+}
+const cache = new Map();
+function drawIcon({ shape, fill, edge = "#ffffff", w = 1.5, glyph = "", hatched = false, flat = false }) {
+  const id = [shape, fill, edge, w, glyph, hatched, flat].join("|");
+  if (cache.has(id)) return cache.get(id);
+  const n = (glyph ? (flat ? 23 : BADGE) : (flat ? 13 : SIZE)) * PX,   // flat (for the key): no shadow, so no room kept for one
+    cv = document.createElement("canvas"); cv.width = cv.height = n;
+  const ctx = cv.getContext("2d");
+  if (glyph) {
+    const c = n / 2, r = 10 * PX, sq = shape === "square";
+    ctx.save(); if (!flat) { ctx.shadowColor = "rgba(2,6,23,0.38)"; ctx.shadowBlur = 5 * PX; ctx.shadowOffsetY = 1.5 * PX; }
+    ctx.beginPath(); body(ctx, c, r + 1.25 * PX, sq); ctx.fillStyle = "rgba(255,255,255,0.96)"; ctx.fill(); ctx.restore();
+    ctx.beginPath(); body(ctx, c, r, sq); ctx.fillStyle = fill; ctx.fill();
+    if (hatched) { ctx.beginPath(); body(ctx, c, r, sq); flat ? hatch(ctx, n, fill, 6.5 * PX, 2.4 * PX) : hatch(ctx, n, fill, 3.6 * PX); }   // the key: four bold stripes; the map: finer ones
+    const sheen = ctx.createLinearGradient(0, c - r, 0, c + r); sheen.addColorStop(0, "rgba(255,255,255,0.28)"); sheen.addColorStop(0.55, "rgba(255,255,255,0)"); sheen.addColorStop(1, "rgba(2,6,23,0.12)");
+    ctx.beginPath(); body(ctx, c, r, sq); ctx.fillStyle = sheen; ctx.fill();
+    ctx.beginPath(); body(ctx, c, r - 0.6 * PX, sq); ctx.lineWidth = 1.2 * PX; ctx.strokeStyle = "rgba(255,255,255,0.35)"; ctx.stroke();
+    if (glyph.trim()) {
+      const px = (glyph.length >= 3 ? 7.6 : glyph.length === 2 ? 10 : 11.5) * PX;
+      ctx.font = `600 ${px}px -apple-system, BlinkMacSystemFont, "SF Pro Text", ui-sans-serif, system-ui, "Segoe UI", Helvetica, sans-serif`;
+      ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      if (hatched) { ctx.lineWidth = 2.4 * PX; ctx.strokeStyle = fill; ctx.lineJoin = "round"; ctx.strokeText(glyph, c, c + 0.6 * PX); }   // a halo of the fill keeps the symbol clear of the stripes
+      ctx.fillStyle = inkOn(fill); ctx.fillText(glyph, c, c + 0.6 * PX);
+    }
+  } else {
+    const lw = Number(w) * PX, r = 6 * PX - lw;
+    ctx.save(); if (!flat) { ctx.shadowColor = "rgba(2,6,23,0.55)"; ctx.shadowBlur = 3 * PX; }
+    ctx.beginPath(); path(ctx, shape, n / 2, r); ctx.fillStyle = fill; ctx.fill(); ctx.restore();
+    if (hatched) { ctx.beginPath(); path(ctx, shape, n / 2, r); hatch(ctx, n, fill, 3 * PX); }
+    ctx.beginPath(); path(ctx, shape, n / 2, r);
+    if (lw > 0) { ctx.lineJoin = "round"; ctx.lineWidth = lw; ctx.strokeStyle = edge; ctx.stroke(); }
+  }
+  const out = { url: cv.toDataURL(), css: n / PX };
+  cache.set(id, out); return out;
+}
+const img = (spec, size) => { const d = drawIcon(spec); const s = size ?? d.css; return `<img alt="" src="${d.url}" width="${s}" height="${s}">`; };
+
+// ---------------------------------------------------------------- classes (TARGET_COLOUR from mapColour.ts, unchanged)
+const TARGET_COLOUR = [
+  ["gold", "Gold", "#f5c518", "Au"], ["copper", "Copper", "#e8701a", "Cu"], ["nickel", "Nickel", "#17a398", "Ni"], ["base metals", "Base metals", "#3b6fd6", "BM"],
+  ["iron", "Iron", "#b42318", "Fe"], ["uranium", "Uranium", "#5cb531", "U"], ["rare earth elements", "Rare earths", "#d63384", "REE"], ["lithium", "Lithium", "#8b5cf6", "Li"],
+  ["petroleum", "Petroleum", "#3f3a36", "Oil"], ["zinc", "Zinc", "#0f8fa8", "Zn"], ["lead", "Lead", "#5b6472", "Pb"], ["coal", "Coal", "#1f1d1b", "C"],
+  ["cobalt", "Cobalt", "#2a4bd7", "Co"], ["platinum group elements", "PGE", "#6d28d9", "PGE"], ["silver", "Silver", "#8a94a6", "Ag"], ["manganese", "Manganese", "#a3165a", "Mn"],
+  ["tin", "Tin", "#0f766e", "Sn"], ["tungsten", "Tungsten", "#4338ca", "W"], ["vanadium", "Vanadium", "#c2410c", "V"], ["diamonds", "Diamonds", "#38bdf8", "Dia"],
+  ["heavy mineral sands", "Mineral sands", "#a16207", "HMS"], ["water", "Water", "#0ea5e9", "H₂O"], ["molybdenum", "Molybdenum", "#475569", "Mo"], ["antimony", "Antimony", "#7e22ce", "Sb"],
+];
+const OTHER = { key: "other", label: "Other commodities", color: "#64748b", glyph: "+" };       // proposed: slate + "+", no longer the Waiting grey
+const UNKNOWN = { key: "unknown", label: "Target unknown", color: "#cbd5e1" };                 // proposed: small pale dot, never a badge
+const OTHER_KINDS = ["Graphite", "Bauxite", "Gypsum", "Kaolin", "Talc", "Garnet", "Feldspar"];
+const CLASSES = [...TARGET_COLOUR.map(([key, label, color, glyph]) => ({ key, label, color, glyph })), OTHER, UNKNOWN];
+const BY_KEY = Object.fromEntries(CLASSES.map((c) => [c.key, c]));
+// the core-type families mapColour.ts names (FAMILY, then the plagioclase / quartz / other fall-backs)
+const CORES = ["Chlorite", "White mica", "Amphibole", "Carbonate", "Kaolin", "Dark mica", "Smectite", "Quartz only", "Plagioclase only", "Other"];
+const SOURCE_LABEL = { survey: "the hole's own record (DMIRS HyLogger package)", report: "the exploration report", deposit: "the nearest known deposit within 5 km" };
+const NEUTRAL = "#94a3b8";
+
+// ---------------------------------------------------------------- illustrative holes round the Eastern Goldfields
+let seed = 7; const rnd = () => ((seed = (seed * 16807) % 2147483647) - 1) / 2147483646;
+const gauss = () => { let u = 0, v = 0; while (!u) u = rnd(); while (!v) v = rnd(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); };
+const pick = (w) => { const t = Object.values(w).reduce((a, b) => a + b, 0); let x = rnd() * t; for (const [k, v] of Object.entries(w)) { if ((x -= v) <= 0) return k; } return Object.keys(w)[0]; };
+const CORE_W = { Chlorite: 30, "White mica": 24, Amphibole: 12, Carbonate: 10, Kaolin: 9, "Dark mica": 5, Smectite: 3, "Quartz only": 4, "Plagioclase only": 2, Other: 1 };
+const CAMPS = [
+  { name: "KAL", lat: -30.75, lon: 121.47, sd: 0.22, n: 520, w: { gold: 70, nickel: 8, "base metals": 4, unknown: 8, other: 3, copper: 3, silver: 2, zinc: 2 } },
+  { name: "KMB", lat: -31.2, lon: 121.67, sd: 0.16, n: 260, w: { nickel: 55, gold: 25, cobalt: 4, "platinum group elements": 4, unknown: 6, other: 3, copper: 3 } },
+  { name: "LEO", lat: -28.88, lon: 121.33, sd: 0.25, n: 230, w: { gold: 55, nickel: 15, uranium: 8, copper: 5, unknown: 10, zinc: 4, other: 3 } },
+  { name: "LAV", lat: -28.63, lon: 122.4, sd: 0.22, n: 170, w: { gold: 60, nickel: 12, cobalt: 6, "base metals": 6, unknown: 10, other: 4 } },
+  { name: "NRS", lat: -32.2, lon: 121.78, sd: 0.2, n: 160, w: { gold: 55, lithium: 18, nickel: 8, "rare earth elements": 6, unknown: 9, other: 4 } },
+  { name: "MNZ", lat: -29.69, lon: 121.03, sd: 0.2, n: 140, w: { gold: 50, iron: 15, nickel: 10, vanadium: 5, unknown: 12, other: 4, manganese: 3 } },
+  { name: "SXC", lat: -31.23, lon: 119.33, sd: 0.28, n: 200, w: { gold: 45, iron: 25, lithium: 8, nickel: 6, unknown: 10, other: 4, tungsten: 2 } },
+  { name: "MHL", lat: -32.1, lon: 119.75, sd: 0.16, n: 120, w: { lithium: 60, gold: 20, "rare earth elements": 6, unknown: 8, tin: 3, other: 3 } },
+  { name: "YIL", lat: -29.6, lon: 119.8, sd: 0.45, n: 160, w: { gold: 30, iron: 25, uranium: 10, water: 8, unknown: 16, copper: 5, other: 4, molybdenum: 2 } },
+];
+const Y0 = 1970, Y1 = 2024;
+const HOLES = [];
+for (const c of CAMPS) for (let i = 0; i < c.n; i++) {
+  const t = pick(c.w), src = t === "unknown" ? "" : rnd() < 0.8 ? "survey" : rnd() < 0.5 ? "report" : "deposit", raw = rnd() < 0.14;
+  // drilled: a long run from the 1980s gold boom, a second rise with the 2000s nickel and lithium years; some undated
+  const y = rnd() < 0.07 ? null : Math.max(Y0, Math.min(Y1, Math.round(rnd() < 0.55 ? 1992 + gauss() * 9 : 2011 + gauss() * 6)));
+  HOLES.push({
+    name: `${c.name}${String(1000 + i).slice(1)}${rnd() < 0.5 ? "D" : "RD"}`,
+    lat: c.lat + gauss() * c.sd, lon: c.lon + gauss() * c.sd * 1.15,
+    target: t, other: t === "other" ? OTHER_KINDS[Math.floor(rnd() * OTHER_KINDS.length)] : "",
+    source: src, raw, core: raw ? null : pick(CORE_W), year: y, waiting: rnd() < 0.035,
+  });
+}
+const READY = HOLES.filter((h) => !h.waiting);
+
+// ---------------------------------------------------------------- the map
+const map = L.map("map", { zoomControl: false, attributionControl: true, minZoom: 4, maxZoom: 15 }).setView([-30.55, 120.9], 8);
+const TILES = {
+  sat: L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", { attribution: "Imagery © Esri, Maxar, Earthstar Geographics", maxZoom: 18 }),
+  map: L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", { attribution: "© OpenStreetMap contributors © CARTO", subdomains: "abcd", maxZoom: 18 }),
+};
+let bm = "sat"; TILES.sat.addTo(map);
+L.control.scale({ imperial: false, position: "bottomleft", maxWidth: 140 }).addTo(map);
+document.getElementById("zin").onclick = () => map.zoomIn();
+document.getElementById("zout").onclick = () => map.zoomOut();
+document.querySelectorAll("[data-bm]").forEach((b) => b.onclick = () => {
+  const to = b.dataset.bm; if (to === bm) return;
+  map.removeLayer(TILES[bm]); TILES[to].addTo(map).bringToBack(); bm = to;
+  document.querySelectorAll("[data-bm]").forEach((x) => x.setAttribute("aria-checked", String(x.dataset.bm === bm)));
+});
+
+// three views by zoom (Leaflet zoom is one more than Mapbox's for the same ground):
+//   below GRID_BELOW (scale bar at 200 km and beyond) a commodity grid; then dots; from BADGE_FROM the badges.
+// The app's BADGE_FROM is 6 in Mapbox zoom (7 here); it moves up one so the dots keep a step between grid and badges.
+const GRID_BELOW = 7, BADGE_FROM = 8;
+const lerp = (z, stops) => { if (z <= stops[0][0]) return stops[0][1]; for (let i = 1; i < stops.length; i++) { const [z1, v1] = stops[i]; const [z0, v0] = stops[i - 1]; if (z <= z1) return v0 + (v1 - v0) * (z - z0) / (z1 - z0); } return stops[stops.length - 1][1]; };
+const badgeScale = (z) => lerp(z - 1, [[5.5, 0.6], [8, 0.78], [11, 0.95], [14, 1.15]]);
+const dotScale = (z) => lerp(z - 1, [[3, 0.72], [6, 0.95], [9, 1.3], [12, 1.7]]);
+
+function specOf(h, z) {
+  const c = BY_KEY[h.target], shape = h.raw ? "square" : "circle", hatched = h.source === "report" || h.source === "deposit";
+  if (h.target === "unknown") return { spec: { shape, fill: c.color, w: 1.2 }, size: SIZE * dotScale(z) * 0.72, opacity: 0.8 };
+  if (z >= BADGE_FROM) return { spec: { shape, fill: c.color, glyph: c.glyph, hatched }, size: BADGE * badgeScale(z), opacity: 1 };
+  return { spec: { shape, fill: c.color, hatched }, size: SIZE * dotScale(z), opacity: 1 };
+}
+
+const waitLayer = L.layerGroup().addTo(map), holeLayer = L.layerGroup().addTo(map);
+const tipHtml = (h) => {
+  const c = BY_KEY[h.target], src = h.target === "unknown" ? "—" : (h.source === "survey" ? "Recorded on the hole" : "Inferred, from " + SOURCE_LABEL[h.source]);
+  return `<div class="ct-card"><div class="nm">${img(specOf(h, 10).spec, 22)}${h.name}</div><dl>
+    <dt>Target</dt><dd>${h.target === "other" ? `Other: ${h.other}` : c.label}</dd>
+    <dt>Source</dt><dd>${src}</dd>
+    <dt>Model</dt><dd>${h.raw ? "Raw scan only (chips: no model can read it)" : "Read by the models"}</dd>
+    <dt>Core type</dt><dd>${h.core ?? "—"}</dd>
+    <dt>Drilled</dt><dd>${h.year ?? "No date on record"}</dd></dl></div>`;
+};
+for (const h of HOLES) {
+  if (h.waiting) { h.m = L.circleMarker([h.lat, h.lon], { radius: 2.2, stroke: false, fillColor: "#f8fafc", fillOpacity: 0.45, interactive: false }).addTo(waitLayer); continue; }
+  h.m = L.marker([h.lat, h.lon], { keyboard: false, riseOnHover: true });
+  h.m.bindTooltip(() => tipHtml(h), { className: "ct-tip", direction: "top", offset: [0, -10], opacity: 1 });
+}
+
+// ---------------------------------------------------------------- what is shown: hidden keys per section, and a year range
+const hidden = { core: new Set(), target: new Set(), source: new Set(), shape: new Set() };
+let yr = [Y0, Y1];
+const srcKey = (h) => (h.target === "unknown" ? null : h.source === "survey" ? "solid" : "hatched");
+const shapeKey = (h) => (h.raw ? "square" : "circle");
+const yearOn = (h) => h.year === null || (h.year >= yr[0] && h.year <= yr[1]);
+// whether a hole passes every filter, or every filter but one section's own (for that section's counts)
+const passes = (h, skip) => (skip === "target" || !hidden.target.has(h.target))
+  && (skip === "source" || !(srcKey(h) && hidden.source.has(srcKey(h))))
+  && (skip === "shape" || !hidden.shape.has(shapeKey(h)))
+  && (skip === "core" || !hidden.core.size || (h.core && !hidden.core.has(h.core)))   // a core filter on leaves out the holes with no core type
+  && (skip === "year" || yearOn(h));
+const shown = (h) => passes(h);
+const filtering = () => Object.values(hidden).some((s) => s.size) || yr[0] !== Y0 || yr[1] !== Y1;
+
+// the commodity grid: the holes that pass the key's filters, binned into square cells of a fixed size on the ground
+// (finer as the map zooms in). A cell takes the colour of its leading commodity, a named one ahead of Other and
+// Unknown; its opacity says how much of the cell that commodity holds, so a mixed cell is paler.
+const gridLayer = L.layerGroup(), gridCanvas = L.canvas({ padding: 0.5 });
+const cellDeg = (z) => 0.4 * 2 ** (6 - z);           // ≈ 40 km at the switch, doubling with each step out
+function paintGrid(z) {
+  gridLayer.clearLayers();
+  const d = cellDeg(z), cells = new Map();
+  for (const h of READY) {
+    if (!shown(h)) continue;
+    const i = Math.floor(h.lat / d), j = Math.floor(h.lon / d), k = `${i},${j}`;
+    const c = cells.get(k) ?? { i, j, n: 0, by: {} }; c.n++; c.by[h.target] = (c.by[h.target] || 0) + 1; cells.set(k, c);
+  }
+  for (const c of cells.values()) {
+    const ranked = Object.entries(c.by).sort((a, b) => b[1] - a[1]);
+    const lead = ranked.find(([k]) => k !== "other" && k !== "unknown") ?? ranked[0], cls = BY_KEY[lead[0]], share = lead[1] / c.n;
+    const card = `<div class="ct-card"><div class="nm">${img({ shape: "circle", fill: cls.color, glyph: cls.glyph || " ", flat: true }, 20)}${cls.label}</div>
+      <dl>${ranked.slice(0, 4).map(([k, v]) => `<dt>${BY_KEY[k].label}</dt><dd>${v.toLocaleString()} of ${c.n.toLocaleString()} holes</dd>`).join("")}</dl></div>`;
+    L.rectangle([[c.i * d, c.j * d], [(c.i + 1) * d, (c.j + 1) * d]], {
+      renderer: gridCanvas, color: "#ffffff", weight: 0.6, opacity: 0.55, fillColor: cls.color, fillOpacity: 0.3 + 0.6 * share,
+    }).bindTooltip(card, { className: "ct-tip", sticky: true, direction: "top", offset: [0, -8], opacity: 1 }).addTo(gridLayer);
+  }
+  document.getElementById("cellKm").textContent = `about ${Math.round(d * 111 / 10) * 10} km`;
+}
+
+function paint() {
+  const z = map.getZoom(), grid = z < GRID_BELOW;
+  document.getElementById("gridkey").classList.toggle("show", grid);
+  for (const [layer, want] of [[gridLayer, grid], [holeLayer, !grid], [waitLayer, !grid]]) {
+    if (want && !map.hasLayer(layer)) layer.addTo(map); else if (!want && map.hasLayer(layer)) map.removeLayer(layer);
+  }
+  if (grid) { paintGrid(z); render(); return; }
+  for (const h of READY) {
+    const on = shown(h), has = holeLayer.hasLayer(h.m);
+    if (on && h.z !== z) {
+      const { spec, size, opacity } = specOf(h, z), d = drawIcon(spec), s = Math.round(size);
+      h.m.setIcon(L.icon({ iconUrl: d.url, iconSize: [s, s], iconAnchor: [s / 2, s / 2], className: "ct" }));
+      h.m.setOpacity(opacity); h.z = z;
+      h.m.setZIndexOffset(h.target === "unknown" ? -1000 : h.raw ? 200 : 0);   // the rarer marks over the common; unknown under all
+    }
+    if (on && !has) holeLayer.addLayer(h.m); else if (!on && has) holeLayer.removeLayer(h.m);
+  }
+  render();
+}
+
+// ---------------------------------------------------------------- the key
+// counts are faceted: a section counts the holes that pass every other section's filters, whatever is in view.
+// Its own filter is left out, so a row hidden there still says how many it would bring back.
+// The rows keep the order of the State's totals, so they do not jump about as the counts change.
+const tally = (f, skip) => { const c = {}; for (const h of READY) { if (skip !== "all" && !passes(h, skip)) continue; const k = f(h); if (k != null) c[k] = (c[k] || 0) + 1; } return c; };
+const T0 = tally((h) => h.target, "all"), C0 = tally((h) => h.core, "all");
+const OTHER_KINDS_ON_MAP = Object.entries(tally((h) => (h.target === "other" ? h.other : null), "all")).sort((a, b) => b[1] - a[1]).map(([k]) => k);
+const KEYS = {
+  target: [...TARGET_COLOUR.map(([k]) => k).filter((k) => T0[k]).sort((a, b) => T0[b] - T0[a]), "other", "unknown"].filter((k) => T0[k]),
+  source: ["solid", "hatched"], shape: ["circle", "square"], core: CORES.filter((k) => C0[k]).sort((a, b) => C0[b] - C0[a]),
+};
+let more = { target: false, core: false }, othersOpen = false;
+
+const ICON = {
+  only: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M2.5 5.5v-2a1 1 0 0 1 1-1h2M10.5 2.5h2a1 1 0 0 1 1 1v2M13.5 10.5v2a1 1 0 0 1-1 1h-2M5.5 13.5h-2a1 1 0 0 1-1-1v-2"/><circle cx="8" cy="8" r="2"/></svg>`,
+  eye: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1.5 8S4 3.5 8 3.5 14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8Z"/><circle cx="8" cy="8" r="2"/></svg>`,
+  eyeOff: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M6.6 3.7A6.5 6.5 0 0 1 8 3.5C12 3.5 14.5 8 14.5 8a12 12 0 0 1-1.7 2.2M10 10.2a2 2 0 0 1-2.8-2.8M4.2 4.9C2.5 6 1.5 8 1.5 8S4 12.5 8 12.5c1.2 0 2.3-.4 3.2-1M2 2l12 12"/></svg>`,
+  info: `<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="8" cy="8" r="6.5"/><path d="M8 7.2V11.5M8 4.6v.1" stroke-linecap="round"/></svg>`,
+  chev: `<svg class="chev" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4.5 6.5 8 10l3.5-3.5"/></svg>`,
+};
+const isOnly = (level, key) => hidden[level].size === KEYS[level].length - 1 && !hidden[level].has(key);
+const actions = (level, key) => {
+  const off = hidden[level].has(key), only = isOnly(level, key);
+  return `<span class="act">
+    <button type="button" data-act="only" class="${only ? "on" : ""}" data-tip="${only ? "Show all again" : "Show only this"}" aria-label="${only ? "Show all again" : "Show only this"}">${ICON.only}</button>
+    <button type="button" data-act="hide" data-tip="${off ? "Show" : "Hide"}" aria-label="${off ? "Show" : "Hide"}">${off ? ICON.eyeOff : ICON.eye}</button></span>`;
+};
+const rowHtml = ({ level, key, mark, label, info, hint, n, pair, expand }) => `
+  <div class="row${hidden[level].has(key) ? " off" : n === 0 ? " zero" : ""}${expand ? " expand" : ""}${expand && othersOpen ? " open" : ""}" data-level="${level}" data-key="${key}">
+    <span class="mk${pair ? " pair" : ""}">${mark}</span>
+    <span class="txt"><span class="lab"><span>${label}</span>${info ? `<span class="info" data-tip="${info}">${ICON.info}</span>` : ""}${expand ? ICON.chev : ""}</span>${hint ? `<span class="hint">${hint}</span>` : ""}</span>
+    <span class="n">${n.toLocaleString()}</span>${actions(level, key)}
+  </div>`;
+const barHtml = (key, n, max) => `
+  <div class="row bars${hidden.core.has(key) ? " off" : n === 0 ? " zero" : ""}" data-level="core" data-key="${key}">
+    <div class="top"><span class="lab"><span>${key}</span></span><span class="n">${n.toLocaleString()}</span></div>
+    <div class="barline"><i style="width:${max ? (100 * n) / max : 0}%"></i></div>${actions("core", key)}
+  </div>`;
+const moreBtn = (id, level, tail) => {
+  const b = document.getElementById(id); b.hidden = tail === 0; b.classList.toggle("open", more[level]);
+  b.querySelector("span").textContent = more[level] ? "Show fewer" : `Show ${tail} more`;
+};
+
+function render() {
+  const n = READY.filter(shown).length, waiting = HOLES.length - READY.length;
+  document.getElementById("headSub").innerHTML = filtering() ? `<b>${n.toLocaleString()}</b> of <b>${READY.length.toLocaleString()}</b> shown` : `<b>${READY.length.toLocaleString()}</b> holes`;
+
+  // each section's counts, under every other section's filters
+  const C = tally((h) => h.core, "core"), T = tally((h) => h.target, "target"), S = tally(srcKey, "source"), SH = tally(shapeKey, "shape"), YEARS = tally((h) => h.year, "year");
+  const OTHERS = tally((h) => (h.target === "other" ? h.other : null), "target");
+
+  // core type: bar rows, the five largest, the rest under "Show more"; the bars are scaled to the largest count now
+  const cmax = Math.max(0, ...KEYS.core.map((k) => C[k] || 0));
+  const cores = more.core ? KEYS.core : KEYS.core.slice(0, 5);
+  document.getElementById("cores").innerHTML = cores.map((k) => barHtml(k, C[k] || 0, cmax)).join("");
+  moreBtn("moreCore", "core", KEYS.core.length - 5);
+
+  // target commodity: mark, name, count; the six largest, the rest under "Show more"; Other and Unknown always last
+  const named = KEYS.target.filter((k) => k !== "other" && k !== "unknown");
+  const tRow = (k) => { const c = BY_KEY[k]; return rowHtml({ level: "target", key: k, label: c.label, n: T[k] || 0, mark: img({ shape: "circle", fill: c.color, glyph: c.glyph, flat: true }, 22) }); };
+  document.getElementById("targets").innerHTML = named.slice(0, 6).map(tRow).join("");
+  moreBtn("moreTarget", "target", named.length - 6);
+  document.getElementById("targetsTail").innerHTML = (more.target ? named.slice(6).map(tRow).join("") : "")
+    + (T0.other ? rowHtml({ level: "target", key: "other", label: OTHER.label, expand: true, n: T.other || 0, mark: img({ shape: "circle", fill: OTHER.color, glyph: "+", flat: true }, 22),
+        info: `Commodities with too few holes for a colour of their own: ${OTHER_KINDS_ON_MAP.join(", ")}. Click the row to list them.` })
+      + `<div class="others${othersOpen ? " open" : ""}">${OTHER_KINDS_ON_MAP.map((k) => `<div><span>${k}</span><span>${OTHERS[k] || 0}</span></div>`).join("")}</div>` : "")
+    + (T0.unknown ? rowHtml({ level: "target", key: "unknown", label: UNKNOWN.label, n: T.unknown || 0, mark: img({ shape: "circle", fill: UNKNOWN.color, w: 1.2, flat: true }, 12),
+        info: "No target is recorded on the hole, and there is no exploration report or known deposit nearby to infer one from." }) : "");
+
+  // where the target comes from: the same neutral badge as Model reading, plain or hatched, no symbol, so no commodity is implied
+  document.getElementById("sources").innerHTML =
+    rowHtml({ level: "source", key: "solid", label: "Recorded on the hole", hint: "The survey's own record of the hole", n: S.solid || 0, mark: img({ shape: "circle", fill: NEUTRAL, glyph: " ", flat: true }, 22) }) +
+    rowHtml({ level: "source", key: "hatched", label: "Inferred", hint: "From the exploration report (QLD, NT) or the nearest deposit within 5 km (NSW, TAS)", n: S.hatched || 0, mark: img({ shape: "circle", fill: NEUTRAL, glyph: " ", hatched: true, flat: true }, 22) });
+
+  // model reading: the badge's two shapes, as they look zoomed in
+  document.getElementById("shapes").innerHTML =
+    rowHtml({ level: "shape", key: "circle", label: "Read by the models", hint: "Core types, look-again intervals, everything", n: SH.circle || 0, mark: img({ shape: "circle", fill: NEUTRAL, glyph: " ", flat: true }, 22) }) +
+    rowHtml({ level: "shape", key: "square", label: "Raw scan only", hint: "Chips, a heavy mask or another band grid: the models cannot read it, so only the scan is shown", n: SH.square || 0, mark: img({ shape: "square", fill: NEUTRAL, glyph: " ", flat: true }, 22) });
+
+  // year drilled: one bar a year, under every other filter, scaled to the tallest year now
+  const ys = []; for (let y = Y0; y <= Y1; y++) ys.push(YEARS[y] || 0);
+  const ymax = Math.max(1, ...ys);
+  document.getElementById("ymax").textContent = ymax.toLocaleString();
+  document.getElementById("ybars").innerHTML = ys.map((v, i) => { const y = Y0 + i; return `<i data-y="${y}" class="${y < yr[0] || y > yr[1] ? "out" : ""}" data-tip="${y}: ${v.toLocaleString()} holes" style="height:${(100 * v) / ymax}%"></i>`; }).join("");
+  const span = Y1 - Y0; document.getElementById("yfill").style.cssText = `left:${(100 * (yr[0] - Y0)) / span}%;right:${(100 * (Y1 - yr[1])) / span}%`;
+  document.getElementById("y0t").textContent = yr[0]; document.getElementById("y1t").textContent = yr[1];
+  document.getElementById("yearReset").hidden = yr[0] === Y0 && yr[1] === Y1;
+
+  document.getElementById("waitTxt").textContent = waiting ? `${waiting.toLocaleString()} still being processed` : "Every hole is processed";
+  for (const lv of Object.keys(hidden)) document.querySelector(`[data-reset="${lv}"]`).hidden = hidden[lv].size === 0;
+  document.getElementById("resetAll").hidden = !filtering();
+}
+
+// the year range, set up once (the bars are drawn by render)
+(() => {
+  const undated = READY.filter((h) => h.year === null).length;
+  document.getElementById("yearInfo").dataset.tip = `The year the hole was drilled. ${undated.toLocaleString()} holes have no date on record; they stay on the map whatever range is picked.`;
+  const a = document.getElementById("y0"), b = document.getElementById("y1");
+  for (const el of [a, b]) { el.min = Y0; el.max = Y1; el.step = 1; }
+  a.value = Y0; b.value = Y1;
+  const on = () => { let lo = +a.value, hi = +b.value; if (lo > hi) [lo, hi] = [hi, lo]; yr = [lo, hi]; paint(); };
+  a.oninput = on; b.oninput = on;
+  document.getElementById("yearReset").onclick = () => { a.value = Y0; b.value = Y1; yr = [Y0, Y1]; paint(); };
+})();
+
+document.getElementById("panel").addEventListener("click", (e) => {
+  const reset = e.target.closest("[data-reset]");
+  if (reset) { hidden[reset.dataset.reset].clear(); paint(); return; }
+  const row = e.target.closest(".row"); if (!row) return;
+  const { level, key } = row.dataset, act = e.target.closest("[data-act]")?.dataset.act;
+  if (act === "only") hidden[level] = isOnly(level, key) ? new Set() : new Set(KEYS[level].filter((k) => k !== key));
+  else if (act === "hide") hidden[level].has(key) ? hidden[level].delete(key) : hidden[level].add(key);
+  else if (row.classList.contains("expand") && !e.target.closest(".info")) { othersOpen = !othersOpen; render(); return; }
+  else return;
+  hideTip(); paint();
+});
+document.getElementById("moreCore").onclick = () => { more.core = !more.core; render(); };
+document.getElementById("moreTarget").onclick = () => { more.target = !more.target; render(); };
+document.getElementById("resetAll").onclick = () => {
+  Object.values(hidden).forEach((x) => x.clear()); yr = [Y0, Y1];
+  document.getElementById("y0").value = Y0; document.getElementById("y1").value = Y1; paint();
+};
+document.getElementById("noteBtn").onclick = (e) => { const p = document.getElementById("notePop"), o = !p.classList.contains("open"); p.classList.toggle("open", o); e.currentTarget.setAttribute("aria-expanded", String(o)); };
+document.getElementById("fold").onclick = () => { document.getElementById("panel").classList.toggle("folded"); document.body.classList.toggle("panel-folded"); };
+const notes = document.getElementById("notes"), nb = document.getElementById("notesBtn");
+nb.onclick = () => { const o = !notes.classList.contains("open"); notes.classList.toggle("open", o); nb.setAttribute("aria-expanded", String(o)); };
+document.getElementById("notesX").onclick = () => { notes.classList.remove("open"); nb.setAttribute("aria-expanded", "false"); };
+
+// one fixed tooltip for every [data-tip]: above the element, kept on screen
+const tip = document.getElementById("tip");
+function hideTip() { tip.classList.remove("show"); }
+document.addEventListener("mouseover", (e) => {
+  const el = e.target.closest("[data-tip]"); if (!el) { hideTip(); return; }
+  tip.textContent = el.dataset.tip; tip.classList.add("show");
+  const r = el.getBoundingClientRect(), t = tip.getBoundingClientRect();
+  let x = r.left + r.width / 2 - t.width / 2, y = r.top - t.height - 8;
+  if (y < 8) y = r.bottom + 8;
+  tip.style.left = `${Math.max(8, Math.min(innerWidth - t.width - 8, x))}px`; tip.style.top = `${y}px`;
+});
+document.addEventListener("scroll", hideTip, true);
+
+map.on("zoomend", paint);
+paint();
+</script>
+</body>
+</html>

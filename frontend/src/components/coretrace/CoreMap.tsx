@@ -16,91 +16,49 @@ const tilesUrl = (layer: string) => `${PLATFORM_URL}/geo/api/tiles/${layer}/{z}/
 const TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN ?? "";
 export type Basemap = "satellite" | "map";
 const STYLES: Record<Basemap, string> = { satellite: "mapbox://styles/mapbox/satellite-streets-v12", map: "mapbox://styles/mapbox/outdoors-v12" };
+// a thumbnail of each basemap (the goldfields round Kalgoorlie), from the Static Images API, for the layers menu
+const thumb = (style: string) => `https://api.mapbox.com/styles/v1/mapbox/${style}/static/121.45,-30.75,7.2,0/184x128@2x?attribution=false&logo=false&access_token=${TOKEN}`;
+export const BASEMAPS: { id: Basemap; label: string; thumb: string }[] = [
+  { id: "satellite", label: "Satellite", thumb: thumb("satellite-streets-v12") }, { id: "map", label: "Terrain", thumb: thumb("outdoors-v12") },
+];
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-type Look = { color: string; label: string; ring?: string; wait?: boolean; dim?: boolean; shape?: Shape; shapeLabel?: string; glyph?: string; dashed?: boolean };
+type Look = { color: string; label: string; wait?: boolean; shape?: Shape; shapeLabel?: string; glyph?: string; hatched?: boolean; small?: boolean };
 const BADGE_FROM = 6;      // zoom from which a mark with letters is drawn as a badge; further out it is a dot like the rest
+// the furthest the map zooms out: the scale bar at about 300 km (Australia's breadth fills a wide screen)
+const MIN_ZOOM = 4.5;
+const HOME: [number, number] = [134, -27];
 
-// the rarer marks draw over the common ones, so a gold triangle is not buried under the circles around it
+// the rarer marks draw over the common ones, so a raw scan is not buried under the circles around it
 const RANK: Record<Shape, number> = { circle: 1, square: 2, diamond: 3, triangle: 4 };
 
-/** The classes a clustered map adds up: up to SLOTS of them, the commonest first, the rest in the last slot. */
-export type ClusterClass = { label: string; color: string; glyph: string; ring?: string };
-const SLOTS = 24;
-const CLUSTER_PROPS = Object.fromEntries([...Array(SLOTS).keys()].map((i) => [`c${i}`, ["+", ["coalesce", ["get", `s${i}`], 0]]]).concat([["dimn", ["+", ["coalesce", ["get", "dim"], 0]]]]));
+/** What the zoom buttons outside the map call. */
+export type MapApi = { zoomIn: () => void; zoomOut: () => void };
 
-function features(holes: HoleRow[], colour: (h: HoleRow) => Look): { fc: any; classes: ClusterClass[] } {
+function features(holes: HoleRow[], colour: (h: HoleRow) => Look) {
   const placed = holes.filter((h) => h.lon !== null && h.lat !== null && h.status === "ready");
-  const looks = placed.map(colour);
-  const count = new Map<string, { n: number; look: Look }>();
-  for (const l of looks) { const e = count.get(l.label); if (e) e.n++; else count.set(l.label, { n: 1, look: l }); }
-  const ranked = [...count.values()].sort((a, b) => b.n - a.n);
-  const classes: ClusterClass[] = ranked.slice(0, SLOTS - (ranked.length > SLOTS ? 1 : 0)).map(({ look }) => ({ label: look.label, color: look.color, glyph: look.glyph ?? "", ring: look.ring }));
-  if (ranked.length > SLOTS) classes.push({ label: "Other", color: "#94a3b8", glyph: "" });
-  const slot = new Map(classes.map((c, i) => [c.label, i]));
-  const fc = {
+  return {
     type: "FeatureCollection" as const,
-    features: placed.map((h, i) => ({
-      type: "Feature" as const, geometry: { type: "Point" as const, coordinates: [h.lon as number, h.lat as number] },
-      properties: { key: h.key, name: h.name, mine: h.mine ? 1 : 0, ready: 1, issues: h.n_issues, [`s${slot.get(looks[i].label) ?? SLOTS - 1}`]: 1, ...(({ color, label, ring, wait, dim, shape, shapeLabel, glyph, dashed }) => ({
-        color, cls: [label, shapeLabel].filter(Boolean).join(" · "), ring: ring ?? "", wait: wait ? 1 : 0, dim: dim ? 1 : 0, z: dim ? 0 : RANK[shape ?? "circle"], shape: shape ?? "circle", glyph: glyph ?? "",
-        icon: iconId(shape ?? "circle", ring ? "#ffffff" : color, h.mine ? "#111111" : ring ?? "rgba(255,255,255,0.9)", ring || h.mine ? 1.6 : 1),
-        badge: glyph ? iconId(shape ?? "circle", ring ? "#ffffff" : color, h.mine ? "#111111" : ring ?? "rgba(255,255,255,0.9)", ring || h.mine ? 1.6 : 1, glyph, !!dashed) : "" }))(looks[i]) },
-    })),
+    features: placed.map((h) => {
+      const { color, label, wait, shape = "circle", shapeLabel, glyph, hatched, small } = colour(h);
+      const edge = h.mine ? "#111111" : "rgba(255,255,255,0.9)", w = h.mine ? 1.6 : 1;
+      return {
+        type: "Feature" as const, geometry: { type: "Point" as const, coordinates: [h.lon as number, h.lat as number] },
+        properties: { key: h.key, name: h.name, mine: h.mine ? 1 : 0, issues: h.n_issues, color, cls: [label, shapeLabel].filter(Boolean).join(" · "),
+          wait: wait ? 1 : 0, z: small ? 0 : RANK[shape], shape, glyph: glyph ?? "", hatch: hatched ? 1 : 0, small: small ? 1 : 0,
+          icon: iconId(shape, color, edge, w, "", !!hatched), badge: glyph ? iconId(shape, color, edge, w, glyph, !!hatched) : "" },
+      };
+    }),
   };
-  return { fc, classes };
 }
 
-/** The holes still waiting, as their own small source: they never cluster. */
+/** The holes still waiting, as their own small source. */
 function waiting(holes: HoleRow[]) {
   return { type: "FeatureCollection" as const, features: holes.filter((h) => h.lon !== null && h.lat !== null && h.status !== "ready").map((h) => ({
-    type: "Feature" as const, geometry: { type: "Point" as const, coordinates: [h.lon as number, h.lat as number] }, properties: { key: h.key, name: h.name, wait: 1, dim: 0 } })) };
+    type: "Feature" as const, geometry: { type: "Point" as const, coordinates: [h.lon as number, h.lat as number] }, properties: { key: h.key, name: h.name, wait: 1 } })) };
 }
 
-const PX = 2;                 // cluster images are drawn at twice their size, as the marks are
-/** The image id of a cluster: "cl|<count>|<per-slot counts>|<dim>"; one image per distinct make-up and size. */
-const CLUSTER_ICON = ["concat", "cl|", ["get", "point_count"], "|", ...[...Array(SLOTS).keys()].flatMap((i) => [["coalesce", ["get", `c${i}`], 0], ","]), "|", ["case", [">=", ["coalesce", ["get", "dimn"], 0], ["get", "point_count"]], 1, 0]];
-const clusterRadius = (n: number) => Math.round(16 + Math.min(18, Math.sqrt(n) * 1.15));
-
-/** A cluster as a donut on a translucent disc: one thin arc per class in the order of the key, the count in
- * the middle, sized by the count. Drawn on a canvas and handed to the map as an image, so a thousand clusters
- * cost the GPU one quad each — the same disc as a DOM marker, blurred, cost a frame per hundred. */
-function drawCluster(id: string, classes: ClusterClass[]): { width: number; height: number; data: Uint8ClampedArray } | null {
-  const [, nS, slots, dimS] = id.split("|"); const n = Number(nS); if (!n || typeof document === "undefined") return null;
-  const counts = slots.split(",").map(Number); const dim = dimS === "1";
-  const parts = classes.map((c, i) => [i, counts[i] || 0] as const).filter(([, v]) => v > 0);
-  const r = clusterRadius(n) * PX, w = Math.max(4, Math.round((r / PX) * 0.2)) * PX, S = r * 2 + w + 10 * PX, c = S / 2;
-  const cv = document.createElement("canvas"); cv.width = cv.height = S;
-  const g = cv.getContext("2d"); if (!g) return null;
-  g.globalAlpha = dim ? 0.3 : 1;
-  // the disc: translucent white with a hairline rim, lifted by a soft shadow
-  g.save(); g.shadowColor = "rgba(2,6,23,0.28)"; g.shadowBlur = 8 * PX; g.shadowOffsetY = 2 * PX;
-  g.beginPath(); g.arc(c, c, r + w / 2 + 2 * PX, 0, Math.PI * 2); g.fillStyle = "rgba(255,255,255,0.72)"; g.fill(); g.restore();
-  g.beginPath(); g.arc(c, c, r + w / 2 + 2 * PX, 0, Math.PI * 2); g.lineWidth = 1 * PX; g.strokeStyle = "rgba(255,255,255,0.85)"; g.stroke();
-  // the ring: a faint track, then one arc per class with a small gap and rounded ends
-  g.beginPath(); g.arc(c, c, r, 0, Math.PI * 2); g.lineWidth = w; g.strokeStyle = "rgba(15,23,42,0.08)"; g.stroke();
-  const gap = parts.length > 1 ? Math.min(0.12, (Math.PI * 2) / (parts.length * 6)) : 0;
-  let a = -Math.PI / 2; g.lineCap = "round";
-  for (const [i, v] of parts) {
-    const sweep = (v / n) * Math.PI * 2, a1 = a + sweep - gap;
-    g.beginPath(); g.strokeStyle = classes[i].color; g.fillStyle = classes[i].color;
-    if (a1 - a > 0.001) { g.arc(c, c, r, a, a1); g.stroke(); } else { g.arc(c + r * Math.cos(a + sweep / 2), c + r * Math.sin(a + sweep / 2), w / 2, 0, Math.PI * 2); g.fill(); }
-    a += sweep;
-  }
-  const fs = (n >= 1000 ? Math.max(10, (r / PX) * 0.46) : n >= 100 ? Math.max(11, (r / PX) * 0.52) : Math.max(12, (r / PX) * 0.6)) * PX;
-  g.font = `600 ${fs}px -apple-system, BlinkMacSystemFont, "SF Pro Text", ui-sans-serif, system-ui, sans-serif`; g.textAlign = "center"; g.textBaseline = "middle"; g.fillStyle = "#0f172a";
-  g.fillText(n.toLocaleString(), c, c + 0.5 * PX);
-  return { width: S, height: S, data: g.getImageData(0, 0, S, S).data };
-}
-
-/** What a cluster holds, for its tooltip: "182 holes · Gold 120, Nickel 40 …". */
-function clusterText(p: Record<string, number>, classes: ClusterClass[]): string {
-  const n = p.point_count; const parts = classes.map((c, i) => [c.label, p[`c${i}`] ?? 0] as const).filter(([, v]) => v > 0).sort((x, y) => y[1] - x[1]);
-  return `${n.toLocaleString()} holes · ` + parts.slice(0, 4).map(([l, v]) => `${l} ${v}`).join(", ") + (parts.length > 4 ? " …" : "");
-}
-
-/** The map of scanned holes, on satellite imagery or a terrain map; each hole has a white edge so its colour reads on any ground. A point is a hole; clicking one selects it. */
 /** A circle of `km` around a point, as a polygon (geodesic enough at these sizes). */
 function ring(lon: number, lat: number, km: number) {
   const pts: [number, number][] = []; const dLat = km / 110.574, dLon = km / (111.32 * Math.cos((lat * Math.PI) / 180));
@@ -108,12 +66,13 @@ function ring(lon: number, lat: number, km: number) {
   return { type: "FeatureCollection", features: [{ type: "Feature", geometry: { type: "Polygon", coordinates: [pts] }, properties: {} }] };
 }
 
-export function CoreMap({ holes, colour, card, selected, onSelect, padRight, padBottom = 0, fitTo, basemap = "satellite", ringKm = null, overlays = {}, cluster = true }: {
+/** The map of scanned holes, on satellite imagery or a terrain map; each hole has a white edge so its colour reads on any ground. A point is a hole; clicking one selects it. */
+export function CoreMap({ holes, colour, card, selected, onSelect, padRight, padLeft = 0, padBottom = 0, fitTo, basemap = "satellite", ringKm = null, overlays = {}, apiRef }: {
   holes: HoleRow[]; selected: HoleRow | null; onSelect: (key: string | null) => void; padRight: number;
+  /** room taken at the left by the map key: the scale bar sits just right of it */
+  padLeft?: number;
   /** which context layers are shown */
   overlays?: Partial<Record<Overlay, boolean>>;
-  /** holes that crowd are added up into donuts (default), or every hole is its own mark at every zoom */
-  cluster?: boolean;
   /** a ring of this many km around the selected hole (its neighbours), or none */
   ringKm?: number | null;
   /** room taken at the foot by a bottom sheet: the selected hole is framed above it */
@@ -125,15 +84,14 @@ export function CoreMap({ holes, colour, card, selected, onSelect, padRight, pad
   /** changes when the reader picks a State: the map then frames the holes it is given */
   fitTo?: string;
   basemap?: Basemap;
+  /** filled with the map's zoom calls, for buttons drawn outside the map */
+  apiRef?: React.MutableRefObject<MapApi | null>;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const mapRef = useRef<any>(null);
   const readyRef = useRef(false);
   const holesRef = useRef(holes); const fitted = useRef(false); const colourRef = useRef(colour); const cardRef = useRef(card);
-  const classesRef = useRef<ClusterClass[]>([]); const dropClustersRef = useRef<() => void>(() => {});
   useEffect(() => { cardRef.current = card; }, [card]);
-  const clusterRef = useRef(cluster); const rebuildRef = useRef<() => void>(() => {});
-  useEffect(() => { if (clusterRef.current === cluster) return; clusterRef.current = cluster; if (readyRef.current) rebuildRef.current(); }, [cluster]);
   const overlaysRef = useRef(overlays);
   useEffect(() => {
     overlaysRef.current = overlays; const map = mapRef.current; if (!map || !readyRef.current) return;
@@ -147,6 +105,13 @@ export function CoreMap({ holes, colour, card, selected, onSelect, padRight, pad
   }, [basemap]);
   const selectRef = useRef(onSelect);
   useEffect(() => { selectRef.current = onSelect; }, [onSelect]);
+  // the scale bar (Mapbox's bottom-left corner) moves out from under the key
+  const padLeftRef = useRef(padLeft);
+  useEffect(() => {
+    padLeftRef.current = padLeft;
+    const corner = mapRef.current?.getContainer().querySelector(".mapboxgl-ctrl-bottom-left") as HTMLElement | null;
+    if (corner) corner.style.left = `${padLeft}px`;
+  }, [padLeft]);
 
   useEffect(() => {
     let map: any; let gone = false;
@@ -154,104 +119,79 @@ export function CoreMap({ holes, colour, card, selected, onSelect, padRight, pad
       const mapboxgl = (await import("mapbox-gl")).default;
       if (gone || !ref.current) return;
       mapboxgl.accessToken = TOKEN;
-      map = new mapboxgl.Map({ container: ref.current, style: STYLES[basemapRef.current], center: [134, -27], zoom: 3.5, maxBounds: [[100, -46], [160, -7]], fadeDuration: 0 });
+      map = new mapboxgl.Map({ container: ref.current, style: STYLES[basemapRef.current], center: HOME, zoom: MIN_ZOOM, minZoom: MIN_ZOOM, maxBounds: [[100, -46], [160, -7]], fadeDuration: 0,
+        // flat at every zoom: Mapbox v3 draws a globe below about zoom 6, and the furthest zoom (4.5) is in that range, so
+        // zooming out would bend the map into a globe pinned at the edge of its bounds
+        projection: "mercator" });
       mapRef.current = map;
-      // zoom buttons on a wide screen only: a phone pinches, and the legend needs the corner
-      if (window.innerWidth >= 640) map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), "bottom-left");
+      if (apiRef) apiRef.current = { zoomIn: () => map.zoomIn(), zoomOut: () => map.zoomOut() };
       map.addControl(new mapboxgl.ScaleControl({ unit: "metric" }), "bottom-left");
+      const corner = map.getContainer().querySelector(".mapboxgl-ctrl-bottom-left") as HTMLElement | null;
+      if (corner) corner.style.left = `${padLeftRef.current}px`;
       const tip = new mapboxgl.Popup({ closeButton: false, closeOnClick: false, className: "ct-popup", offset: 12, maxWidth: "none" });
       // the holes' layers go on whichever basemap is showing: a change of basemap replaces the whole style, so they
       // are added again each time a style has loaded (the click and hover handlers, bound by layer id, carry over)
-      // The holes' source and the layers drawn from it. Kept apart from the rest so that a change of the cluster
-      // setting (Mapbox fixes it when the source is made) can rebuild just these, under the picked-hole ring.
-      const D = ["==", ["get", "dim"], 1], R = ["!=", ["get", "ring"], ""], HOV = ["boolean", ["feature-state", "hover"], false];
-      // zoom outermost, the hover case inside each stop
-      const size = (k: number) => ["interpolate", ["linear"], ["zoom"], ...[[3, 3], [6, 4.2], [9, 6], [12, 8]].flatMap(([z, r]) => [z, ["case", HOV, r * k, r]])];
-      const HOLE_LAYERS = ["holes-halo", "holes-cluster", "holes-badge", "holes-pt", "holes-sym-far", "holes-pt-plain", "holes-sym"];
-      const addHoleSource = () => {
-        const built = features(holesRef.current, colourRef.current); classesRef.current = built.classes;
-        map.addSource("holes", { type: "geojson", data: built.fc, promoteId: "key", cluster: clusterRef.current, clusterRadius: 44, clusterMaxZoom: 7, clusterProperties: CLUSTER_PROPS });
-      };
-      const addHoleLayers = () => {
-        const before = map.getLayer("picked-ring") ? "picked-ring" : undefined;
-        map.addLayer({ id: "holes-halo", type: "circle", source: "holes", filter: ["==", ["get", "wait"], 0], paint: {
-          "circle-radius": ["interpolate", ["linear"], ["zoom"], 3, 5, 6, 6.5, 9, 9, 12, 12],
-          "circle-color": "#020617", "circle-blur": 0.9, "circle-opacity": ["case", D, 0.03, 0.4] } }, before);
-        map.addLayer({ id: "holes-cluster", type: "symbol", source: "holes", filter: ["has", "point_count"], layout: {
-          "icon-image": CLUSTER_ICON, "icon-allow-overlap": true, "icon-ignore-placement": true, "symbol-sort-key": ["-", 0, ["get", "point_count"]] } }, before);
-        // a mark with letters is a dot or its shape until BADGE_FROM, a badge from there on
-        const G = ["!=", ["get", "glyph"], ""];
-        map.addLayer({ id: "holes-badge", type: "symbol", source: "holes", minzoom: BADGE_FROM, filter: ["all", ["==", ["get", "wait"], 0], G], layout: {
-          "icon-image": ["get", "badge"], "icon-allow-overlap": true, "icon-ignore-placement": true, "symbol-sort-key": ["get", "z"],
-          "icon-size": ["interpolate", ["linear"], ["zoom"], 5.5, 0.6, 8, 0.78, 11, 0.95, 14, 1.15] },
-          paint: { "icon-opacity": ["case", D, 0.12, 1] } }, before);
-        map.addLayer({ id: "holes-pt", type: "circle", source: "holes", maxzoom: BADGE_FROM, filter: ["all", ["==", ["get", "wait"], 0], G, ["==", ["get", "shape"], "circle"]],
-          layout: { "circle-sort-key": ["get", "z"] }, paint: {
-            "circle-radius": size(1.45), "circle-color": ["case", R, "#ffffff", ["get", "color"]], "circle-opacity": ["case", D, 0.12, 1],
-            "circle-stroke-width": ["case", R, 1.6, ["==", ["get", "mine"], 1], 1.8, 1], "circle-stroke-color": ["case", ["==", ["get", "mine"], 1], "#111111", R, ["get", "ring"], "#ffffff"],
-            "circle-stroke-opacity": ["case", D, 0.08, R, 1, 0.9] } }, before);
-        map.addLayer({ id: "holes-sym-far", type: "symbol", source: "holes", maxzoom: BADGE_FROM, filter: ["all", ["==", ["get", "wait"], 0], G, ["!=", ["get", "shape"], "circle"]], layout: {
-          "icon-image": ["get", "icon"], "icon-allow-overlap": true, "icon-ignore-placement": true, "symbol-sort-key": ["get", "z"],
-          "icon-size": ["interpolate", ["linear"], ["zoom"], 3, 0.72, 6, 0.95] }, paint: { "icon-opacity": ["case", D, 0.12, 1] } }, before);
-        map.addLayer({ id: "holes-pt-plain", type: "circle", source: "holes", filter: ["all", ["==", ["get", "wait"], 0], ["==", ["get", "glyph"], ""], ["==", ["get", "shape"], "circle"]],
-          layout: { "circle-sort-key": ["get", "z"] }, paint: {
-            "circle-radius": size(1.45),
-            "circle-color": ["case", R, "#ffffff", ["get", "color"]],
-            "circle-opacity": ["case", D, 0.12, 1],
-            "circle-stroke-width": ["case", R, 1.6, ["==", ["get", "mine"], 1], 1.8, 1],
-            "circle-stroke-color": ["case", ["==", ["get", "mine"], 1], "#111111", R, ["get", "ring"], "#ffffff"],
-            "circle-stroke-opacity": ["case", D, 0.08, R, 1, 0.9],
-            "circle-radius-transition": { duration: 120 } } }, before);
-        map.addLayer({ id: "holes-sym", type: "symbol", source: "holes", filter: ["all", ["==", ["get", "wait"], 0], ["==", ["get", "glyph"], ""], ["!=", ["get", "shape"], "circle"]], layout: {
-          "icon-image": ["get", "icon"], "icon-allow-overlap": true, "icon-ignore-placement": true, "symbol-sort-key": ["get", "z"],
-          "icon-size": ["interpolate", ["linear"], ["zoom"], 3, 0.72, 6, 0.95, 9, 1.3, 12, 1.7] },
-          paint: { "icon-opacity": ["case", D, 0.12, 1] } }, before);
-      };
-      rebuildRef.current = () => {
-        if (!map.getSource("holes")) return;
-        for (const id of HOLE_LAYERS) if (map.getLayer(id)) map.removeLayer(id);
-        map.removeSource("holes"); addHoleSource(); addHoleLayers();
-      };
+      const D = ["==", ["get", "small"], 1], HOV = ["boolean", ["feature-state", "hover"], false];
+      // zoom outermost, the hover and small cases inside each stop
+      const size = (k: number) => ["interpolate", ["linear"], ["zoom"], ...[[3, 3], [6, 4.2], [9, 6], [12, 8]].flatMap(([z, r]) => [z, ["case", HOV, r * k, D, r * 0.7, r]])];
+      // mapbox-gl 3.25: a symbol layer with no paint that reads the feature state crashes a repaint made while a hole is
+      // hovered (its bucket is updated with an empty list of state-dependent layers, "reading 'paint' of undefined").
+      // An opacity that reads the hover state and is 1 either way gives each symbol layer one.
+      const STATEFUL = { "icon-opacity": ["case", HOV, 1, 1] };
       const addLayers = () => {
         if (map.getSource("holes")) return;
-          // holes that crowd cluster through zoom 7 (the country, a State, a field); from 8 each is its own mark, and
-          // a hole on its own is a mark at any zoom
-          addHoleSource();
-          map.addSource("holes-waiting", { type: "geojson", data: waiting(holesRef.current), promoteId: "key" });
-          map.addSource("picked", { type: "geojson", data: pickedRef.current });
-          // context layers under the holes: hidden until toggled, so they cost nothing by default
-          map.addSource("open_pits", { type: "vector", tiles: [tilesUrl("open_pits")], minzoom: 4, maxzoom: 14, attribution: "Interim data © Gov of WA (DMIRS, CC BY 4.0)" });
-          map.addLayer({ id: "ov-open_pits", type: "circle", source: "open_pits", "source-layer": "open_pits", layout: { visibility: overlaysRef.current.open_pits ? "visible" : "none" }, paint: {
-            "circle-radius": ["interpolate", ["linear"], ["zoom"], 4, 3, 9, 5.5, 12, 8], "circle-color": "#ffffff", "circle-opacity": 0.15,
-            "circle-stroke-width": 2, "circle-stroke-color": ["match", ["get", "pitfillamt"], "full", "#0284c7", "partial", "#38bdf8", "dry", "#a8a29e", "#0284c7"] } });
-          map.addSource("officer_copper", { type: "vector", tiles: [tilesUrl("officer_copper")], minzoom: 4, maxzoom: 14, attribution: "Interim data © Gov of WA (DMIRS, CC BY 4.0)" });
-          map.addLayer({ id: "ov-officer_copper", type: "circle", source: "officer_copper", "source-layer": "officer_copper", layout: { visibility: overlaysRef.current.officer_copper ? "visible" : "none" }, paint: {
-            "circle-radius": ["interpolate", ["linear"], ["zoom"], 4, 3.5, 9, 5.5, 12, 8],
-            "circle-color": ["step", ["coalesce", ["get", "cu_ppm"], 0], "#fdba74", 100, "#f97316", 1000, "#c2410c", 10000, "#7c2d12"],
-            "circle-stroke-width": 1, "circle-stroke-color": "#ffffff" } });
-          map.addSource("ring", { type: "geojson", data: ringRef.current });
-          map.addLayer({ id: "ring-fill", type: "fill", source: "ring", paint: { "fill-color": "#00c4f5", "fill-opacity": 0.08 } });
-          map.addLayer({ id: "ring-line", type: "line", source: "ring", paint: { "line-color": "#00c4f5", "line-width": 1.5, "line-dasharray": [2, 2] } });
-          // holes still waiting are small grey dots underneath; every processed hole is a coloured shape with a thin
-          // white edge (so every colour reads on the satellite ground); a class picked in the legend leaves the rest faint
-          // markers: a small coloured dot with a fine white edge, lifted off the imagery by a soft dark halo; a dot grows
-          // under the pointer. Holes still waiting are faint pinpricks underneath. A class picked in the legend leaves
-          // the rest faint. (Zoom must be the outer expression in Mapbox.)
-          map.addLayer({ id: "holes-wait", type: "circle", source: "holes-waiting", paint: {
-            "circle-radius": ["interpolate", ["linear"], ["zoom"], 3, 1.2, 6, 2, 9, 3, 12, 4.5],
-            "circle-color": "#f8fafc", "circle-opacity": ["case", D, 0.1, 0.45] } });
-          addHoleLayers();
-          map.addLayer({ id: "picked-ring", type: "circle", source: "picked", paint: {
-            "circle-radius": ["interpolate", ["linear"], ["zoom"], 4, 10, 12, 16], "circle-color": "rgba(0,196,245,0.12)", "circle-stroke-width": 2.5, "circle-stroke-color": "#00c4f5" } });
+        map.addSource("holes", { type: "geojson", data: features(holesRef.current, colourRef.current), promoteId: "key" });
+        map.addSource("holes-waiting", { type: "geojson", data: waiting(holesRef.current), promoteId: "key" });
+        map.addSource("picked", { type: "geojson", data: pickedRef.current });
+        // context layers under the holes: hidden until toggled, so they cost nothing by default
+        map.addSource("open_pits", { type: "vector", tiles: [tilesUrl("open_pits")], minzoom: 4, maxzoom: 14, attribution: "Interim data © Gov of WA (DMIRS, CC BY 4.0)" });
+        map.addLayer({ id: "ov-open_pits", type: "circle", source: "open_pits", "source-layer": "open_pits", layout: { visibility: overlaysRef.current.open_pits ? "visible" : "none" }, paint: {
+          "circle-radius": ["interpolate", ["linear"], ["zoom"], 4, 3, 9, 5.5, 12, 8], "circle-color": "#ffffff", "circle-opacity": 0.15,
+          "circle-stroke-width": 2, "circle-stroke-color": ["match", ["get", "pitfillamt"], "full", "#0284c7", "partial", "#38bdf8", "dry", "#a8a29e", "#0284c7"] } });
+        map.addSource("officer_copper", { type: "vector", tiles: [tilesUrl("officer_copper")], minzoom: 4, maxzoom: 14, attribution: "Interim data © Gov of WA (DMIRS, CC BY 4.0)" });
+        map.addLayer({ id: "ov-officer_copper", type: "circle", source: "officer_copper", "source-layer": "officer_copper", layout: { visibility: overlaysRef.current.officer_copper ? "visible" : "none" }, paint: {
+          "circle-radius": ["interpolate", ["linear"], ["zoom"], 4, 3.5, 9, 5.5, 12, 8],
+          "circle-color": ["step", ["coalesce", ["get", "cu_ppm"], 0], "#fdba74", 100, "#f97316", 1000, "#c2410c", 10000, "#7c2d12"],
+          "circle-stroke-width": 1, "circle-stroke-color": "#ffffff" } });
+        map.addSource("ring", { type: "geojson", data: ringRef.current });
+        map.addLayer({ id: "ring-fill", type: "fill", source: "ring", paint: { "fill-color": "#00c4f5", "fill-opacity": 0.08 } });
+        map.addLayer({ id: "ring-line", type: "line", source: "ring", paint: { "line-color": "#00c4f5", "line-width": 1.5, "line-dasharray": [2, 2] } });
+        // holes still waiting are faint pinpricks underneath; every processed hole is a coloured mark with a fine
+        // white edge, lifted off the imagery by a soft dark halo, that grows under the pointer
+        map.addLayer({ id: "holes-wait", type: "circle", source: "holes-waiting", paint: {
+          "circle-radius": ["interpolate", ["linear"], ["zoom"], 3, 1.2, 6, 2, 9, 3, 12, 4.5], "circle-color": "#f8fafc", "circle-opacity": 0.45 } });
+        map.addLayer({ id: "holes-halo", type: "circle", source: "holes", filter: ["==", ["get", "small"], 0], paint: {
+          "circle-radius": ["interpolate", ["linear"], ["zoom"], 3, 5, 6, 6.5, 9, 9, 12, 12], "circle-color": "#020617", "circle-blur": 0.9, "circle-opacity": 0.4 } });
+        // a mark with letters is a dot (or its drawn shape, or its hatched dot) until BADGE_FROM, a badge from there on;
+        // a mark without letters (target unknown) is a small pale dot at every zoom
+        const G = ["!=", ["get", "glyph"], ""], PLAIN = ["all", ["==", ["get", "shape"], "circle"], ["==", ["get", "hatch"], 0]];
+        map.addLayer({ id: "holes-badge", type: "symbol", source: "holes", minzoom: BADGE_FROM, filter: G, layout: {
+          "icon-image": ["get", "badge"], "icon-allow-overlap": true, "icon-ignore-placement": true, "symbol-sort-key": ["get", "z"],
+          "icon-size": ["interpolate", ["linear"], ["zoom"], 5.5, 0.6, 8, 0.78, 11, 0.95, 14, 1.15] }, paint: STATEFUL });
+        map.addLayer({ id: "holes-pt", type: "circle", source: "holes", maxzoom: BADGE_FROM, filter: ["all", G, PLAIN],
+          layout: { "circle-sort-key": ["get", "z"] }, paint: {
+            "circle-radius": size(1.45), "circle-color": ["get", "color"],
+            "circle-stroke-width": ["case", ["==", ["get", "mine"], 1], 1.8, 1], "circle-stroke-color": ["case", ["==", ["get", "mine"], 1], "#111111", "#ffffff"], "circle-stroke-opacity": 0.9 } });
+        map.addLayer({ id: "holes-sym-far", type: "symbol", source: "holes", maxzoom: BADGE_FROM, filter: ["all", G, ["!", PLAIN]], layout: {
+          "icon-image": ["get", "icon"], "icon-allow-overlap": true, "icon-ignore-placement": true, "symbol-sort-key": ["get", "z"],
+          "icon-size": ["interpolate", ["linear"], ["zoom"], 3, 0.72, 6, 0.95] }, paint: STATEFUL });
+        map.addLayer({ id: "holes-pt-plain", type: "circle", source: "holes", filter: ["all", ["!", G], ["==", ["get", "shape"], "circle"]],
+          layout: { "circle-sort-key": ["get", "z"] }, paint: {
+            "circle-radius": size(1.45), "circle-color": ["get", "color"], "circle-opacity": ["case", D, 0.85, 1],
+            "circle-stroke-width": ["case", ["==", ["get", "mine"], 1], 1.8, 1], "circle-stroke-color": ["case", ["==", ["get", "mine"], 1], "#111111", "#ffffff"],
+            "circle-stroke-opacity": 0.9, "circle-radius-transition": { duration: 120 } } });
+        map.addLayer({ id: "holes-sym", type: "symbol", source: "holes", filter: ["all", ["!", G], ["!=", ["get", "shape"], "circle"]], layout: {
+          "icon-image": ["get", "icon"], "icon-allow-overlap": true, "icon-ignore-placement": true, "symbol-sort-key": ["get", "z"],
+          "icon-size": ["interpolate", ["linear"], ["zoom"], 3, 0.6, 6, 0.8, 9, 1.1, 12, 1.4] }, paint: STATEFUL });
+        map.addLayer({ id: "picked-ring", type: "circle", source: "picked", paint: {
+          "circle-radius": ["interpolate", ["linear"], ["zoom"], 4, 10, 12, 16], "circle-color": "rgba(0,196,245,0.12)", "circle-stroke-width": 2.5, "circle-stroke-color": "#00c4f5" } });
       };
       map.on("style.load", addLayers);
       // icons are drawn the first time the map asks for one: a shape in a fill colour with an edge
       map.on("styleimagemissing", (e: any) => {
-        const im = e.id.startsWith("cl|") ? drawCluster(e.id, classesRef.current) : drawIcon(e.id);
-        if (im && !map.hasImage(e.id)) map.addImage(e.id, im, { pixelRatio: e.id.startsWith("cl|") ? PX : ICON_PIXEL_RATIO });
+        const im = drawIcon(e.id);
+        if (im && !map.hasImage(e.id)) map.addImage(e.id, im, { pixelRatio: ICON_PIXEL_RATIO });
       });
-      // when the classes change the cluster images are drawn again (an id names a make-up by slot, not by class)
-      dropClustersRef.current = () => { for (const id of map.listImages?.() ?? []) if (id.startsWith("cl|")) map.removeImage(id); };
       map.on("load", () => {
         addLayers();
         let hovered: string | null = null;
@@ -259,13 +199,6 @@ export function CoreMap({ holes, colour, card, selected, onSelect, padRight, pad
           if (hovered) map.setFeatureState({ source: "holes", id: hovered }, { hover: false });
           hovered = k; if (k) map.setFeatureState({ source: "holes", id: k }, { hover: true });
         };
-        map.on("click", "holes-cluster", (e: any) => {
-          const f = e.features?.[0]; if (!f) return;
-          map.getSource("holes").getClusterExpansionZoom(f.properties.cluster_id, (err: any, z: number) => { if (!err) map.easeTo({ center: f.geometry.coordinates, zoom: Math.min(z + 0.3, 12), duration: 600 }); });
-        });
-        map.on("mouseenter", "holes-cluster", () => { map.getCanvas().style.cursor = "pointer"; });
-        map.on("mousemove", "holes-cluster", (e: any) => { const f = e.features?.[0]; if (!f) return; tip.setLngLat(f.geometry.coordinates).setDOMContent(html(`<div class="px-2.5 py-1.5 text-xs text-slate-800">${clusterText(f.properties, classesRef.current)}</div>`)).addTo(map); });
-        map.on("mouseleave", "holes-cluster", () => { map.getCanvas().style.cursor = ""; tip.remove(); });
         const LAYERS = ["holes-badge", "holes-sym", "holes-sym-far", "holes-pt", "holes-pt-plain", "holes-wait"];
         map.on("click", LAYERS, (e: any) => { const k = e.features?.[0]?.properties?.key; if (k) selectRef.current(k); });
         map.on("mouseenter", LAYERS, () => { map.getCanvas().style.cursor = "pointer"; });
@@ -294,19 +227,20 @@ export function CoreMap({ holes, colour, card, selected, onSelect, padRight, pad
         });
         map.on("mouseleave", "ov-officer_copper", () => tip.remove());
         readyRef.current = true;
+        // the list may have arrived between the style loading (when the source was made) and now, when the effect
+        // below still saw the map as not ready: bring the source up to date
+        map.getSource("holes")?.setData(features(holesRef.current, colourRef.current)); map.getSource("holes-waiting")?.setData(waiting(holesRef.current));
         map.resize();
       });
     })();
-    return () => { gone = true; readyRef.current = false; map?.remove(); mapRef.current = null; };
+    return () => { gone = true; readyRef.current = false; map?.remove(); mapRef.current = null; if (apiRef) apiRef.current = null; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
     holesRef.current = holes; colourRef.current = colour;
     const map = mapRef.current;
-    if (map && readyRef.current) {
-      const built = features(holes, colour); classesRef.current = built.classes; dropClustersRef.current();
-      map.getSource("holes")?.setData(built.fc); map.getSource("holes-waiting")?.setData(waiting(holes));
-    }
+    if (map && readyRef.current) { map.getSource("holes")?.setData(features(holes, colour)); map.getSource("holes-waiting")?.setData(waiting(holes)); }
   }, [holes, colour]);
 
   useEffect(() => {
@@ -315,9 +249,9 @@ export function CoreMap({ holes, colour, card, selected, onSelect, padRight, pad
     const apply = () => {
       const wide = map.getContainer().clientWidth > 900;
       const pts = holesRef.current.filter((h) => h.lon !== null && h.lat !== null && !h.offshore);
-      if (!fitTo || !pts.length) { map.easeTo({ center: [134, -27], zoom: 3.5, padding: { right: padRight, left: 0, top: 0, bottom: 0 }, duration: 900 }); return; }
+      if (!fitTo || !pts.length) { map.easeTo({ center: HOME, zoom: MIN_ZOOM, padding: { right: padRight, left: 0, top: 0, bottom: 0 }, duration: 900 }); return; }
       const xs = pts.map((h) => h.lon as number), ys = pts.map((h) => h.lat as number);
-      map.fitBounds([[Math.min(...xs), Math.min(...ys)], [Math.max(...xs), Math.max(...ys)]], { padding: wide ? { top: 60, bottom: 60, left: 380, right: padRight + 40 } : 24, maxZoom: 8, duration: 900 });
+      map.fitBounds([[Math.min(...xs), Math.min(...ys)], [Math.max(...xs), Math.max(...ys)]], { padding: wide ? { top: 60, bottom: 60, left: padLeftRef.current + 40, right: padRight + 40 } : 24, maxZoom: 8, duration: 900 });
     };
     if (readyRef.current) apply(); else map.once("load", apply);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -355,7 +289,7 @@ export function CoreMap({ holes, colour, card, selected, onSelect, padRight, pad
       pickedRef.current = { type: "FeatureCollection", features: lon !== null && lat !== null
         ? [{ type: "Feature", geometry: { type: "Point", coordinates: [lon, lat] }, properties: {} }] : [] };
       map.getSource("picked")?.setData(pickedRef.current);
-      if (lon !== null && lat !== null) map.easeTo({ center: [lon, lat], zoom: Math.max(map.getZoom(), 8.2), padding: { right: padRight, left: 0, top: padBottom ? 60 : 0, bottom: padBottom }, duration: 900 });   // past the last clustered zoom, so the hole is its own mark
+      if (lon !== null && lat !== null) map.easeTo({ center: [lon, lat], zoom: Math.max(map.getZoom(), 8.2), padding: { right: padRight, left: 0, top: padBottom ? 60 : 0, bottom: padBottom }, duration: 900 });   // close enough that the hole's neighbours are badges
     };
     if (readyRef.current) apply(); else map.once("load", apply);
   }, [key, lon, lat, padRight, padBottom]);

@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { AlertTriangle, ArrowDown, ArrowUp, Download, Loader2, MessageCircle, Search, X } from "lucide-react";
+import { AlertTriangle, ArrowDown, ArrowUp, Download, Info, Loader2, MessageCircle, Search, X } from "lucide-react";
 import { commodityName, coreScan, type HoleRow, inferred, TARGET_SOURCE_LABEL } from "@/lib/coreScan";
 import { csvSheet } from "@/lib/lookAgain";
 import { NONE, coreTypeColor, fmt } from "@/components/coretrace/palette";
@@ -9,16 +9,32 @@ import { Mark, type Shape } from "@/components/coretrace/shapes";
 import { STATUS_LABEL } from "@/components/coretrace/palette";
 import { cn } from "@/lib/utils";
 
-type Look = { color: string; label: string; ring?: string; wait?: boolean; shape?: Shape; shapeLabel?: string; glyph?: string };
+type Look = { color: string; label: string; ring?: string; wait?: boolean; shape?: Shape; shapeLabel?: string; glyph?: string; hatched?: boolean };
 type Key = "name" | "state" | "target" | "depth" | "again" | "gold" | "issues";
 const PAGE = 100;
 
-// the strips colour each core type by its leading mineral; one example name per colour gives the key
+// the strips colour each rock type by its leading mineral; one example name per colour gives the key (behind the ⓘ)
 const KEY: [string, string][] = [
   ["Chlorite", "Quartz + chlorite"], ["White mica", "Quartz + white mica"], ["Kaolin", "Quartz + kaolin"], ["Carbonate", "Carbonate"],
   ["Amphibole", "Amphibole"], ["Smectite", "Smectite"], ["Dark mica", "Dark mica"], ["Plagioclase, no SWIR minerals", "Plagioclase"],
   ["Quartz, no SWIR minerals", "Quartz"], ["Other", "Other"],
 ];
+
+/** The key to the rock-type strips: an ⓘ by the column's name, opening on hover or focus. */
+function RockKey() {
+  return (
+    <span className="group relative inline-flex">
+      <button type="button" aria-label="What the colours mean" className="grid size-4 place-items-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-800 focus-visible:text-slate-800"><Info size={12} /></button>
+      <span role="tooltip" className="pointer-events-none absolute top-full left-1/2 z-30 mt-1.5 hidden w-60 -translate-x-1/2 rounded-xl border border-slate-200 bg-white p-3 text-left text-[11px] font-normal text-slate-600 shadow-glass group-focus-within:block group-hover:block">
+        <span className="mb-2 block leading-snug">Down the hole, top to bottom, each rock type coloured by its leading mineral:</span>
+        <span className="grid grid-cols-1 gap-1">
+          {KEY.map(([label, name]) => <span key={label} className="flex items-center gap-1.5"><i className="inline-block size-2.5 flex-none rounded-[2px]" style={{ background: coreTypeColor(name) }} />{label}</span>)}
+          <span className="flex items-center gap-1.5"><i className="inline-block size-2.5 flex-none rounded-[2px] ring-1 ring-slate-200" style={{ background: NONE }} />No model reading</span>
+        </span>
+      </span>
+    </span>
+  );
+}
 
 /** Every hole on the map as a table, its own tab beside the map: search, sort, open. */
 export function HoleTable({ holes, q, onQ, look, typeName, onOpen, onAsk, loading, sheet }: {
@@ -27,7 +43,7 @@ export function HoleTable({ holes, q, onQ, look, typeName, onOpen, onAsk, loadin
   /** the State and search the "worth a second look" sheet is exported for */
   sheet?: { state: string; q: string };
 }) {
-  const [sort, setSort] = useState<{ k: Key; desc: boolean }>({ k: "name", desc: false });
+  const [sort, setSort] = useState<{ k: Key; desc: boolean }>({ k: "state", desc: true });   // by State, descending: WA first
   const [shown, setShown] = useState(PAGE);
   const [exporting, setExporting] = useState(false);
   const againHoles = holes.filter((h) => h.n_again > 0).length;
@@ -67,14 +83,6 @@ export function HoleTable({ holes, q, onQ, look, typeName, onOpen, onAsk, loadin
         {againHoles > 0 && <button type="button" onClick={exportSheet} disabled={exporting} title="Every interval where the model disagrees with the log, for the holes shown, as a CSV" className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-800 hover:bg-slate-50 disabled:opacity-60">{exporting ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />}Export the second-look sheet</button>}
         {onAsk && <button type="button" onClick={onAsk} className="ml-auto flex items-center gap-1.5 text-xs font-medium text-slate-600 hover:text-slate-900"><MessageCircle size={13} />Or ask: &ldquo;holes with gold in NSW&rdquo;</button>}
       </div>
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-slate-200/70 px-4 py-2 text-[11px] text-slate-600">
-        <span className="font-medium text-slate-900">Core types down the hole</span>
-        <span className="hidden text-slate-500 sm:inline">top to bottom, coloured by each type&rsquo;s leading mineral:</span>
-        {KEY.map(([label, name]) => (
-          <span key={label} className="flex items-center gap-1"><i className="inline-block h-2.5 w-2.5 rounded-[2px]" style={{ background: coreTypeColor(name) }} />{label}</span>
-        ))}
-        <span className="flex items-center gap-1"><i className="inline-block h-2.5 w-2.5 rounded-[2px] ring-1 ring-slate-200" style={{ background: NONE }} />No model reading</span>
-      </div>
       <div className="min-h-0 flex-1 overflow-auto">
         {/* a phone gets a list of cards; the columns need a wide screen */}
         <ul className="divide-y divide-slate-100 sm:hidden">
@@ -84,7 +92,7 @@ export function HoleTable({ holes, q, onQ, look, typeName, onOpen, onAsk, loadin
               <li key={h.key}>
                 <button type="button" onClick={() => onOpen(h.key)} className="flex w-full flex-col gap-1 px-4 py-2.5 text-left active:bg-cyan/5">
                   <span className="flex items-center gap-2 text-sm">
-                    {c.wait ? <i className="inline-block size-1.5 flex-none rounded-full bg-slate-400/70" /> : <Mark shape={c.shape} color={c.color} ring={c.ring} glyph={c.glyph} size={11} />}
+                    {c.wait ? <i className="inline-block size-1.5 flex-none rounded-full bg-slate-400/70" /> : <Mark shape={c.shape} color={c.color} ring={c.ring} glyph={c.glyph ?? " "} hatched={c.hatched} size={11} />}
                     <span className="font-medium text-slate-900">{h.name}</span><span className="text-[11px] text-slate-400">{h.state}</span>
                     <span className="ml-auto font-mono text-[11px] text-slate-500">{h.depth_max !== null ? `${fmt(h.depth_max, 0)} m` : ""}</span>
                   </span>
@@ -103,7 +111,7 @@ export function HoleTable({ holes, q, onQ, look, typeName, onOpen, onAsk, loadin
               {head("name", "Hole")}{head("state", "State", "w-16")}
               <th scope="col" className="sticky top-0 z-10 bg-white/95 px-3 py-2 font-medium backdrop-blur">Company · project · region</th>
               {head("target", "Drilled for", "w-28")}
-              <th scope="col" className="sticky top-0 z-10 w-44 bg-white/95 px-3 py-2 font-medium backdrop-blur">Core types down the hole</th>
+              <th scope="col" className="sticky top-0 z-20 w-44 bg-white/95 px-3 py-2 font-medium backdrop-blur"><span className="inline-flex items-center gap-1">Dominant rock types<RockKey /></span></th>
               {head("depth", "Depth", "w-20 text-right")}{head("again", "Look again", "w-28")}{head("gold", "Gold assays", "w-28")}{head("issues", "Issues", "w-16 text-right")}
             </tr>
           </thead>
@@ -114,7 +122,7 @@ export function HoleTable({ holes, q, onQ, look, typeName, onOpen, onAsk, loadin
                 <tr key={h.key} onClick={() => onOpen(h.key)} className="cursor-pointer border-b border-slate-100 hover:bg-cyan/5">
                   <td className="px-3 py-2">
                     <span className="flex items-center gap-2">
-                      {c.wait ? <i className="inline-block size-1.5 flex-none rounded-full bg-slate-400/70" title={c.label} /> : <Mark shape={c.shape} color={c.color} ring={c.ring} glyph={c.glyph} size={11} title={[c.label, c.shapeLabel].filter(Boolean).join(" · ")} />}
+                      {c.wait ? <i className="inline-block size-1.5 flex-none rounded-full bg-slate-400/70" title={c.label} /> : <Mark shape={c.shape} color={c.color} ring={c.ring} glyph={c.glyph ?? " "} hatched={c.hatched} size={11} title={[c.label, c.shapeLabel].filter(Boolean).join(" · ")} />}
                       <span className="font-medium text-slate-900">{h.name}</span>
                       {h.offshore && <span className="rounded bg-sky-50 px-1 text-[10px] text-sky-800">Offshore</span>}
                       {h.status === "ready" && h.message && <span className="rounded bg-slate-100 px-1 text-[10px] text-slate-600">No models</span>}

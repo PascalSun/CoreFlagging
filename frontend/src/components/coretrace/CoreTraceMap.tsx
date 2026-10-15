@@ -1,36 +1,30 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronDown, ChevronUp, Grip, HelpCircle, LayoutGrid, MessageCircle, SlidersHorizontal, Upload, X } from "lucide-react";
+import { Check, HelpCircle, Layers, MessageCircle, Minus, Plus, ScanSearch, Upload, X } from "lucide-react";
 import { AccountMenu } from "@/components/auth/AccountMenu";
 import { EmailGate } from "@ntlp/geodata-web/email-gate";
 import { VerifyEmailDialog } from "@/components/auth/VerifyEmailDialog";
 import { CoreChat, type OpenTarget } from "@/components/coretrace/CoreChat";
-import { CoreMap, OVERLAYS, type Basemap, type Overlay } from "@/components/coretrace/CoreMap";
+import { BASEMAPS, CoreMap, type Basemap, type MapApi, type Overlay } from "@/components/coretrace/CoreMap";
 import { HolePanel } from "@/components/coretrace/HolePanel";
 import { UploadDialog } from "@/components/coretrace/UploadDialog";
 import { isAuthed, isVerified } from "@/lib/auth";
-import { ACTIVE, inferred, coreScan, STATES } from "@/lib/coreScan";
-import { COLOUR_MODES, classify, shapeOf, type ColourMode } from "@/components/coretrace/mapColour";
-import { Mark, type Shape } from "@/components/coretrace/shapes";
-import { ColourNote } from "@/components/coretrace/ColourNote";
+import { ACTIVE, coreScan } from "@/lib/coreScan";
+import { classify, shapeOf } from "@/components/coretrace/mapColour";
+import { MapKey, MapKeyBody, NO_HIDDEN, PANEL_W, facet, filtering, passes, type Facet, type Hidden } from "@/components/coretrace/MapKey";
 import { HoleTable } from "@/components/coretrace/HoleTable";
 import { holeCard } from "@/components/coretrace/mapCard";
 import { Tour, tourSeen, type TourStep } from "@/components/coretrace/Tour";
-import { Picker } from "@/components/coretrace/Picker";
 import { LegendSheet } from "@/components/coretrace/LegendSheet";
 import { HoleSheet } from "@/components/coretrace/HoleSheet";
 import { coretraceBase } from "@/lib/sites";
 import { useIsMobile } from "@/lib/useIsMobile";
 import { cn } from "@/lib/utils";
 
-type Filter = "all" | "mine" | "again" | "issues" | "notir" | "assays";
-const FILTERS: { id: Filter; label: string }[] = [
-  { id: "all", label: "All" }, { id: "mine", label: "My scans" }, { id: "again", label: "Worth a second look" }, { id: "assays", label: "With assays" }, { id: "issues", label: "With issues" }, { id: "notir", label: "No TIR" },
-];
 const glass = "rounded-2xl border border-white/60 bg-white/80 shadow-glass backdrop-blur-xl";
 
 /** The CoreTrace map: every scanned hole in the State, and the way into any one of them.
@@ -70,7 +64,7 @@ export function CoreTraceMap() {
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { if (mobile) setChatOpen(false); }, [mobile]);
   // a search can be linked to (the regions page does)
-  const [q, setQ] = useState(sp.get("q") ?? ""); const [filter, setFilter] = useState<Filter>("all"); const [state, setState] = useState("");
+  const [q, setQ] = useState(sp.get("q") ?? "");
   const [upload, setUpload] = useState(false); const [verify, setVerify] = useState(false);
   const [authed, setAuthed] = useState(false);
   // the session lives in localStorage, which the server render cannot see
@@ -105,21 +99,17 @@ export function CoreTraceMap() {
   };
   const selected = holes.find((h) => h.key === holeKey) ?? null;
 
-  // the State and the filter chips decide what is on the map; the search only finds holes among them
-  const onMap = useMemo(() => holes.filter((h) => {
-    if (state && h.state !== state && !h.mine) return false;
-    if (filter === "mine" && !h.mine) return false;
-    if (filter === "again" && !h.n_again) return false;
-    if (filter === "issues" && !h.n_issues) return false;
-    if (filter === "notir" && (h.status !== "ready" || h.tir === "ok")) return false;
-    if (filter === "assays" && !h.au_m) return false;
-    return true;
-  }), [holes, filter, state]);
+  // every hole is on the map; the key decides which are drawn, and the search only finds holes in the list
+  const onMap = holes;
+  // "worth a second look": only the holes where the model's reading disagrees with the geologist's log, on the map
+  // and in the table alike (switched in the top bar)
+  const [again, setAgain] = useState(false);
+  const againN = useMemo(() => holes.filter((h) => h.n_again > 0).length, [holes]);
   const list = useMemo(() => {
     const s = q.trim().toLowerCase();
-    return onMap.filter((h) => !s || h.name.toLowerCase().includes(s) || h.key.toLowerCase().includes(s) || h.operator.toLowerCase().includes(s) || h.project.toLowerCase().includes(s) || h.region.toLowerCase().includes(s))
+    return onMap.filter((h) => (!again || h.n_again > 0) && (!s || h.name.toLowerCase().includes(s) || h.key.toLowerCase().includes(s) || h.operator.toLowerCase().includes(s) || h.project.toLowerCase().includes(s) || h.region.toLowerCase().includes(s)))
       .sort((a, b) => Number(b.mine) - Number(a.mine) || Number(b.status === "ready") - Number(a.status === "ready") || a.name.localeCompare(b.name));
-  }, [onMap, q]);
+  }, [onMap, q, again]);
   // what the hole was drilled for by default: the question an explorer asks first; core type and "look again" are views to switch to
   // context layers from the platform (DMIRS interim data), off until asked for
   const [overlays, setOverlays] = useState<Partial<Record<Overlay, boolean>>>({});
@@ -128,13 +118,13 @@ export function CoreTraceMap() {
   const [ringKm, setRingKm] = useState<number | null>(null);
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { setRingKm(null); }, [holeKey]);
-  const [mode, setMode] = useState<ColourMode>("target"); const [focus, setFocus] = useState<string | null>(null);
-  // holes that crowd are added up into donuts, or every hole is its own mark: a reader who wants to see the whole field at once turns the grouping off
-  const [grouped, setGrouped] = useState(true);
-  const [filtersOpen, setFiltersOpen] = useState(false); const [legendOpen, setLegendOpen] = useState(true);
-  // on a phone the legend starts folded to its one line of pickers, so the map keeps the screen
-  // eslint-disable-next-line react-hooks/set-state-in-effect
-  useEffect(() => { if (mobile) setLegendOpen(false); }, [mobile]);
+  // the map key: rows hidden in each of its sections, and a range of years drilled; together they decide which
+  // of the holes on the map are drawn
+  const [hidden, setHidden] = useState<Hidden>(NO_HIDDEN); const [years, setYears] = useState<[number, number] | null>(null);
+  const onHidden = (f: Facet, s: Set<string>) => setHidden((h) => ({ ...h, [f]: s }));
+  const [keyFolded, setKeyFolded] = useState(false);
+  const mapApi = useRef<MapApi | null>(null);
+  const [layersOpen, setLayersOpen] = useState(false);
   // the tour runs once, on a first visit with a wide screen, after the holes have arrived; "?" in the top bar replays it
   // the basemap, remembered on this browser
   const [basemap, setBasemap] = useState<Basemap>("satellite");
@@ -146,36 +136,29 @@ export function CoreTraceMap() {
   useEffect(() => { if (!mobile && !holeKey && hq.data && !tourSeen()) setTouring(true); }, [hq.data]);   // eslint-disable-line react-hooks/exhaustive-deps
   const tour: TourStep[] = [
     { title: "Welcome to CoreTrace", body: `Every HyLogger-scanned drillhole in Australia's core libraries, ${holes.length ? holes.length.toLocaleString() + " of them, " : ""}read metre by metre by a model trained on scanned drill core. Five quick steps.` },
-    { target: "legend", title: "Each point is a drillhole", body: "Colour is what the hole was drilled for \u2014 gold, copper, nickel\u2026 from the survey's record of the hole in WA, SA and Victoria, from its exploration report or the nearest known deposit elsewhere (a dashed rim). Shape is whether its assays found gold. Switch the colour to \u201cCore type\u201d for what the model reads, or \u201cLook again\u201d for where it differs from the geologist's log. Click a row to show only those holes." },
-    { target: "tabs", title: "Map, or every hole as a table", body: "The Holes tab lists every hole: search by name, company or region and sort by depth or gold. The State and filter beside it apply to both." },
+    { target: "legend", title: "Each point is a drillhole", body: "Colour is what the hole was drilled for \u2014 gold, copper, nickel\u2026 from the survey's record of the hole in WA, SA and Victoria, from its exploration report or the nearest known deposit elsewhere (a hatched fill). A square is a scan the models could not read. Hover a row in the key to show only those holes or hide them, by core type, commodity, source or model reading; every count follows what is shown." },
+    { target: "tabs", title: "Map, or every hole as a table", body: "The Table tab lists every hole: search by name, company or region and sort by depth or gold. The map key on the left decides which holes the map draws." },
     ...(chatOpen && !mobile ? [{ target: "chat", title: "Ask in plain words", body: "\u201cHoles with gold in NSW\u201d, \u201cwhat is unusual in MND036?\u201d. The assistant answers from the same data, and opens the holes it talks about on the map." }] : []),
     { target: "upload", title: "Bring your own scan", body: "Upload a TSG package from a HyLogger: it gets the same checks, log and model reading as the library holes, and stays private to you." },
     { title: "Open any hole", body: "Click a point. You get its strip log, its tray photographs, and what the model reads at each metre. Zoom the log from the whole hole down to 10 cm, open \u201cLook again\u201d for where the scan is worth a second look, and \u201cSimilar core\u201d for core like it anywhere in the State." },
   ];
+  // colour is always the target commodity; shape is whether the models read the hole
   const colour = useMemo(() => (h: (typeof holes)[number]) => {
-    const c = classify(h, mode, typeName), sh = shapeOf(h);
-    return { ...c, shape: sh?.shape, shapeLabel: sh?.label, dim: focus !== null && c.label !== focus && sh?.label !== focus };
-  }, [mode, typeName, focus]);
-  const shapes = useMemo(() => {
-    const c = new Map<string, { shape: Shape; n: number; order: number }>();
-    for (const h of onMap) {
-      if (h.lat === null) continue;
-      const k = shapeOf(h); if (!k) continue;
-      const e = c.get(k.label) ?? { shape: k.shape, n: 0, order: k.order }; e.n++; c.set(k.label, e);
-    }
-    return [...c.entries()].sort((a, b) => a[1].order - b[1].order);
-  }, [onMap]);
-  // the legend counts what is on the map, so it changes with the State picked
-  const legend = useMemo(() => {
-    const c = new Map<string, { color: string; n: number; order: number; ring?: string; wait?: boolean; glyph?: string }>();
-    for (const h of onMap) {
-      if (h.lat === null) continue;
-      const k = classify(h, mode, typeName); const e = c.get(k.label) ?? { color: k.color, n: 0, order: k.order, ring: k.ring, wait: k.wait, glyph: k.glyph }; e.n++; c.set(k.label, e);
-    }
-    return [...c.entries()].sort((a, b) => a[1].order - b[1].order || b[1].n - a[1].n);
-  }, [onMap, mode, typeName]);
-  const perState = useMemo(() => { const c = new Map<string, number>(); for (const h of holes) if (h.state) c.set(h.state, (c.get(h.state) ?? 0) + 1); return c; }, [holes]);
-  const mine = holes.filter((h) => h.mine).length;
+    const c = classify(h), sh = shapeOf(h);
+    return { ...c, shape: sh?.shape, shapeLabel: sh?.label };
+  }, []);
+  // the key counts the processed holes, facet by facet
+  const faceted = useMemo(() => onMap.filter((h) => h.lat !== null && h.status === "ready").map((h) => facet(h, typeName)), [onMap, typeName]);
+  const keyOn = filtering(hidden, years, again);
+  // what is drawn: the holes the key lets through; holes still waiting only while the key filters nothing
+  const drawn = useMemo(() => {
+    if (!keyOn) return onMap;
+    const pass = new Set(faceted.filter((f) => passes(f, hidden, years, again)).map((f) => f.h.key));
+    return onMap.filter((h) => pass.has(h.key));
+  }, [onMap, faceted, hidden, years, again, keyOn]);
+  const waitingN = useMemo(() => onMap.filter((h) => h.lat !== null && h.status !== "ready").length, [onMap]);
+  const resetKey = () => { setHidden(NO_HIDDEN); setYears(null); setAgain(false); };
+  const keyBody = { rows: faceted, hidden, onHidden, years, onYears: setYears, again, overlays, onOverlay: toggleOverlay };
 
   // sign-in is the platform's: /auth/signin sends the browser there and back here (one sign-in for every app)
   // Sign-in happens right here, in the platform's shared dialog (no trip to another site).
@@ -198,72 +181,50 @@ export function CoreTraceMap() {
 
   return (
     <div className="fixed inset-0 overflow-hidden bg-slate-50 text-slate-900">
-      <div className="absolute inset-0 z-0"><CoreMap holes={onMap} cluster={grouped} basemap={basemap} colour={colour} card={(h) => holeCard(h, colour(h), typeName, COLOUR_MODES.find((m) => m.id === mode)?.label)} fitTo={state} selected={selected} ringKm={ringKm} overlays={overlays} onSelect={(k) => set({ hole: k, m: null, full: null })} padRight={mobile ? 0 : panelW + chatW} padBottom={mobile && holeKey ? Math.round(vh * 0.56) : 0} /></div>
+      <div className="absolute inset-0 z-0"><CoreMap holes={drawn} basemap={basemap} colour={colour} card={(h) => holeCard(h, colour(h), typeName, "Target")} selected={selected} ringKm={ringKm} overlays={overlays} onSelect={(k) => set({ hole: k, m: null, full: null })}
+        padRight={mobile ? 0 : panelW + chatW} padLeft={!mobile && view === "map" && holes.length > 0 && !keyFolded ? PANEL_W + 22 : 6} padBottom={mobile && holeKey ? Math.round(vh * 0.56) : 0} apiRef={mapApi} /></div>
 
-      {/* the legend: what colour and shape mean, each switchable, in as little room as the map can spare.
-          A row picked here leaves every other hole faint; the card folds away to a single line. */}
-      {view === "map" && holes.length > 0 && !mobile && (() => {
-        const shown = legend.filter(([, e]) => !e.wait); const waiting = legend.find(([, e]) => e.wait)?.[1].n ?? 0;
-        const row = (label: string, mark: React.ReactNode, n: number) => {
-          const on = focus === label, off = focus !== null && !on;
-          return (
-            <button key={label} type="button" onClick={() => setFocus(on ? null : label)} aria-pressed={on} title={on ? "Show every hole" : `Show only: ${label}`}
-              className={cn("flex min-w-0 items-center gap-1.5 rounded px-1 py-0.5 text-left text-xs hover:bg-white", on && "bg-white font-semibold text-slate-900", off ? "opacity-35" : "text-slate-700")}>
-              {mark}<span className="min-w-0 flex-1 truncate">{label}</span><span className="font-mono text-[10px] tabular-nums text-slate-400">{n.toLocaleString()}</span>
-            </button>
-          );
-        };
-        return (
-          <div data-tour="legend" className={cn(glass, "absolute bottom-8 left-3 z-10 w-[calc(100vw-24px)] max-w-[332px] sm:bottom-3 sm:left-[52px]")}>
-            <div className="flex items-center gap-2 px-3 py-2">
-              <span className="text-[11px] font-medium text-slate-500">Colour</span>
-              <div className="w-[118px]"><Picker value={mode} label="Colour the holes by" side="top" options={COLOUR_MODES.map((m) => ({ id: m.id, label: m.label }))} onChange={(v) => { setMode(v); setFocus(null); }} /></div>
-              <button type="button" onClick={() => setGrouped((g) => !g)} aria-pressed={!grouped} title={grouped ? "Holes that crowd are added up into one mark. Click to show every hole." : "Every hole is its own mark. Click to add up the ones that crowd."}
-                className={cn("ml-auto flex h-6 items-center gap-1 rounded-md px-1.5 text-[11px] font-medium ring-1", grouped ? "bg-white/70 text-slate-600 ring-slate-200 hover:bg-white" : "bg-slate-900 text-white ring-slate-900")}>
-                {grouped ? <LayoutGrid size={12} /> : <Grip size={12} />}{grouped ? "Grouped" : "All holes"}</button>
-              <button type="button" onClick={() => setLegendOpen((o) => !o)} aria-label={legendOpen ? "Fold the legend" : "Open the legend"} className="grid size-6 place-items-center rounded text-slate-500 hover:bg-white">
-                {legendOpen ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
-              </button>
-            </div>
-            {legendOpen && (
-              <div className="border-t border-white/70 px-2 pb-2 pt-1.5">
-                <div className="grid grid-cols-2 gap-x-1">{shown.map(([label, e]) => row(label, <Mark color={e.color} ring={e.ring} glyph={e.glyph} size={11} />, e.n))}</div>
-                {shapes.length > 0 && <div className="mt-1 grid grid-cols-2 gap-x-1 border-t border-white/70 pt-1">{shapes.map(([label, e]) => row(label, <Mark shape={e.shape} color="#64748b" size={11} />, e.n))}</div>}
-                <div className="mt-1 border-t border-white/70 pt-1.5">
-                  <p className="px-1 text-[10.5px] font-medium text-slate-500">Also show</p>
-                  {OVERLAYS.map((o) => (
-                    <label key={o.id} title={o.hint} className="flex cursor-pointer items-center gap-1.5 rounded px-1 py-0.5 text-xs text-slate-700 hover:bg-white">
-                      <input type="checkbox" checked={!!overlays[o.id]} onChange={() => toggleOverlay(o.id)} className="size-3 accent-slate-900" />
-                      <i className="inline-block size-2.5 rounded-full" style={{ background: o.color }} /><span className="min-w-0 flex-1 truncate">{o.label}</span><span className="text-[10px] text-slate-400">interim</span>
-                    </label>
-                  ))}
-                </div>
-                <p className="mt-1.5 flex items-center justify-between px-1 text-[10.5px] text-slate-500">
-                  <span>{focus ? "Showing one class" : "Click a row to show only those holes"}{waiting ? ` · ${waiting.toLocaleString()} still being processed` : ""}</span>
-                  {focus && <button type="button" onClick={() => setFocus(null)} className="font-medium text-slate-800 hover:underline">Show all</button>}
-                </p>
-                {mode === "target" && onMap.some((h) => inferred(h.target_source)) && <p className="flex items-center gap-1.5 px-1 pt-1 text-[10.5px] text-slate-500"><Mark color="#94a3b8" glyph="Au" dashed size={10} /> dashed rim: inferred from the report or the nearest deposit</p>}
-                {(mode === "target" || mode === "type") && <ColourNote kind={mode === "target" ? "target" : "mineral"} className="mt-0.5" />}
-              </div>
-            )}
-          </div>
-        );
-      })()}
+      {/* the key: a single column down the left edge; every row can be shown alone or hidden, and every count
+          follows what the other sections let through */}
+      {view === "map" && holes.length > 0 && !mobile && (
+        <MapKey {...keyBody} shown={drawn.filter((h) => h.status === "ready").length} waiting={waitingN} folded={keyFolded} onFold={setKeyFolded} onReset={resetKey} />
+      )}
 
-      {/* satellite or terrain map, bottom right of the map; on a phone both live in the legend sheet */}
+      {/* zoom, and under it the basemap behind a layers button, bottom right of the map; on a phone the map is
+          pinched and the basemap lives in the key's sheet */}
       {view === "map" && !mobile && (
-        <div className={cn(glass, "absolute bottom-3 z-10 flex gap-0.5 rounded-full p-1")} style={{ right: (holeKey ? panelW + 24 : 12) + chatW }} role="radiogroup" aria-label="Basemap">
-          {([["satellite", "Satellite"], ["map", "Map"]] as const).map(([id, label]) => (
-            <button key={id} type="button" role="radio" aria-checked={basemap === id} onClick={() => pickBasemap(id)}
-              className={cn("rounded-full px-3 py-1 text-xs font-semibold transition-colors", basemap === id ? "bg-ink text-white" : "text-slate-600 hover:text-slate-900")}>{label}</button>
-          ))}
+        <div className="absolute bottom-3 z-10 flex flex-col items-end gap-2" style={{ right: (holeKey ? panelW + 24 : 12) + chatW }}>
+          <div className={cn(glass, "flex flex-col overflow-hidden rounded-xl")} role="group" aria-label="Zoom">
+            <button type="button" onClick={() => mapApi.current?.zoomIn()} aria-label="Zoom in" className="grid size-9 place-items-center text-slate-700 hover:bg-white hover:text-slate-900"><Plus size={15} /></button>
+            <button type="button" onClick={() => mapApi.current?.zoomOut()} aria-label="Zoom out" className="grid size-9 place-items-center border-t border-slate-900/[0.08] text-slate-700 hover:bg-white hover:text-slate-900"><Minus size={15} /></button>
+          </div>
+          <div className="relative">
+            <button type="button" onClick={() => setLayersOpen((o) => !o)} aria-label="Basemap" aria-expanded={layersOpen} data-tip="Basemap" data-tip-left=""
+              className={cn(glass, "grid size-9 place-items-center rounded-xl text-slate-700 hover:bg-white hover:text-slate-900", layersOpen && "bg-white text-slate-900")}><Layers size={16} /></button>
+            {layersOpen && <>
+              <button type="button" aria-label="Close" onClick={() => setLayersOpen(false)} className="fixed inset-0 z-0 cursor-default" />
+              <div role="radiogroup" aria-label="Basemap" className={cn(glass, "absolute right-[calc(100%+8px)] bottom-0 z-10 flex gap-2 bg-white/90 p-2")}>
+                {BASEMAPS.map((b) => (
+                  <button key={b.id} type="button" role="radio" aria-checked={basemap === b.id} onClick={() => { pickBasemap(b.id); setLayersOpen(false); }} className="group flex w-[92px] flex-col gap-1.5 text-left">
+                    <span className={cn("relative block h-16 overflow-hidden rounded-lg ring-2 transition-shadow", basemap === b.id ? "ring-slate-900" : "ring-transparent group-hover:ring-slate-300")}>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={b.thumb} alt="" className="size-full object-cover" />
+                      {basemap === b.id && <span className="absolute top-1 right-1 grid size-4 place-items-center rounded-full bg-slate-900 text-white"><Check size={11} /></span>}
+                    </span>
+                    <span className={cn("px-0.5 text-xs font-semibold", basemap === b.id ? "text-slate-900" : "text-slate-600")}>{b.label}</span>
+                  </button>
+                ))}
+              </div>
+            </>}
+          </div>
         </div>
       )}
       {view === "map" && mobile && !holeKey && holes.length > 0 && (
-        <LegendSheet modes={COLOUR_MODES} mode={mode} onMode={setMode} grouped={grouped} onGrouped={setGrouped}
-          overlays={OVERLAYS.map((o) => ({ id: o.id, label: o.label, color: o.color, on: !!overlays[o.id] }))} onOverlay={(id) => toggleOverlay(id as Overlay)}
-          basemaps={[{ id: "satellite" as Basemap, label: "Satellite" }, { id: "map" as Basemap, label: "Map" }]} basemap={basemap} onBasemap={pickBasemap}
-          legend={legend} shapes={shapes} focus={focus} onFocus={setFocus} />
+        <LegendSheet basemaps={BASEMAPS} basemap={basemap} onBasemap={pickBasemap}
+          dots={[...new Set(faceted.filter((f) => f.glyph && f.glyph !== "+").map((f) => f.color))]} label={keyOn ? `${drawn.filter((h) => h.status === "ready").length.toLocaleString()} of ${faceted.length.toLocaleString()} holes` : "Target commodity"}>
+          <MapKeyBody {...keyBody} />
+          {keyOn && <p className="flex justify-end px-2 pt-1 pb-2"><button type="button" onClick={resetKey} className="text-xs font-semibold text-slate-900">Show every hole</button></p>}
+        </LegendSheet>
       )}
 
       {touring && <Tour steps={tour} onClose={() => setTouring(false)} />}
@@ -284,44 +245,29 @@ export function CoreTraceMap() {
             {(["map", "holes"] as const).map((id) => (
               <button key={id} type="button" role="tab" aria-selected={view === id} onClick={() => set({ view: id === "map" ? null : id })}
                 className={cn("flex h-9 items-center gap-1.5 whitespace-nowrap rounded-full px-3 text-sm font-semibold transition-colors sm:px-4", view === id ? "bg-ink text-white" : "text-slate-600 hover:text-slate-900")}>
-                {id === "map" ? "Map" : "Holes"}
-                {id === "holes" && !hq.isLoading && <span className={cn("hidden rounded-full px-1.5 sm:inline font-mono text-[10px] font-medium", view === id ? "bg-white/20" : "bg-slate-200/70")}>{onMap.length.toLocaleString()}</span>}
+                {id === "map" ? "Map" : "Table"}
               </button>
             ))}
           </div>
-          {/* the State and which-holes pickers: inline when the bar has room, behind a Filter button when it has not */}
-          {barW >= 1000 ? (
-            <div className={cn(glass, "flex h-11 items-center gap-2 rounded-full px-3.5")}>
-            <div className="w-[11rem]"><Picker value={state} label="State" className="border-transparent bg-transparent text-sm hover:border-transparent" menuClassName="max-h-[70vh] overflow-y-auto"
-              options={[{ id: "", label: "All of Australia" }, ...STATES.filter((x) => perState.get(x.id)).map((x) => ({ id: x.id, label: `${x.name} (${(perState.get(x.id) ?? 0).toLocaleString()})` }))]} onChange={setState} /></div>
-            <span className="h-5 w-px bg-slate-200" aria-hidden />
-            <div className="w-[8rem]"><Picker value={filter} label="Which holes" className="border-transparent bg-transparent text-sm hover:border-transparent"
-              options={FILTERS.filter((f) => f.id !== "mine" || mine > 0).map((f) => ({ id: f.id, label: f.id === "all" ? "Every hole" : `${f.label}${f.id === "mine" ? ` (${mine})` : ""}` }))} onChange={setFilter} /></div>
-            </div>
-          ) : !mobile && (
-            <div className="relative">
-              <button type="button" onClick={() => setFiltersOpen((o) => !o)} aria-expanded={filtersOpen}
-                className={cn(glass, "flex h-11 items-center gap-2 rounded-full px-3.5 text-sm font-medium text-slate-700 hover:bg-white")}>
-                <SlidersHorizontal size={15} />Filter
-                {(state || filter !== "all") && <span className="rounded-full bg-ink px-1.5 text-[10px] font-semibold text-white">{(state ? 1 : 0) + (filter !== "all" ? 1 : 0)}</span>}
-              </button>
-              {filtersOpen && (
-                <div className={cn(glass, "absolute top-[calc(100%+8px)] left-0 z-30 flex w-64 flex-col gap-2 p-3")}>
-                  <p className="text-[11px] font-medium text-slate-500">State</p>
-            <div className="w-full"><Picker value={state} label="State" className="py-1.5 text-sm" menuClassName="max-h-[70vh] overflow-y-auto"
-              options={[{ id: "", label: "All of Australia" }, ...STATES.filter((x) => perState.get(x.id)).map((x) => ({ id: x.id, label: `${x.name} (${(perState.get(x.id) ?? 0).toLocaleString()})` }))]} onChange={setState} /></div>
-                  <p className="text-[11px] font-medium text-slate-500">Which holes</p>
-            <div className="w-full"><Picker value={filter} label="Which holes" className="py-1.5 text-sm"
-              options={FILTERS.filter((f) => f.id !== "mine" || mine > 0).map((f) => ({ id: f.id, label: f.id === "all" ? "Every hole" : `${f.label}${f.id === "mine" ? ` (${mine})` : ""}` }))} onChange={setFilter} /></div>
-                </div>
-              )}
-            </div>
+          {/* "worth a second look": one switch for the map and the table, beside the tabs, so it holds across both. At rest
+              it is the magnifier alone; hovering slides out its name and count; switched on it stays open, in ink */}
+          {againN > 0 && (
+            <button type="button" role="switch" aria-checked={again} onClick={() => setAgain((a) => !a)} aria-label="Worth a second look"
+              className={cn("group flex h-11 items-center rounded-full border px-[13px] text-sm font-semibold whitespace-nowrap shadow-glass backdrop-blur-xl transition-colors duration-300",
+                again ? "border-ink bg-ink text-white" : "border-white/60 bg-white/80 text-slate-700 hover:bg-white hover:text-slate-900")}>
+              <ScanSearch size={16} className={cn("flex-none transition-colors", again ? "text-cyan" : "text-slate-600 group-hover:text-slate-900")} />
+              <span className={cn("flex items-center gap-2 overflow-hidden transition-[max-width,opacity,margin] duration-300 ease-out",
+                again ? "ml-2 max-w-60 opacity-100" : "ml-0 max-w-0 opacity-0 group-hover:ml-2 group-hover:max-w-60 group-hover:opacity-100 group-focus-visible:ml-2 group-focus-visible:max-w-60 group-focus-visible:opacity-100")}>
+                {!mobile && <span>Worth a second look</span>}
+                <span className={cn("rounded-full px-1.5 font-mono text-[10px] font-medium", again ? "bg-white/20" : "bg-slate-200/70")}>{againN.toLocaleString()}</span>
+              </span>
+            </button>
           )}
         </div>
         <div className="pointer-events-auto flex items-center gap-2">
           {!mobile && <button type="button" onClick={() => { set({ view: null, hole: null }); setTouring(true); }} aria-label="Show the guided tour" title="Show the guided tour" className={cn(glass, "grid size-11 place-items-center rounded-full text-slate-600 hover:bg-white hover:text-slate-900")}><HelpCircle size={18} /></button>}
           {!chatOpen && <button type="button" onClick={() => setChatOpen(true)} aria-label="Ask about the core" className={cn(glass, "flex h-11 items-center gap-2 rounded-full px-3.5 text-sm font-semibold text-slate-800 hover:bg-white sm:px-4")}><MessageCircle size={15} /><span className="hidden sm:inline">Ask</span></button>}
-          <button type="button" data-tour="upload" onClick={openUpload} aria-label="Upload a scan" className="flex h-11 items-center gap-2 whitespace-nowrap rounded-full bg-ink px-3.5 text-sm font-semibold sm:px-4 text-white shadow-glass-sm hover:bg-ink-soft"><Upload size={15} />{!mobile && <span>{barW >= 1120 ? "Upload a scan" : "Upload"}</span>}</button>
+          <button type="button" data-tour="upload" onClick={openUpload} aria-label="Upload a scan" className={cn(glass, "flex h-11 items-center gap-2 whitespace-nowrap rounded-full px-3.5 text-sm font-semibold text-slate-800 hover:bg-white hover:text-slate-900 sm:px-4")}><Upload size={15} />{!mobile && <span>{barW >= 1120 ? "Upload a scan" : "Upload"}</span>}</button>
           {authed ? <div className={cn(glass, "grid h-11 place-items-center rounded-full px-1.5")}><AccountMenu /></div>
             : <button type="button" onClick={toSignIn} className={cn(glass, "h-11 whitespace-nowrap rounded-full px-3 text-sm font-medium text-slate-700 hover:bg-white sm:px-4")}>Sign in</button>}
         </div>
@@ -330,7 +276,7 @@ export function CoreTraceMap() {
       {/* the holes tab: every hole on the map as a table */}
       {view === "holes" && (
         <div className={cn(glass, "absolute top-[68px] bottom-3 left-3 z-20 overflow-hidden bg-white/92")} style={{ right: chatW + 12 }}>
-          <HoleTable holes={list} q={q} onQ={setQ} look={colour} typeName={typeName} loading={hq.isLoading} sheet={{ state, q }} onOpen={(k) => set({ hole: k, m: null, full: null, view: null })}
+          <HoleTable holes={list} q={q} onQ={setQ} look={colour} typeName={typeName} loading={hq.isLoading} sheet={{ state: "", q }} onOpen={(k) => set({ hole: k, m: null, full: null, view: null })}
             onAsk={chatOpen ? undefined : () => setChatOpen(true)} />
         </div>
       )}
@@ -376,7 +322,7 @@ export function CoreTraceMap() {
       )}
 
       <UploadDialog open={upload} onClose={() => setUpload(false)} onNeedVerify={() => { setUpload(false); setVerify(true); }}
-        onQueued={(h) => { setUpload(false); qc.invalidateQueries({ queryKey: ["core-holes"] }); setFilter("mine"); set({ hole: h.key, m: null, full: null }); }} />
+        onQueued={(h) => { setUpload(false); qc.invalidateQueries({ queryKey: ["core-holes"] }); set({ hole: h.key, m: null, full: null }); }} />
       <EmailGate open={gate} onClose={() => setGate(false)} onAuthed={() => { setGate(false); setAuthed(true); }} />
       <VerifyEmailDialog open={verify} onClose={() => setVerify(false)} onVerified={() => { setVerify(false); setUpload(true); }} />
     </div>
