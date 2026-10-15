@@ -312,7 +312,7 @@ export function HolePanel({ holeKey, tab: tabProp, onTab, models, run, metre, on
   const shown = peek ?? metre;
   const eq = useQuery({ queryKey: ["core-metre", holeKey, shown, useRun], queryFn: () => coreScan.metre(holeKey, shown as number, useRun),
     enabled: ready && wide && shown !== null && (!!useRun || displayOnly), staleTime: 5 * 60_000, retry: false, placeholderData: keepPreviousData });
-  // what the similar-core search asks about: the zoomed window when there is one (up to 50 m), else the 2 m at the metre
+  // what the similar-core search asks about: the zoomed window when there is one (up to 50 m), else the metre
   const [simScope, setSimScope] = useState<SimilarScope>("state");
   const [simWhole, setSimWhole] = useState(false);     // a stretch of the hole, or the whole hole
   const simAt = win && win[1] - win[0] <= 50 ? { from: win[0], to: win[1] } : metre !== null ? { m: metre } : null;
@@ -490,7 +490,7 @@ export function HolePanel({ holeKey, tab: tabProp, onTab, models, run, metre, on
               const scopes: { id: SimilarScope; label: string; hint: string }[] = [
                 { id: "hole", label: "This hole", hint: "Where else in this hole is core like this" }, { id: "nearby", label: "Within 10 km", hint: "The neighbouring holes" },
                 { id: "region", label: hole.region ? `Region: ${hole.region}` : "Region", hint: "Holes of the same tectonic region" }, { id: "state", label: "Whole State", hint: "Every other hole, none within 5 km" }];
-              const what = simAt === null ? null : "from" in simAt ? `${fmt(simAt.from, 1)}–${fmt(simAt.to, 1)} m (the window)` : `the 2 m from ${simAt.m} m`;
+              const what = simAt === null ? null : "from" in simAt ? `${fmt(simAt.from, 1)}–${fmt(simAt.to, 1)} m (the window)` : `the metre at ${simAt.m} m`;
               const asking = (
                 <div className="flex flex-wrap items-center gap-1.5" role="tablist" aria-label="What to compare">
                   <span className="text-[11px] text-slate-500">Compare</span>
@@ -508,7 +508,7 @@ export function HolePanel({ holeKey, tab: tabProp, onTab, models, run, metre, on
                   : sq.isLoading ? <Empty>Searching…</Empty>
                   : sq.isError || !sq.data ? <Empty>The similarity search is not available right now. Everything else on this page still works.</Empty> : (
                 <>
-                  <p className="text-xs leading-relaxed text-slate-600">{what}{sq.data.query.metres && sq.data.query.metres > 1 ? ` (${sq.data.query.metres} metres averaged)` : ""}, compared with {simScope === "hole" ? "every interval of this hole" : `${sq.data.library.intervals.toLocaleString()} two-metre intervals from ${sq.data.library.holes.toLocaleString()} holes`}{simScope === "nearby" ? ", within 10 km" : simScope === "region" ? `, in ${hole.region}` : simScope === "state" ? "; holes within 5 km are left out" : ""}. {simScope === "hole" ? "Every matching interval is listed; the window itself comes first." : "Each hole appears once, at its best match."}</p>
+                  <p className="text-xs leading-relaxed text-slate-600">{what}{sq.data.query.metres && sq.data.query.metres > 1 ? ` (${sq.data.query.metres} metres pooled into one query)` : ""}, compared with {simScope === "hole" ? "every interval of this hole" : `${sq.data.library.intervals.toLocaleString()} two-metre intervals from ${sq.data.library.holes.toLocaleString()} holes`}{simScope === "nearby" ? ", within 10 km" : simScope === "region" ? `, in ${hole.region}` : simScope === "state" ? "; holes within 5 km are left out" : ""}. {simScope === "hole" ? "Every matching interval is listed; the window itself comes first." : "Each hole appears once, at its best match."}</p>
                   <table className="w-full border-collapse">
                     <thead><tr>{["Hole", "Interval (m)", "Similarity", "SWIR / TIR", "Region"].map((h) => <th key={h} className={th}>{h}</th>)}</tr></thead>
                     <tbody>{sq.data.results.map((r) => (

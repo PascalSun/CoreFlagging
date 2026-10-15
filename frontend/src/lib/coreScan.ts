@@ -161,11 +161,12 @@ export type SimilarHit = {
   rock: string; au: number | null; lat: number | null; lon: number | null; region: string; split: string;
 };
 export type SimilarScope = "state" | "nearby" | "region" | "hole";
-/** A whole hole's signature: the share of each core type, and the type read most in each of 20 slices down the hole. */
-export type HoleSig = { shares: Record<string, number>; seq: number[]; n: number; from_m: number; to_m: number };
+/** A whole hole against another, metre by metre on the model's representation: `score` is the mean best cosine of each metre in
+ * the other hole (both ways); `rho` says whether the other hole repeats this one's order down the hole (1 same order, -1 reversed). */
 export type SimilarHole = { key: string; name: string; region: string; operator: string; project: string; target: string; lon: number | null; lat: number | null; km: number | null;
-  score: number; composition: number; sequence: number; sig: HoleSig };
-export type SimilarHolesView = { model: string; scope: SimilarScope; km: number | null; region: string | null; n_candidates: number; mine: HoleSig; core_types: { k: number; name: string }[]; results: SimilarHole[] };
+  score: number; rho: number | null; n: number };
+export type SimilarHolesView = { model: string; scope: SimilarScope; km: number | null; region: string | null; n_candidates: number; compared: number;
+  mine: { n: number; from_m: number; to_m: number }; results: SimilarHole[] };
 export type SimilarView = { model: string; library: { intervals: number; holes: number }; results: SimilarHit[];
   query: { from_m: number; to_m: number; metres?: number; scope?: SimilarScope; km?: number | null; region?: string | null; gs: string; gt: string; rock: string } };
 
@@ -238,10 +239,10 @@ export const coreScan = {
   documents: (key: string) => json<HoleDocuments>(`/holes/${enc(key)}/documents/`),
   model: (key: string, run: string) => json<ModelView>(`/holes/${enc(key)}/models/${enc(run)}/`).then((v) => v.model ? { ...v, model: { ...v.model, name: modelName(v.model.name) } } : v),
   metre: (key: string, m: number, run: string) => json<MetreView>(`/holes/${enc(key)}/metres/${m}/?model=${enc(run)}`),
-  /** Core like a stretch of this hole: the 2 m at a metre, or a window; where to look is the scope. */
+  /** Core like a stretch of this hole: one metre, or a window; where to look is the scope. */
   similar: (key: string, at: { m: number } | { from: number; to: number }, run: string, scope: SimilarScope = "state", km = 10) =>
     json<SimilarView>(`/holes/${enc(key)}/similar/?${"m" in at ? `m=${at.m}` : `from=${at.from}&to=${at.to}`}&model=${enc(run)}&scope=${scope}&km=${km}`),
-  /** Holes like this one as a whole (composition and downhole sequence); 404 when the hole has no signature yet. */
+  /** Holes like this one as a whole, metre by metre on the model's representation; 404 when the hole has no metre vectors yet. */
   similarHoles: (key: string, run: string, scope: Exclude<SimilarScope, "hole"> = "state", km = 25) => json<SimilarHolesView>(`/holes/${enc(key)}/similar-holes/?model=${enc(run)}&scope=${scope}&km=${km}`),
   trays: (key: string) => json<{ trays: Tray[] }>(`/holes/${enc(key)}/trays/`),
   /** The original of a tray photograph as a deep-zoom pyramid; 404 for an upload (no original kept). */
