@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import type { CoreModelInfo, HoleDetail, ModelView, Tray } from "@/lib/coreScan";
 import { coreScan, readDate, surveyOf } from "@/lib/coreScan";
 import { GRID, INK, MUTED, NONE, SERIES, coreTypeColor, fmt, groupColor, groupName, issueLabel, lithColor, pct } from "@/components/coretrace/palette";
-import { marks } from "@/components/coretrace/TrayPhoto";
 import { CORE_TEAM } from "@/components/coretrace/team";
 import { useT } from "@/lib/i18n";
 
@@ -115,7 +114,8 @@ export function ReportDocument({ hole, mv, run, models, trays, nodeRef }: {
     if (tray) coreScan.trayImage(hole.key, tray.id).then(dataUrl).then((u) => { if (!gone) setPhoto(u); }).catch(() => {});
     return () => { gone = true; };
   }, [hole.key, tray]);
-  const box = tray && peak !== null ? marks(tray, peak) : [];
+  // the tray is chosen for the most unusual metre; it is named, not boxed (a box placed from the scan positions can miss)
+  const holdsPeak = !!tray && peak !== null && tray.from_m <= peak + 0.5 && peak + 0.5 <= tray.to_m + 0.05;
   const res = hole.results.find((r) => r.run === run);
   const today = new Date().toLocaleDateString("en-AU", { day: "numeric", month: "long", year: "numeric" });
   const training = hole.split === "train" || hole.split === "val";
@@ -163,9 +163,8 @@ export function ReportDocument({ hole, mv, run, models, trays, nodeRef }: {
           <div className="relative overflow-hidden rounded-md bg-slate-900" style={{ aspectRatio: `${tray.width || 1800} / ${tray.height || 672}` }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             {photo && <img src={photo} alt="" className="absolute inset-0 h-full w-full object-fill" />}
-            {photo && box.map(([x0, y0, x1, y1], i) => <div key={i} className="absolute border-2 border-[#00c4f5]" style={{ left: `${x0 * 100}%`, top: `${y0 * 100}%`, width: `${(x1 - x0) * 100}%`, height: `${(y1 - y0) * 100}%` }} />)}
           </div>
-          <figcaption className="mt-1.5 text-[10.5px] text-slate-500">Tray {tray.n}, {tray.from_m.toFixed(1)}–{tray.to_m.toFixed(1)} m.{box.length ? ` The box marks ${peak}–${peak! + 1} m, the most unusual metre in the hole.` : ""} Photograph: GSWA, NVCL, CC BY 4.0.</figcaption>
+          <figcaption className="mt-1.5 text-[10.5px] text-slate-500">Tray {tray.n}, {tray.from_m.toFixed(1)}–{tray.to_m.toFixed(1)} m.{holdsPeak ? ` It holds ${peak}–${peak! + 1} m, the most unusual metre in the hole.` : ""} Photograph: GSWA, NVCL, CC BY 4.0.</figcaption>
         </figure>
       )}
 
