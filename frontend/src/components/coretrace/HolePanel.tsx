@@ -354,7 +354,7 @@ export function HolePanel({ holeKey, tab: tabProp, onTab, models, run, metre, on
   // no longer offers to switch: the picker confused readers more than it helped.
   const defaultRun = models.find((m) => m.default)?.run ?? runs[0];
   const modelPicker = runs.length > 0 && (
-    <p className="text-[11px] text-slate-500">Read by <b className="font-semibold text-slate-800">{useRun === defaultRun ? "Core Flagging" : models.find((m) => m.run === useRun)?.name ?? useRun}</b>{useRun === defaultRun ? ", a foundation model for core spectra" : ""}</p>
+    <p className="text-[11px] text-slate-500">Read by <b className="font-semibold text-slate-800">{useRun === defaultRun ? "HyFormer" : models.find((m) => m.run === useRun)?.name ?? useRun}</b>{useRun === defaultRun ? ", a foundation model for core spectra" : ""}</p>
   );
 
   let body: React.ReactNode;

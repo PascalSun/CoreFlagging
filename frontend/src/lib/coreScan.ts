@@ -174,8 +174,13 @@ async function json<T>(path: string, init?: RequestInit): Promise<T> {
 
 const enc = encodeURIComponent;
 
+/** The model's name as readers see it: HyFormer. The platform may still hold the names a worker announced before the
+ * rename ("CoreTrace-MAE", "CoreTrace-MAE+DINO"…) until the worker announces its models again. */
+export const modelName = (name: string) => name.replace(/^CoreTrace-MAE/, "HyFormer");
+
+
 export const coreScan = {
-  models: () => json<CoreModelInfo[]>("/models/"),
+  models: () => json<CoreModelInfo[]>("/models/").then((ms) => ms.map((m) => ({ ...m, name: modelName(m.name) }))),
   holes: () => json<{ holes: HoleRow[]; n: number; core_types: { k: number; name: string }[] }>("/holes/"),
   hole: (key: string) => json<HoleDetail>(`/holes/${enc(key)}/`),
   package: (key: string) => json<HolePackage>(`/holes/${enc(key)}/package/`),
@@ -201,7 +206,7 @@ export const coreScan = {
   unreview: (key: string, body: Omit<ReviewBody, "verdict">) => json<void>(`/holes/${enc(key)}/reviews/`, { method: "DELETE", body: JSON.stringify(body), headers: { "Content-Type": "application/json" } }),
   /** 404 when the scan names no report. */
   report: (key: string) => json<HoleReport>(`/holes/${enc(key)}/report/`),
-  model: (key: string, run: string) => json<ModelView>(`/holes/${enc(key)}/models/${enc(run)}/`),
+  model: (key: string, run: string) => json<ModelView>(`/holes/${enc(key)}/models/${enc(run)}/`).then((v) => v.model ? { ...v, model: { ...v.model, name: modelName(v.model.name) } } : v),
   metre: (key: string, m: number, run: string) => json<MetreView>(`/holes/${enc(key)}/metres/${m}/?model=${enc(run)}`),
   /** Core like a stretch of this hole: the 2 m at a metre, or a window; where to look is the scope. */
   similar: (key: string, at: { m: number } | { from: number; to: number }, run: string, scope: SimilarScope = "state", km = 10) =>

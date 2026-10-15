@@ -95,7 +95,7 @@ export function DepthLens({ hole, mv, win, onWindow, trays, metre, onMetre, type
           {/* the metre level: the model's reading of each metre in the window, then the 10 cm bins */}
           {mv && metres.length > 0 && (
             <section>
-              <H4>Second Eye reads, per metre</H4>
+              <H4>HyFormer reads, per metre</H4>
               <div className="grid grid-cols-2 gap-2 @2xl:grid-cols-3">{metres.map((m) => { const j = midx.get(m); if (j === undefined) return null; return (
                 <button key={m} type="button" onClick={() => onMetre(m)} className={cn("rounded-lg border bg-white px-3 py-2 text-left hover:border-slate-400", metre === m ? "border-cyan" : "border-slate-200")}>
                   <div className="text-[11px] text-slate-500">{m}–{m + 1} m</div>
