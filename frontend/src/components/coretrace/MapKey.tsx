@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { ChevronDown, Eye, EyeOff, Focus, Info, Minimize2 } from "lucide-react";
 import type { HoleRow } from "@/lib/coreScan";
-import { OVERLAYS, type Overlay } from "@/components/coretrace/CoreMap";
 import { ColourNote } from "@/components/coretrace/ColourNote";
 import { INFERRED_LABEL, OTHER_LABEL, RAW_LABEL, READ_LABEL, RECORDED_LABEL, UNKNOWN_LABEL, classify, coreFamily, shapeOf, sourceOf } from "@/components/coretrace/mapColour";
 import { Mark } from "@/components/coretrace/shapes";
@@ -126,13 +125,12 @@ const More = ({ open, n, onClick }: { open: boolean; n: number; onClick: () => v
   </button>) : null;
 
 /** The sections of the key: core type, target commodity, where the target comes from, model reading, year drilled
- * and the context layers. Each count is of the holes the other sections let through. */
-export function MapKeyBody({ rows, hidden, onHidden, years, onYears, again, overlays, onOverlay }: {
+ * (core type is hidden for now). Each count is of the holes the other sections let through. */
+export function MapKeyBody({ rows, hidden, onHidden, years, onYears, again }: {
   rows: Faceted[]; hidden: Hidden; onHidden: (f: Facet, s: Set<string>) => void;
   years: [number, number] | null; onYears: (y: [number, number] | null) => void;
   /** only the holes worth a second look (switched in the top bar; the counts follow it) */
   again: boolean;
-  overlays: Partial<Record<Overlay, boolean>>; onOverlay: (id: Overlay) => void;
 }) {
   const [more, setMore] = useState({ core: false, target: false }); const [othersOpen, setOthersOpen] = useState(false);
   // the rows of each section, in the order of their totals, so a row stays put while the counts change
@@ -213,15 +211,6 @@ export function MapKeyBody({ rows, hidden, onHidden, years, onYears, again, over
           <Years span={yearSpan} counts={count.year} value={years ?? yearSpan} onChange={(y) => onYears(y[0] === yearSpan[0] && y[1] === yearSpan[1] ? null : y)} />
         </Section>
       )}
-
-      <Section title="Context layers">
-        {OVERLAYS.map((o) => (
-          <label key={o.id} title={o.hint} className="flex cursor-pointer items-center gap-2.5 rounded-lg px-2 py-1.5 text-[13px] text-slate-800 hover:bg-white/90">
-            <input type="checkbox" checked={!!overlays[o.id]} onChange={() => onOverlay(o.id)} className="size-3.5 accent-slate-900" />
-            <i className="inline-block size-2.5 rounded-full" style={{ background: o.color }} /><span className="min-w-0 flex-1 truncate">{o.label}</span><span className="text-[10.5px] text-slate-400">interim</span>
-          </label>
-        ))}
-      </Section>
     </>
   );
 }

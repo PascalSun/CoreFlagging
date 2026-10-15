@@ -9,7 +9,7 @@ import { AccountMenu } from "@/components/auth/AccountMenu";
 import { EmailGate } from "@ntlp/geodata-web/email-gate";
 import { VerifyEmailDialog } from "@/components/auth/VerifyEmailDialog";
 import { CoreChat, type OpenTarget } from "@/components/coretrace/CoreChat";
-import { BASEMAPS, CoreMap, type Basemap, type MapApi, type Overlay } from "@/components/coretrace/CoreMap";
+import { BASEMAPS, CoreMap, type Basemap, type MapApi } from "@/components/coretrace/CoreMap";
 import { HolePanel } from "@/components/coretrace/HolePanel";
 import { UploadDialog } from "@/components/coretrace/UploadDialog";
 import { isAuthed, isVerified } from "@/lib/auth";
@@ -123,9 +123,6 @@ export function CoreTraceMap() {
       .sort((a, b) => Number(b.mine) - Number(a.mine) || Number(b.status === "ready") - Number(a.status === "ready") || a.name.localeCompare(b.name));
   }, [onMap, q, again]);
   // what the hole was drilled for by default: the question an explorer asks first; core type and "look again" are views to switch to
-  // context layers from the platform (DMIRS interim data), off until asked for
-  const [overlays, setOverlays] = useState<Partial<Record<Overlay, boolean>>>({});
-  const toggleOverlay = (id: Overlay) => setOverlays((o) => ({ ...o, [id]: !o[id] }));
   // the neighbours' ring, when the hole page asks for one (reset when the hole changes)
   const [ringKm, setRingKm] = useState<number | null>(null);
   // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -170,7 +167,7 @@ export function CoreTraceMap() {
   }, [onMap, faceted, hidden, years, again, keyOn]);
   const waitingN = useMemo(() => onMap.filter((h) => h.lat !== null && h.status !== "ready").length, [onMap]);
   const resetKey = () => { setHidden(NO_HIDDEN); setYears(null); setAgain(false); };
-  const keyBody = { rows: faceted, hidden, onHidden, years, onYears: setYears, again, overlays, onOverlay: toggleOverlay };
+  const keyBody = { rows: faceted, hidden, onHidden, years, onYears: setYears, again };
 
   // sign-in is the platform's: /auth/signin sends the browser there and back here (one sign-in for every app)
   // Sign-in happens right here, in the platform's shared dialog (no trip to another site).
@@ -196,7 +193,7 @@ export function CoreTraceMap() {
 
   return (
     <div className="fixed inset-0 overflow-hidden bg-slate-50 text-slate-900">
-      <div className="absolute inset-0 z-0"><CoreMap holes={drawn} basemap={basemap} colour={colour} card={(h) => holeCard(h, colour(h), typeName, "Target")} selected={selected} ringKm={ringKm} overlays={overlays} onSelect={(k) => set({ hole: k, m: null, full: null })}
+      <div className="absolute inset-0 z-0"><CoreMap holes={drawn} basemap={basemap} colour={colour} card={(h) => holeCard(h, colour(h), typeName, "Target")} selected={selected} ringKm={ringKm} onSelect={(k) => set({ hole: k, m: null, full: null })}
         padRight={mobile ? 0 : panelW + chatW + ctlW} padLeft={!mobile && view === "map" && holes.length > 0 && !keyFolded ? PANEL_W + 22 : 6} padBottom={mobile && holeKey ? Math.round(vh * 0.56) : 0} apiRef={mapApi} /></div>
 
       {/* the key: a single column down the left edge; every row can be shown alone or hidden, and every count
