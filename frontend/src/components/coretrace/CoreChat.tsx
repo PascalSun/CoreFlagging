@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils";
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 const TOOL_LABEL: Record<string, string> = {
-  find_holes: "Searched the holes", hole_summary: "Read the hole summary", hole_log: "Read the auto log", metre_detail: "Read one metre",
+  find_holes: "Searched the holes", hole_summary: "Read the hole summary", hole_log: "Read the auto log", unusual_10cm: "Read the 10 cm scores", metre_detail: "Read one metre",
   similar_core: "Searched similar core", quality_issues: "Read the quality list", open_hole: "Opened it on the map",
   hole_documents: "Looked up the hole's documents", document_text: "Read the document", search_documents: "Searched the reports", open_document: "Opened the PDF",
 };
