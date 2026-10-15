@@ -119,6 +119,7 @@ def write_dataset(pair: dict, hd: Path, meta: dict | None = None) -> dict:
         if name in sc and name.endswith(("TSAS", "TSAV")):
             cols[name] = _labels(s, name)
     spectral = [{"name": "Reflectance", "n": n, "wl": [float(s.wavelength[0]), float(s.wavelength[-1]), len(s.wavelength)]}]
+    t = None
     if pair["tir"]:
         try:
             t = parse_tsg.read_tsg_bip_pair(pair["tir"][0], pair["tir"][1], "tir")
@@ -137,6 +138,9 @@ def write_dataset(pair: dict, hd: Path, meta: dict | None = None) -> dict:
                 if name in t.scalars and name.endswith("jCLST"):
                     cols[name] = _labels(t, name)
     pd.DataFrame(cols).to_parquet(hd / "samples" / f"{d8}.parquet", index=False)
+    # ---- the spectral log's per-bin accumulators (group shares per 10 cm), from the TSA / jCLST scalars of both files
+    from ..spectral import dataset_acc, save_acc
+    save_acc(dataset_acc(s, t, (meta or {}).get("InstrumentName") or h["instrument"] or "", pair["name"]), hd / "tsa" / f"{d8}.json")
     # ---- imported 1 m logs, as the NVCL service downsamples them: one row per metre (and class), all samples counted
     metre = np.floor(depth).astype(int); class_logs = {b.name for b in s.bandheaders if b.class_number >= 0}
     for name in sc.columns:

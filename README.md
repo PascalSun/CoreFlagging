@@ -47,11 +47,12 @@ app/
   extras.py        per-metre outputs stored so opening a metre needs no model run
   labels.py        English for what the pipeline names in Chinese
   trays.py         tray photographs and where each row of core sits in them
+  spectral.py      the spectral log: TSG's mineral-group shares per 0.1 m and 1 m, SWIR and TIR
   sources.py       getting a job's TSG files onto local disk
   platform.py      the platform's job and result API
   worker.py        the job loop
   main.py          FastAPI: /health, /api/v1/models, /api/v1/similar
-  cli.py           process | register | work
+  cli.py           process | register | work | tray-mm | spectral-log
 bundle/            trained models, fitted heads, the State library (read-only, 190 MB)
 reference/         State reference tables: collars, regions, training split
 scripts/           parity checks against the research app
@@ -110,6 +111,23 @@ name keeps it and the other is keyed by its dataset. The collar comes from the S
 Only WA holes use the NVCL node's TIR mask and the WA reference list; the models were trained on
 WA core, so another State's results are read outside the training area. Uploads are always taken
 before the mirror backlog.
+
+### The spectral log
+
+Every processed hole also gets a **spectral log**: per interval, how much of each mineral group TSG
+read (the stacked SWIR and TIR bars of the HyLogger summary report). It is computed once from the
+TSA / jCLST scalars of the TSG files (`Grp1-3` and `Wt1-3`, the system run or else the user run),
+each sample's weights normalised to 1 and averaged over the samples with a result, at 0.1 m and 1 m,
+one dataset per bin by the same priority as the tokens. It goes to the platform in the result package
+(`spectral_log`), which serves it from its tables at `/core-scan/api/holes/<key>/spectral-log/`.
+
+Holes processed before this existed are backfilled from the mirror without rerunning anything:
+
+```bash
+uv run python -m app.cli spectral-log [--only KEY ...] [--state WA ...] [--workers 8]
+```
+
+It reads the scalars plane of each `.bip` only (no spectra, no models) and posts one hole at a time.
 
 ## Deploy
 
