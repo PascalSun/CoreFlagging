@@ -15,7 +15,7 @@ import { UploadDialog } from "@/components/coretrace/UploadDialog";
 import { isAuthed, isVerified } from "@/lib/auth";
 import { ACTIVE, coreScan } from "@/lib/coreScan";
 import { classify, shapeOf } from "@/components/coretrace/mapColour";
-import { MapKey, MapKeyBody, NO_HIDDEN, PANEL_W, facet, filtering, passes, type Facet, type Hidden } from "@/components/coretrace/MapKey";
+import { KeyTips, MapKey, MapKeyBody, NO_HIDDEN, PANEL_W, facet, filtering, passes, type Facet, type Hidden } from "@/components/coretrace/MapKey";
 import { HoleTable } from "@/components/coretrace/HoleTable";
 import { holeCard } from "@/components/coretrace/mapCard";
 import { Tour, tourSeen, type TourStep } from "@/components/coretrace/Tour";
@@ -230,6 +230,8 @@ export function CoreTraceMap() {
         </LegendSheet>
       )}
 
+      {/* one bubble for every [data-keytip] on the page: the map key, the full log's column heads and key */}
+      <KeyTips />
       {touring && <Tour steps={tour} onClose={() => setTouring(false)} />}
 
       {/* top bar: brand left, session right */}

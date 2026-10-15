@@ -98,6 +98,12 @@ export type ResultSummary = {
   gold: { auc: number | null; au_m: number; au_pos: number; top10_share?: number; base_share?: number };
 };
 
+/** One side (SWIR or TIR) of a spectral-log interval: samples in it, samples with a TSG result, and each group's
+ * share of those, weighted by the software's Wt1–3 (shares sum to 1). */
+export type SpectralSide = { n: number; n_result: number; mix: Record<string, number> };
+/** The TSG mineral-group make-up down the hole, worked out once when the hole was read (1 m or 0.1 m intervals). */
+export type SpectralLog = { key: string; step: number; from_m: number; to_m: number; swir_groups: string[]; tir_groups: string[]; tir: string;
+  rows: { from_m: number; swir: SpectralSide | null; tir: SpectralSide | null }[] };
 export type Metres = { m: number[]; gs: string[]; ms: string[]; gt: string[]; lith: string[]; lith_raw: string[]; au: (number | null)[] };
 
 export type HoleDetail = HoleRow & {
@@ -194,6 +200,9 @@ export const coreScan = {
   standout: (key: string, run: string) => json<Standout>(`/holes/${enc(key)}/standout/?model=${enc(run)}`),
   /** The 10 cm bins of a depth window (up to 50 m): the scanner's reading of each. */
   bins: (key: string, from: number, to: number) => json<{ from_m: number; to_m: number; bins: Bin[] }>(`/holes/${enc(key)}/bins/?from=${from}&to=${to}`),
+  /** The SWIR / TIR group make-up: the whole hole at 1 m, or a window of up to 50 m at 0.1 m. 404 when the hole has none. */
+  spectralLog: (key: string, step: 1 | 0.1, from?: number, to?: number) =>
+    json<SpectralLog>(`/holes/${enc(key)}/spectral-log/?step=${step}${from !== undefined && to !== undefined ? `&from=${from}&to=${to}` : ""}`),
   /** One bin's own mean spectra. */
   bin: (key: string, bin: number) => json<BinSpectra>(`/holes/${enc(key)}/bins/${bin}/`),
   /** The holes within `km` of this one, nearest first, each with its distance. */

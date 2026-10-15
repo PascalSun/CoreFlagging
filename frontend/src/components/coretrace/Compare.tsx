@@ -6,7 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, Printer } from "lucide-react";
 import { commodityName, coreScan, inferred, sourceLabel, TARGET_SOURCE_LABEL, type HoleDetail, type ModelView } from "@/lib/coreScan";
-import { StripLog, StripLegend } from "@/components/coretrace/StripLog";
+import { StripLog, StripKey } from "@/components/coretrace/StripLog";
 import { coreTypeColor, fmt, pct } from "@/components/coretrace/palette";
 import { cn } from "@/lib/utils";
 
@@ -51,7 +51,7 @@ function Column({ hole, mv, run, range, cursor, onCursor, missing }: { hole: Hol
                 <li key={d.from_m}><button type="button" onClick={() => onCursor(d.from_m)} className="text-left hover:underline"><span className="font-mono">{d.from_m}–{d.to_m} m</span> · log: {d.logged || d.logged_class} · reads: {d.reads}</button></li>))}</ul>}
           </div>
           {mv && <div><div className="mb-1 text-[11px] font-medium text-slate-500">Stands out from its surroundings</div><p>{mv.anomaly.n_flag_m} {mv.anomaly.n_flag_m === 1 ? "metre" : "metres"} flagged{mv.anomaly.runs[0] ? `, most at ${mv.anomaly.runs[0].peak_m} m` : ""}.</p></div>}
-          <div className="mt-auto border-t border-slate-100 pt-2"><StripLegend metres={hole.metres} model={mv} hasLith={hole.has_lith} hasAu={hole.au_m > 0} /></div>
+          <div className="mt-auto border-t border-slate-100 pt-2"><StripKey metres={hole.metres} model={mv} /></div>
           <p className="text-[10px] text-slate-400">Read by {run || "the model"}.</p>
         </div>
       </div>

@@ -1,10 +1,8 @@
 // Colours for core-scan charts.
 //
-// Seven categorical hues (a palette checked for colour-blind separation) go to the seven
-// minerals that carry most of the SWIR story, always the same hue for the same mineral.
-// The felsic framework minerals TIR sees (quartz, feldspars) are three neutral greys.
-// Anything rarer is one "other" tone and is named in the tooltip and legend, because a
-// ninth invented hue would not be told apart from the first eight.
+// Mineral groups wear the HyLogger / TSG standard colours, the ones the NVCL summary reports and every TSG plot
+// use, so a geologist reads a group here as anywhere else. They are the class colours the NVCL data service
+// gives for the Grp logs (getDownsampledData; stored there as BGR, turned to RGB here).
 
 export const INK = "#0b0b0b";
 export const MUTED = "#6b7280";
@@ -14,14 +12,15 @@ export const OTHER = "#d8d2c4";
 export const NONE = "#f1f5f9";
 
 const GROUP: Record<string, string> = {
-  CHLORITE: SERIES.green, "WHITE-MICA": SERIES.yellow, AMPHIBOLE: SERIES.aqua, KAOLIN: SERIES.magenta, "DARK-MICA": SERIES.violet,
-  CARBONATE: SERIES.blue, SMECTITE: SERIES.orange,
-  SILICA: "#c9ced6", PLAGIOCLASE: "#8d96a3", "K-FELDSPAR": "#4c5a6b",
+  CHLORITE: "#00ff00", INVALID: "#888888", CARBONATE: "#0000ff", "WHITE-MICA": "#ffff00", EPIDOTE: "#00ffff", AMPHIBOLE: "#ff00ff",
+  "DARK-MICA": "#683b50", NOTAROK: "#aaafaf", SMECTITE: "#c4a997", SULPHATE: "#68601c", "OTHER-ALOH": "#fffbbd", SERPENTINE: "#9bbd6f",
+  "OTHER-MGOH": "#20006a", KAOLIN: "#ff0000", TOURMALINE: "#b95d75", SILICA: "#fecfe6", PLAGIOCLASE: "#950d00", "K-FELDSPAR": "#f07800",
+  PYROXENE: "#873192", OXIDE: "#765246", GARNET: "#a10079", PHOSPHATE: "#bf93fe", OLIVINE: "#188c00",
 };
-const NOT_ROCK = new Set(["", "INVALID", "NOTAROK", "nan", "None", "null"]);
+const NO_DATA = new Set(["", "nan", "None", "null"]);
 
 export function groupColor(g: string | null | undefined): string {
-  if (!g || NOT_ROCK.has(g)) return NONE;
+  if (!g || NO_DATA.has(g)) return NONE;
   return GROUP[g] ?? OTHER;
 }
 
@@ -29,7 +28,7 @@ const GROUP_NAME: Record<string, string> = {
   CHLORITE: "Chlorite", "WHITE-MICA": "White mica", AMPHIBOLE: "Amphibole", KAOLIN: "Kaolin", "DARK-MICA": "Dark mica", CARBONATE: "Carbonate", SMECTITE: "Smectite",
   SILICA: "Quartz", PLAGIOCLASE: "Plagioclase", "K-FELDSPAR": "K-feldspar", PYROXENE: "Pyroxene", SERPENTINE: "Serpentine", SULPHATE: "Sulphate", EPIDOTE: "Epidote",
   "OTHER-MGOH": "Other Mg-OH", "OTHER-ALOH": "Other Al-OH", TOURMALINE: "Tourmaline", OLIVINE: "Olivine", GARNET: "Garnet", PHOSPHATE: "Phosphate", OXIDE: "Oxide",
-  "FE-OXIDE": "Iron oxide", ZEOLITE: "Zeolite", INVALID: "No response", NOTAROK: "Not rock",
+  "FE-OXIDE": "Iron oxide", ZEOLITE: "Zeolite", INVALID: "Invalid", NOTAROK: "Not rock",
 };
 export function groupName(g: string | null | undefined): string {
   if (!g || g === "nan" || g === "None") return "—";

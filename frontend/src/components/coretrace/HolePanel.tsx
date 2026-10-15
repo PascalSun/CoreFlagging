@@ -8,7 +8,7 @@ import { PAGE_W, ReportDocument } from "@/components/coretrace/ReportDocument";
 import { ACTIVE, inferred, TARGET_SOURCE_LABEL, abstractParts, commodityName, coreScan, readDate, reportFileKind, sourceLabel, surveyOf, type SimilarScope, type CoreModelInfo, type HoleDetail, type HoleReport, type MetreView, type ModelView, type Tray } from "@/lib/coreScan";
 import { ISSUE_LABEL, STATUS_LABEL, SERIES, coreTypeColor, fmt, groupColor, groupName, issueLabel, mineralName, pct } from "@/components/coretrace/palette";
 import { LINE, SpectraChart } from "@/components/coretrace/SpectraChart";
-import { StripLegend, StripLog } from "@/components/coretrace/StripLog";
+import { StripKey, StripLog } from "@/components/coretrace/StripLog";
 import { TrayViewer } from "@/components/coretrace/DeepZoom";
 import { TrayPhoto } from "@/components/coretrace/TrayPhoto";
 import { LookAgain } from "@/components/coretrace/LookAgain";
@@ -318,6 +318,11 @@ export function HolePanel({ holeKey, tab: tabProp, onTab, models, run, metre, on
   const simAt = win && win[1] - win[0] <= 50 ? { from: win[0], to: win[1] } : metre !== null ? { m: metre } : null;
   const sq = useQuery({ queryKey: ["core-similar", holeKey, simAt, useRun, simScope], queryFn: () => coreScan.similar(holeKey, simAt as { m: number }, useRun, simScope), enabled: ready && wide && tab === "similar" && simAt !== null && !!useRun, staleTime: 5 * 60_000, retry: false });
   const mvw = mq.data; const trays = tq.data?.trays ?? [];
+  // the SWIR / TIR group make-up, worked out when the hole was read: the whole hole at 1 m, and the window at 0.1 m
+  // once it is 50 m or less (404 for a hole that has none yet: the log then shows the leading group per metre)
+  const slq = useQuery({ queryKey: ["core-spectral", holeKey], queryFn: () => coreScan.spectralLog(holeKey, 1), enabled: ready && wide, staleTime: 60 * 60_000, retry: false });
+  const fineWin = win && win[1] - win[0] <= 50 ? win : null;
+  const slf = useQuery({ queryKey: ["core-spectral", holeKey, fineWin], queryFn: () => coreScan.spectralLog(holeKey, 0.1, fineWin![0], fineWin![1]), enabled: ready && wide && !!fineWin, staleTime: 60 * 60_000, retry: false, placeholderData: keepPreviousData });
   // the original report: only holes whose scan names a WAMEX report have one
   const hasReport = !!hole?.meta.wamex;
   const rq = useQuery({ queryKey: ["core-report", holeKey], queryFn: () => coreScan.report(holeKey), enabled: hasReport, staleTime: 60 * 60_000, retry: false });
@@ -425,8 +430,8 @@ export function HolePanel({ holeKey, tab: tabProp, onTab, models, run, metre, on
       // a wide screen keeps the log and the reading side by side, each scrolling on its own; a phone scrolls the whole
       // page as one, with the log a fixed height at the top and the tabs held at the top of the screen as you read
       <div className="flex flex-col lg:min-h-0 lg:flex-1 lg:flex-row">
-        <div className="flex h-[min(380px,52vh)] flex-none flex-col items-center border-b border-slate-200/70 p-3 lg:h-auto lg:min-h-0 lg:items-stretch lg:border-r lg:border-b-0">
-          <StripLog range={win ?? undefined} onRange={onWindow} metres={hole.metres} model={mvw} cursor={metre} onHover={tab === "metre" ? setPeekRaw : undefined} onCursor={(m) => { setPeekRaw(null); jump(m); if (tab === "report" || tab === "quality") setTab("metre"); }} hasLith={hole.has_lith} hasAu={hole.au_m > 0} />
+        <div className="flex h-[min(380px,52vh)] flex-none flex-col items-center border-b border-slate-200/70 p-3 lg:h-auto lg:min-h-0 lg:items-stretch lg:border-r lg:border-b-0 lg:px-5 lg:py-4">
+          <StripLog range={win ?? undefined} onRange={onWindow} metres={hole.metres} model={mvw} spectral={slq.data} spectralFine={fineWin ? slf.data : undefined} cursor={metre} onHover={tab === "metre" ? setPeekRaw : undefined} onCursor={(m) => { setPeekRaw(null); jump(m); if (tab === "report" || tab === "quality") setTab("metre"); }} hasLith={hole.has_lith} hasAu={hole.au_m > 0} />
         </div>
         <div className="@container flex min-w-0 flex-col lg:min-h-0 lg:flex-1">
           {/* on a phone the model line scrolls away; only the tabs stay */}
@@ -528,11 +533,14 @@ export function HolePanel({ holeKey, tab: tabProp, onTab, models, run, metre, on
                   </div>)) : <Empty>The checks found nothing to report for this hole.</Empty>}
               </div>)}
             {tab === "report" && <Report hole={hole} models={models} mvw={mvw} run={useRun} trays={trays} />}
-            {tab !== "report" && tab !== "quality" && <div className="mt-6 border-t border-slate-100 pt-3"><StripLegend metres={hole.metres} model={mvw} hasLith={hole.has_lith} hasAu={hole.au_m > 0} /></div>}
           </div>
         </div>
       </div>
     );
   }
-  return <div className="flex h-full min-h-0 flex-col">{header}<div className="flex min-h-0 flex-1 flex-col overflow-y-auto">{body}</div></div>;
+  // the full log's key, a footer under every tab: they all read the same log on the left
+  const footer = hole && ready && wide && (
+    <div className="flex-none border-t border-slate-200/70 bg-white/70 px-4 py-2"><StripKey metres={hole.metres} model={mvw} spectral={slq.data} /></div>
+  );
+  return <div className="flex h-full min-h-0 flex-col">{header}<div className="flex min-h-0 flex-1 flex-col overflow-y-auto">{body}</div>{footer}</div>;
 }

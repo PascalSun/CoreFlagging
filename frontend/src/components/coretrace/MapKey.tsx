@@ -45,7 +45,7 @@ const NEUTRAL = "#94a3b8";
 // ---- tooltips: the key scrolls inside a blurred panel, which would clip a bubble (and a bubble wider than the
 // panel would let it scroll sideways), so the bubble is drawn on the page, over everything, from [data-keytip]
 
-function KeyTips() {
+export function KeyTips() {
   const [tip, setTip] = useState<{ text: string; x: number; y: number; below: boolean; end?: number } | null>(null);
   useEffect(() => {
     const over = (e: MouseEvent) => {
@@ -102,6 +102,9 @@ function Row({ label, n, off, only, onOnly, onHide, mark, info, hint, bar, onCli
     </div>
   );
 }
+
+/** The "Dominant rock types" section is hidden for now; the filter behind it stays, so it can come back. */
+const SHOW_ROCK_TYPES = false;
 
 function Section({ title, tag, info, onReset, children }: { title: string; tag?: string; info?: string; onReset?: () => void; children: React.ReactNode }) {
   return (
@@ -172,7 +175,7 @@ export function MapKeyBody({ rows, hidden, onHidden, years, onYears, again, over
 
   return (
     <>
-      {order.core.length > 0 && (
+      {SHOW_ROCK_TYPES && order.core.length > 0 && (
         <Section title="Dominant rock types" info="The rock type the models read most often down the hole, by its leading mineral. Raw-scan holes have no model reading and so no rock type: they show while every rock type is on, and drop out once any is hidden." onReset={reset("core")}>
           {(more.core ? order.core : order.core.slice(0, 5)).map((k) => row("core", k, { bar: (count.core.get(k) ?? 0) / cmax }))}
           <More open={more.core} n={order.core.length - 5} onClick={() => setMore((m) => ({ ...m, core: !m.core }))} />
@@ -253,7 +256,6 @@ export function MapKey({ rows, shown, waiting, folded, onFold, onReset, ...body 
   return (
     <aside data-tour="legend" aria-label="Map key" style={{ width: PANEL_W }}
       className={cn("absolute top-[68px] left-3 z-10 flex max-w-[calc(100vw-24px)] flex-col overflow-hidden rounded-2xl border border-white/60 bg-white/90 shadow-glass backdrop-blur-xl", !folded && "bottom-3")}>
-      <KeyTips />
       <div className="flex items-center gap-2 border-b border-white/75 py-2 pr-2 pl-4">
         <b className="font-display text-sm font-bold tracking-tight">Drillholes</b>
         <span className="ml-auto text-[11.5px] whitespace-nowrap text-slate-500">

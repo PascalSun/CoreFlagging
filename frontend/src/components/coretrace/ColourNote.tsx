@@ -18,7 +18,7 @@ export const COLOUR_NOTES = {
   },
   mineral: {
     title: "Mineral colours",
-    body: "Seven hues, checked for colour-blind separation, go to the seven SWIR mineral groups that carry most of the story (chlorite, white mica, amphibole, kaolin, carbonate, smectite, dark mica), always the same hue for the same mineral on every page; the framework minerals TIR sees (quartz, feldspars) are three greys; rarer groups share one neutral and are named on hover. A model core type takes the colour of its leading mineral.",
+    body: "The HyLogger / TSG standard colours for spectral groups, the same as in the NVCL summary reports and any TSG plot: the same colour for the same group on every page, SWIR and TIR alike. Grey is TSG's Invalid (no usable spectrum). A rock class (RC) takes the colour of its leading mineral.",
     link: null,
   },
 } as const;

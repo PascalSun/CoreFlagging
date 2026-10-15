@@ -1,23 +1,46 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { Metres, ModelView } from "@/lib/coreScan";
+import { Info } from "lucide-react";
+import type { Metres, ModelView, SpectralLog } from "@/lib/coreScan";
 import { GRID, INK, MUTED, SERIES, coreTypeColor, fmt, groupColor, groupName, pct } from "@/components/coretrace/palette";
 import { cn } from "@/lib/utils";
 import { DepthNav } from "@/components/coretrace/DepthNav";
 import { ColourNote } from "@/components/coretrace/ColourNote";
 import { LEVELS, MIN_SPAN, fmtSpan, levelOf, windowAbout, windowAt } from "@/lib/depth";
 
-type Track = { id: string; label: string; w: number; kind: "cat" | "bar" };
-const AXIS_W = 44, GAP = 6, HEAD_H = 30, NAV_W = 30;
+type Track = { id: string; label: string; w: number; kind: "mix" | "cat" | "bar" | "line"; info: string };
+const AXIS_W = 44, GAP = 6, HEAD_H = 34, NAV_W = 30;
+
+export const TIP = {
+  scale: "Scale: the whole hole in miniature. The box is the window on the right; drag it, or its ends, to move or resize it, or click to put it there.",
+  swir: "SWIR: the short-wave infrared mineral groups the scanner's TSG software reads (TSA). Each bar is the share of every group in the interval, weighted by the software's fit: 1 m bars over the whole hole, 10 cm bars once zoomed to 50 m or less. Grey is TSG's Invalid (no usable spectrum).",
+  tir: "TIR: the thermal infrared mineral groups the scanner's TSG software reads (jCLST), drawn the same way as SWIR. Empty where the hole has no usable thermal infrared.",
+  bd: "BD, boundary detection: HyFormer cuts the hole where its reading of the spectra changes. Each black line is a predicted boundary; the chunks between them are the auto log.",
+  rc: "RC, rock classification: the core type HyFormer reads in each metre (a cluster of its reading), in the colour of the type's leading mineral.",
+  unusual: "Unusual: how far each metre's spectra stand from the core within 15 m of it (bar length). Orange-red bars are flagged: among the hole's top 3% and above the State's 98th percentile.",
+};
+
+/** The groups of a spectral log in the order the official HyLogger plots stack them: most of the hole first,
+ * SWIR and TIR counted together. */
+export function groupOrder(log: SpectralLog | undefined): string[] {
+  if (!log) return [];
+  const tot = new Map<string, number>();
+  for (const row of log.rows) for (const side of [row.swir, row.tir]) {
+    if (!side) continue;
+    for (const [g, v] of Object.entries(side.mix)) tot.set(g, (tot.get(g) ?? 0) + v * side.n_result);
+  }
+  return [...tot.entries()].sort((a, b) => b[1] - a[1]).map(([g]) => g);
+}
 
 /** The hole from top to bottom, one row per metre, drawn to depth. Categorical tracks say
- * what the core is (software minerals, the model's core type); the bar track says how unusual
- * it is. Each track has its own scale — they sit side by side, never on a shared axis. Hover
- * reads a metre, click selects it. Type2 is a copy of Type, holding the place of a second
- * reading of the core type to come. */
-export function StripLog({ metres, model, cursor, onCursor, onHover, hasLith, range, onRange }: {
+ * what the core is: the TSG software's mineral groups as stacked shares (SWIR, TIR), HyFormer's
+ * boundaries (BD) and its rock class (RC); the bar track says how unusual it is. Each track has its
+ * own scale — they sit side by side, never on a shared axis. Hover reads a metre, click selects it. */
+export function StripLog({ metres, model, cursor, onCursor, onHover, hasLith, range, onRange, spectral, spectralFine }: {
   metres: Metres; model: ModelView | undefined; cursor: number | null; onCursor: (m: number) => void; onHover?: (m: number | null) => void; hasLith: boolean; hasAu?: boolean;
+  /** the group make-up of the whole hole at 1 m, and of the window at 0.1 m; without them SWIR and TIR show the leading group per metre */
+  spectral?: SpectralLog; spectralFine?: SpectralLog;
   /** draw to this depth range instead of the hole's own: two logs side by side share one axis, or the reader has zoomed in */
   range?: [number, number];
   /** when set, the log can be zoomed: the wheel over it and the level buttons change the range (null = whole hole) */
@@ -72,10 +95,11 @@ export function StripLog({ metres, model, cursor, onCursor, onHover, hasLith, ra
   const pinch = useRef<number | null>(null);
 
   const tracks = useMemo<Track[]>(() => [
-    { id: "gs", label: "SWIR", w: 22, kind: "cat" }, { id: "gt", label: "TIR", w: 22, kind: "cat" },
-    ...(model ? [{ id: "core", label: "Type", w: 30, kind: "cat" } as Track, { id: "core2", label: "Type2", w: 30, kind: "cat" } as Track,
-      { id: "anom", label: "Unusual", w: 54, kind: "bar" } as Track] : []),
+    { id: "gs", label: "SWIR", w: 54, kind: "mix", info: TIP.swir }, { id: "gt", label: "TIR", w: 54, kind: "mix", info: TIP.tir },
+    ...(model ? [{ id: "bd", label: "BD", w: 24, kind: "line", info: TIP.bd } as Track, { id: "rc", label: "RC", w: 30, kind: "cat", info: TIP.rc } as Track,
+      { id: "anom", label: "Unusual", w: 54, kind: "bar", info: TIP.unusual } as Track] : []),
   ], [model]);
+  const order = useMemo(() => groupOrder(spectral), [spectral]);
   const width = AXIS_W + tracks.reduce((a, t) => a + t.w + GAP, 0);
 
   // a zoomed range runs from its start to its end; the whole hole from its first metre to its last (inclusive)
@@ -110,26 +134,43 @@ export function StripLog({ metres, model, cursor, onCursor, onHover, hasLith, ra
       g.fillStyle = GRID; g.fillRect(AXIS_W - 4, Math.round(y), width - AXIS_W + 4, 1);
       g.fillStyle = MUTED; g.fillText(step < 1 ? d.toFixed(1) : String(Math.round(d)), AXIS_W - 8, Math.min(Math.max(y, 6), height - 6));
     }
+    // the stacked group shares come from the 0.1 m log when it covers what is in view, else from the 1 m one
+    const fine = spectralFine && spectralFine.from_m <= m0 + 0.05 && spectralFine.to_m >= m1 + 1 - 0.05 ? spectralFine : undefined;
+    const log = fine ?? spectral;
+    const stack = (side: "swir" | "tir", x: number, w: number) => {
+      if (!log) return false;
+      const h = Math.max(log.step * ppm, 1 / dpr);
+      for (const row of log.rows) {
+        const y = (row.from_m - m0) * ppm, sd = row[side];
+        if (y + h < 0 || y > height || !sd || !sd.n_result) continue;
+        let at = 0;
+        const groups = [...order, ...Object.keys(sd.mix).filter((k) => !order.includes(k))];
+        for (const k of groups) { const v = sd.mix[k]; if (!v) continue; g.fillStyle = groupColor(k); g.fillRect(x + at * w, y, v * w, h); at += v; }
+      }
+      return true;
+    };
     let x = AXIS_W;
     for (const t of tracks) {
-      if (t.kind === "bar") { g.fillStyle = "#f8fafc"; g.fillRect(x, 0, t.w, height); }
+      if (t.kind === "bar" || t.kind === "line") { g.fillStyle = "#f8fafc"; g.fillRect(x, 0, t.w, height); }
+      if (t.kind === "mix" && stack(t.id === "gs" ? "swir" : "tir", x, t.w)) { x += t.w + GAP; continue; }
       for (let i = 0; i < metres.m.length; i++) {
         const m = metres.m[i], y = (m - m0) * ppm, j = midx.get(m);
+        // no spectral log (yet): the leading group of each metre
         if (t.id === "gs") { g.fillStyle = groupColor(metres.gs[i]); g.fillRect(x, y, t.w, rowH); }
         else if (t.id === "gt") { g.fillStyle = groupColor(metres.gt[i]); g.fillRect(x, y, t.w, rowH); }
         else if (model && j !== undefined) {
-          if (t.id === "core" || t.id === "core2") { g.fillStyle = coreTypeColor(typeName.get(model.core[j])); g.fillRect(x, y, t.w, rowH); }
+          if (t.id === "rc") { g.fillStyle = coreTypeColor(typeName.get(model.core[j])); g.fillRect(x, y, t.w, rowH); }
           else if (t.id === "anom") { g.fillStyle = flagged(j) ? SERIES.orange : "#9ca3af"; g.fillRect(x, y, Math.max(1, Math.min(1, model.anom_raw[j] / rawTop) * t.w), rowH); }
         }
       }
-      if ((t.id === "core" || t.id === "core2") && model) {            // the auto log: a line at every boundary the model drew
+      if (t.id === "bd" && model) {            // the auto log: a line at every boundary the model drew, and nothing else
         g.fillStyle = INK;
-        for (const s of model.segments) { const y = (s.from_m - m0) * ppm; if (y > 0.5) g.fillRect(x - 2, Math.round(y), t.w + 4, 1); }
+        for (const s of model.segments) { const y = (s.from_m - m0) * ppm; if (y > 0.5) g.fillRect(x, Math.round(y), t.w, 1.5); }
       }
       x += t.w + GAP;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [metres, model, tracks, width, height, ppm, m0, m1, rawTop]);
+  }, [metres, model, tracks, width, height, ppm, m0, m1, rawTop, spectral, spectralFine, order]);
 
   // keep the selected metre in view: it may be set from a link, a table row or another tab
   useEffect(() => {
@@ -176,14 +217,11 @@ export function StripLog({ metres, model, cursor, onCursor, onHover, hasLith, ra
           {LEVELS.map((l) => { const on = l.id === "hole" ? !range : levelOf(range ?? null) === l.id; return (
             <button key={l.id} type="button" role="tab" aria-selected={on} onClick={() => toLevel(l.id)} className={cn("flex-1 rounded-full px-1.5 py-1 text-[11px] font-medium ring-1 transition-colors", on ? "bg-slate-900 text-white ring-slate-900" : "bg-white text-slate-600 ring-slate-200 hover:ring-slate-400")}>{l.label}</button>); })}
         </div>)}
-      <div className="flex text-[10px] font-medium text-slate-500" style={{ height: HEAD_H, width: width + (onRange ? NAV_W : 0) }}>
-        {onRange && <span style={{ width: NAV_W }} />}
+      {/* each column's name, and under it an ⓘ that says what the column is (the bubble is drawn by KeyTips) */}
+      <div className="flex text-[10px] font-semibold text-slate-600" style={{ height: HEAD_H, width: width + (onRange ? NAV_W : 0) }}>
+        {onRange && <Head label="Scale" info={TIP.scale} w={NAV_W} />}
         <span style={{ width: AXIS_W }} />
-        {tracks.map((t) => (
-          <span key={t.id} className="flex items-end justify-center overflow-visible whitespace-nowrap pb-1" style={{ width: t.w + GAP }}>
-            <span className={t.kind === "cat" ? "origin-bottom -rotate-45 translate-x-1" : ""}>{t.label}</span>
-          </span>
-        ))}
+        {tracks.map((t) => <Head key={t.id} label={t.label} info={t.info} w={t.w + GAP} />)}
       </div>
       <div className="flex min-h-0 flex-1 gap-0">
       {onRange && <div className="flex-none pr-1" style={{ width: NAV_W }}><DepthNav metres={metres} model={model} view={view} hole0={hole0} hole1={hole1} onRange={onRange} typeName={typeName} height={boxH} /></div>}
@@ -218,10 +256,10 @@ export function StripLog({ metres, model, cursor, onCursor, onHover, hasLith, ra
         {tipM !== null && ti !== undefined ? (
           <>
             <div className="font-semibold text-slate-900">{tipM}–{tipM + 1} m{hasLith && metres.lith_raw[ti] ? <span className="font-normal text-slate-600"> · {metres.lith_raw[ti]}</span> : null}</div>
-            <div>SWIR <b className="font-medium text-slate-900">{groupName(metres.gs[ti])}</b> · TIR <b className="font-medium text-slate-900">{groupName(metres.gt[ti])}</b></div>
+            <div>SWIR <b className="font-medium text-slate-900">{mixText(spectral, tipM, "swir") ?? groupName(metres.gs[ti])}</b> · TIR <b className="font-medium text-slate-900">{mixText(spectral, tipM, "tir") ?? groupName(metres.gt[ti])}</b></div>
             {model && tj !== undefined ? (
               <>
-                <div title={typeName.get(model.core[tj])}>{typeName.get(model.core[tj]) ?? "—"}</div>
+                <div title={typeName.get(model.core[tj])}>RC {typeName.get(model.core[tj]) ?? "—"}</div>
                 <div>unusual {pct(model.anom[tj])}{flagged(tj) ? " (flagged)" : ""}{metres.au[ti] !== null ? <> · Au {fmt(metres.au[ti], 2)} ppm</> : null}</div>
               </>
             ) : metres.au[ti] !== null ? <div>Au {fmt(metres.au[ti], 2)} ppm</div> : null}
@@ -234,29 +272,44 @@ export function StripLog({ metres, model, cursor, onCursor, onHover, hasLith, ra
 
 const Sw = ({ c }: { c: string }) => <span className="inline-block h-2.5 w-2.5 flex-none rounded-[2px]" style={{ background: c }} />;
 
-/** What the colours and bars of the strip log mean. */
-export function StripLegend({ metres, model }: { metres: Metres; model: ModelView | undefined; hasLith?: boolean; hasAu?: boolean }) {
-  const groups = useMemo(() => {
-    const n = new Map<string, number>();
-    for (const g of [...metres.gs, ...metres.gt]) if (g && g !== "INVALID" && g !== "nan") n.set(g, (n.get(g) ?? 0) + 1);
-    return [...n.entries()].sort((a, b) => b[1] - a[1]).map(([g]) => g);
-  }, [metres]);
-  const named = groups.filter((g) => groupColor(g) !== "#d8d2c4").slice(0, 10); const rest = groups.filter((g) => groupColor(g) === "#d8d2c4");
+/** A column's name over the log, with an ⓘ under it. */
+function Head({ label, info, w }: { label: string; info: string; w: number }) {
   return (
-    <div className="flex flex-col gap-2 text-[11px] text-slate-600">
-      <div className="flex flex-wrap gap-x-3 gap-y-1">
-        <span className="font-medium text-slate-900">{model ? "Minerals (SWIR, TIR, Type)" : "Minerals (SWIR, TIR)"}</span>
-        {named.map((g) => <span key={g} className="flex items-center gap-1"><Sw c={groupColor(g)} />{groupName(g)}</span>)}
-        {rest.length > 0 && <span className="flex items-center gap-1" title={rest.map(groupName).join(", ")}><Sw c="#d8d2c4" />Other ({rest.map(groupName).slice(0, 3).join(", ")}{rest.length > 3 ? "…" : ""})</span>}
-      </div>
-      <div className="flex flex-wrap gap-x-3 gap-y-1">
-        {model && <span className="flex items-center gap-1"><span className="inline-block h-px w-3 bg-slate-900" />auto-log boundary</span>}
-        {model && <span className="flex items-center gap-1"><Sw c={SERIES.orange} />unusual, flagged</span>}
-        {model && <span className="flex items-center gap-1"><Sw c="#9ca3af" />unusual, not flagged</span>}
-      </div>
-      <div className="flex flex-wrap gap-x-2">
-        <ColourNote kind="mineral" />
-      </div>
+    <span className="flex flex-col items-center justify-end gap-0.5 pb-1" style={{ width: w }}>
+      <span className="whitespace-nowrap leading-none">{label}</span>
+      <span data-keytip={info} aria-label={info} role="img" className="grid size-3.5 cursor-help place-items-center rounded-full text-slate-400 hover:text-slate-900"><Info size={11} /></span>
+    </span>
+  );
+}
+
+/** "Chlorite 55%, No response 30%": the leading groups of a metre in the 1 m log, or null when it has none. */
+function mixText(log: SpectralLog | undefined, m: number, side: "swir" | "tir"): string | null {
+  const sd = log?.rows.find((r) => Math.abs(r.from_m - m) < 0.01)?.[side];
+  if (!sd || !sd.n_result) return null;
+  return Object.entries(sd.mix).sort((a, b) => b[1] - a[1]).slice(0, 2).map(([g, v]) => `${groupName(g)} ${pct(v)}`).join(", ");
+}
+
+/** What the colours and marks of the log mean, for the foot of the full log: every tab reads the same log, so the
+ * key sits under all of them. The groups are this hole's, in the order the bars stack them. */
+export function StripKey({ metres, model, spectral }: { metres: Metres; model: ModelView | undefined; spectral?: SpectralLog }) {
+  const groups = useMemo(() => {
+    const ordered = groupOrder(spectral);
+    if (ordered.length) return ordered;
+    const n = new Map<string, number>();
+    for (const g of [...metres.gs, ...metres.gt]) if (g && g !== "nan") n.set(g, (n.get(g) ?? 0) + 1);
+    return [...n.entries()].sort((a, b) => b[1] - a[1]).map(([g]) => g);
+  }, [metres, spectral]);
+  return (
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-600">
+      <span className="flex items-center gap-1 font-semibold text-slate-900">Minerals<ColourNote kind="mineral" /></span>
+      {groups.map((g) => <span key={g} className="flex items-center gap-1"><Sw c={groupColor(g)} />{groupName(g)}</span>)}
+      {model && <>
+        <span className="h-3 w-px bg-slate-200" aria-hidden />
+        <span className="flex items-center gap-1" data-keytip={TIP.bd}><span className="inline-block h-[1.5px] w-3 bg-slate-900" />boundary (BD)</span>
+        <span className="flex items-center gap-1" data-keytip={TIP.rc}>RC in its leading mineral&rsquo;s colour</span>
+        <span className="flex items-center gap-1" data-keytip={TIP.unusual}><Sw c={SERIES.orange} />unusual, flagged</span>
+        <span className="flex items-center gap-1"><Sw c="#9ca3af" />unusual, not flagged</span>
+      </>}
     </div>
   );
 }
