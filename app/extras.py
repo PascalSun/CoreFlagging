@@ -36,6 +36,13 @@ def metre_arrays(eng: Engine, key: str) -> tuple[np.ndarray, np.ndarray]:
     return tir, fp
 
 
+def token_arrays(eng: Engine, key: str) -> tuple[np.ndarray, np.ndarray]:
+    """(anom, raw): the unusual score of every 10 cm token, in the tokens' order (the order of the processed .npz, which is
+    the order the platform keeps them in). The per-metre `anom` of hole_view() is the maximum of these over the metre."""
+    R = eng.compute(key)
+    return R["lc_pct"].astype("<f4"), R["lc"].astype("<f4")
+
+
 def metre_why(eng: Engine, key: str) -> list[list[dict]]:
     """Per metre, up to five features at least 2 robust standard deviations from the surrounding ±15 m (as engine.metre_view)."""
     R = eng.compute(key); G = R["G"]; depth = R["depth"]; m = np.floor(depth).astype(int); out = []
