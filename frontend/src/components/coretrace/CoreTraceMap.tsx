@@ -15,6 +15,7 @@ import { UploadDialog } from "@/components/coretrace/UploadDialog";
 import { isAuthed, isVerified } from "@/lib/auth";
 import { ACTIVE, coreScan } from "@/lib/coreScan";
 import { classify, shapeOf } from "@/components/coretrace/mapColour";
+import { ComparePanel } from "@/components/coretrace/Compare";
 import { KeyTips, MapKey, MapKeyBody, NO_HIDDEN, PANEL_W, facet, filtering, passes, type Facet, type Hidden } from "@/components/coretrace/MapKey";
 import { HoleTable } from "@/components/coretrace/HoleTable";
 import { holeCard } from "@/components/coretrace/mapCard";
@@ -33,6 +34,8 @@ export function CoreTraceMap() {
   const pathname = usePathname(); const sp = useSearchParams(); const qc = useQueryClient();
   const mobile = useIsMobile(); const base = coretraceBase(pathname);
   const holeKey = sp.get("hole"); const wide = sp.get("full") === "1";
+  // a second hole to compare the open one with (?cmp=), in a panel over the map
+  const cmp = sp.get("cmp"); const comparing = !!holeKey && !!cmp;
   // on a phone the hole is a bottom sheet: half height when a hole opens, full screen when pulled up
   const [sheetFull, setSheetFull] = useState(false);
   // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -182,7 +185,7 @@ export function CoreTraceMap() {
   const barW = vw - chatW;
   // the zoom and basemap buttons keep the right edge and the hole's panel sits left of them; the full log takes the
   // page's whole width, over the map and its buttons
-  const ctlW = view === "map" && !mobile && !(holeKey && wide) ? 38 + 8 : 0;
+  const ctlW = view === "map" && !mobile && !(holeKey && wide) && !comparing ? 38 + 8 : 0;
   const panelW = !holeKey ? 0 : wide ? vw - chatW - 24 : 420;
 
   return (
@@ -198,7 +201,7 @@ export function CoreTraceMap() {
 
       {/* zoom, and under it the basemap behind a layers button, at the right edge whether or not a hole is open; on a
           phone the map is pinched and the basemap lives in the key's sheet */}
-      {view === "map" && !mobile && !(holeKey && wide) && (
+      {view === "map" && !mobile && !(holeKey && wide) && !comparing && (
         <div className="absolute bottom-3 z-10 flex flex-col items-end gap-2" style={{ right: 12 + chatW }}>
           <div className={cn(glass, "flex flex-col overflow-hidden rounded-xl")} role="group" aria-label="Zoom">
             <button type="button" onClick={() => mapApi.current?.zoomIn()} aria-label="Zoom in" className="grid size-9 place-items-center text-slate-700 hover:bg-white hover:text-slate-900"><Plus size={15} /></button>
@@ -293,18 +296,26 @@ export function CoreTraceMap() {
       {holeKey && !mobile && (
         <aside className="absolute z-30 overflow-hidden rounded-2xl border border-white/60 bg-white/90 shadow-glass backdrop-blur-xl" style={{ top: 68, bottom: 12, width: panelW, right: chatW + ctlW + 12 }}>
           <HolePanel key={holeKey} holeKey={holeKey} tab={tab} onTab={(t) => set({ tab: t === "window" ? null : t })} models={models} run={run} metre={metre} onMetre={(m) => set({ m: m === null ? null : String(m) })}
-            wide={wide} onWide={(w) => set({ full: w ? "1" : null })} onClose={() => set({ hole: null, m: null, full: null, tab: null, w: null })} win={win} onWindow={(r) => set(r ? { w: `${r[0]}-${r[1]}`, full: "1", tab: "window" } : { w: null, tab: null })}
+            wide={wide} onWide={(w) => set({ full: w ? "1" : null })} onClose={() => set({ hole: null, m: null, full: null, tab: null, w: null, cmp: null })} win={win} onWindow={(r) => set(r ? { w: `${r[0]}-${r[1]}`, full: "1", tab: "window" } : { w: null, tab: null })}
             onOpenHole={(k, m) => set({ hole: k, m: m === undefined ? null : String(m), full: "1" })}
-            onDeleted={() => set({ hole: null, m: null, full: null })} onRing={setRingKm} />
+            onDeleted={() => set({ hole: null, m: null, full: null })} onRing={setRingKm} onCompare={(k) => set({ cmp: k })} />
         </aside>
       )}
       {holeKey && mobile && (
-        <HoleSheet full={wide || sheetFull} onFull={(f) => { setSheetFull(f); if (!f && wide) set({ full: null }); }} onClose={() => set({ hole: null, m: null, full: null, tab: null })}>
+        <HoleSheet full={wide || sheetFull} onFull={(f) => { setSheetFull(f); if (!f && wide) set({ full: null }); }} onClose={() => set({ hole: null, m: null, full: null, tab: null, cmp: null })}>
           <HolePanel key={holeKey} holeKey={holeKey} tab={tab} onTab={(t) => set({ tab: t === "window" ? null : t })} models={models} run={run} metre={metre} onMetre={(m) => set({ m: m === null ? null : String(m) })}
-            wide={wide} onWide={(w) => set({ full: w ? "1" : null })} onClose={() => set({ hole: null, m: null, full: null, tab: null, w: null })} win={win} onWindow={(r) => set(r ? { w: `${r[0]}-${r[1]}`, full: "1", tab: "window" } : { w: null, tab: null })}
+            wide={wide} onWide={(w) => set({ full: w ? "1" : null })} onClose={() => set({ hole: null, m: null, full: null, tab: null, w: null, cmp: null })} win={win} onWindow={(r) => set(r ? { w: `${r[0]}-${r[1]}`, full: "1", tab: "window" } : { w: null, tab: null })}
             onOpenHole={(k, m) => set({ hole: k, m: m === undefined ? null : String(m), full: "1" })}
-            onDeleted={() => set({ hole: null, m: null, full: null })} onRing={setRingKm} />
+            onDeleted={() => set({ hole: null, m: null, full: null })} onRing={setRingKm} onCompare={(k) => set({ cmp: k })} />
         </HoleSheet>
+      )}
+
+      {/* two holes side by side: as big as the full log, over the map and the hole's panel; closing it goes back to them */}
+      {comparing && (
+        <aside className={mobile ? "fixed inset-0 z-50 overflow-hidden bg-white" : "absolute z-[35] overflow-hidden rounded-2xl border border-white/60 bg-white/90 shadow-glass backdrop-blur-xl"}
+          style={mobile ? undefined : { top: 68, bottom: 12, left: 12, right: chatW + 12 }}>
+          <ComparePanel key={`${holeKey}|${cmp}`} a={holeKey!} b={cmp!} onClose={() => set({ cmp: null })} onOpenHole={(k) => set({ hole: k, cmp: null, m: null, w: null, tab: null })} />
+        </aside>
       )}
 
       {/* right: the assistant, a full-height column like the platform's chat */}

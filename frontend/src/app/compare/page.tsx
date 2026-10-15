@@ -1,17 +1,10 @@
-import { Suspense } from "react";
-import type { Metadata } from "next";
-import { Compare } from "@/components/coretrace/Compare";
+import { redirect } from "next/navigation";
 
-export const metadata: Metadata = {
-  icons: { icon: "/brand/coretrace-mark.svg", apple: "/brand/coretrace-mark.svg" },
-  title: "CoreFlagging — Two holes side by side",
-  description: "Two scanned drillholes on one depth axis: what was logged, what the model reads, and where the two disagree.",
-};
-
-export default function ComparePage() {
-  return (
-    <Suspense fallback={<div className="fixed inset-0 bg-slate-50" />}>
-      <Compare />
-    </Suspense>
-  );
+// Two holes are compared in a panel over the map now (?hole=A&cmp=B); an old /compare?a=&b= link lands there.
+export default async function ComparePage({ searchParams }: { searchParams: Promise<{ a?: string; b?: string }> }) {
+  const { a, b } = await searchParams;
+  const p = new URLSearchParams();
+  if (a) p.set("hole", a);
+  if (a && b) p.set("cmp", b);
+  redirect(`/map${p.size ? `?${p}` : ""}`);
 }

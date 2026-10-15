@@ -19,7 +19,7 @@ function SeqBar({ sig, names }: { sig: HoleSig; names: Map<number, string> }) {
  * order down the hole (the type read most in each of 20 slices). Both parts are shown so the reader sees
  * which one carried a match: a hole of the same make-up the other way up scores high on composition and
  * low on order. */
-export function SimilarHoles({ hole, run, onOpenHole }: { hole: HoleDetail; run: string; onOpenHole: (key: string) => void }) {
+export function SimilarHoles({ hole, run, onOpenHole, onCompare }: { hole: HoleDetail; run: string; onOpenHole: (key: string) => void; onCompare?: (key: string) => void }) {
   const [scope, setScope] = useState<Exclude<SimilarScope, "hole">>("state");
   const q = useQuery({ queryKey: ["core-similar-holes", hole.key, run, scope], queryFn: () => coreScan.similarHoles(hole.key, run, scope), staleTime: 10 * 60_000, retry: false });
   const d = q.data;
@@ -46,7 +46,7 @@ export function SimilarHoles({ hole, run, onOpenHole }: { hole: HoleDetail; run:
               <thead><tr>{["Hole", "Likeness", "Make-up", "Order", "Down the hole", scope === "nearby" ? "Distance" : "Region", "Drilled for"].map((h) => <th key={h} className={th}>{h}</th>)}</tr></thead>
               <tbody>{d.results.map((r) => (
                 <tr key={r.key} onClick={() => onOpenHole(r.key)} className="cursor-pointer hover:bg-slate-50">
-                  <td className={cn(td, "font-medium text-slate-900")}>{r.name}<ArrowRight size={12} className="ml-1 inline" /><a href={`/compare?a=${encodeURIComponent(hole.key)}&b=${encodeURIComponent(r.key)}`} onClick={(e) => e.stopPropagation()} className="ml-2 text-[11px] font-normal text-slate-500 underline-offset-2 hover:underline">compare</a></td>
+                  <td className={cn(td, "font-medium text-slate-900")}>{r.name}<ArrowRight size={12} className="ml-1 inline" /><button type="button" onClick={(e) => { e.stopPropagation(); onCompare?.(r.key); }} className="ml-2 text-[11px] font-normal text-slate-500 underline-offset-2 hover:underline">compare</button></td>
                   <td className={cn(td, "font-mono")}>{r.score.toFixed(2)}</td><td className={cn(td, "font-mono text-slate-500")}>{r.composition.toFixed(2)}</td><td className={cn(td, "font-mono text-slate-500")}>{r.sequence.toFixed(2)}</td>
                   <td className={td}><SeqBar sig={r.sig} names={names} /></td>
                   <td className={td}>{scope === "nearby" ? (r.km !== null ? `${fmt(r.km, 1)} km` : "—") : r.region || "—"}</td>

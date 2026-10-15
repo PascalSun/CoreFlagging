@@ -12,7 +12,7 @@ const RINGS = [5, 10] as const;
 
 /** The holes within 5 or 10 km, nearest first: what a geologist reads a hole against. Choosing a ring draws
  * it on the map; each neighbour opens on its own or side by side with this one. */
-export function Nearby({ hole, onOpen, onRing }: { hole: HoleDetail; onOpen: (key: string) => void; onRing?: (km: number | null) => void }) {
+export function Nearby({ hole, onOpen, onRing, onCompare }: { hole: HoleDetail; onOpen: (key: string) => void; onRing?: (km: number | null) => void; onCompare?: (key: string) => void }) {
   const [km, setKm] = useState<number | null>(null);
   const q = useQuery({ queryKey: ["core-nearby", hole.key, km], queryFn: () => coreScan.nearby(hole.key, km as number), enabled: km !== null, staleTime: 5 * 60_000 });
   useEffect(() => { onRing?.(km); return () => onRing?.(null); }, [km, onRing]);
@@ -40,8 +40,8 @@ export function Nearby({ hole, onOpen, onRing }: { hole: HoleDetail; onOpen: (ke
                 {n.n_again > 0 && <span className="text-slate-500"> · look again {fmt(n.again_m, 0)} m</span>}
                 {n.status === "ready" && n.message && <span className="text-slate-400"> · scan only</span>}
               </button>
-              <Link href={`/compare?a=${encodeURIComponent(hole.key)}&b=${encodeURIComponent(n.key)}`} title={`${hole.name} and ${n.name} side by side`}
-                className="inline-flex h-6 items-center gap-1 rounded-md border border-slate-200 px-1.5 text-[11px] text-slate-600 hover:border-slate-400 hover:text-slate-900"><Columns2 size={11} />Compare</Link>
+              <button type="button" onClick={() => onCompare?.(n.key)} title={`${hole.name} and ${n.name} side by side`}
+                className="inline-flex h-6 items-center gap-1 rounded-md border border-slate-200 px-1.5 text-[11px] text-slate-600 hover:border-slate-400 hover:text-slate-900"><Columns2 size={11} />Compare</button>
             </li>
           ))}
           {rows.length > 12 && <li className="px-2.5 py-1.5 text-[11px] text-slate-500">and {rows.length - 12} more, nearest first</li>}

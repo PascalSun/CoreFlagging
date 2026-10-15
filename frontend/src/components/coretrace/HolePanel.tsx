@@ -282,11 +282,13 @@ function Report({ hole, models, mvw, run, trays }: { hole: HoleDetail; models: C
   );
 }
 
-export function HolePanel({ holeKey, tab: tabProp, onTab, models, run, metre, onMetre, wide, onWide, onClose, onOpenHole, onDeleted, onRing, win = null, onWindow }: {
+export function HolePanel({ holeKey, tab: tabProp, onTab, models, run, metre, onMetre, wide, onWide, onClose, onOpenHole, onDeleted, onRing, win = null, onWindow, onCompare }: {
   holeKey: string; tab: string; onTab: (t: Tab) => void; models: CoreModelInfo[]; run: string; metre: number | null; onMetre: (m: number | null) => void;
   wide: boolean; onWide: (w: boolean) => void; onClose: () => void; onOpenHole: (key: string, m?: number) => void; onDeleted: () => void;
   /** draw (or clear) a ring of this many km around the hole on the map */
   onRing?: (km: number | null) => void;
+  /** set this hole beside another (by key) in the comparison panel */
+  onCompare?: (key: string) => void;
   /** the depth window the reader has zoomed to, and how to change it */
   win?: Window | null; onWindow?: (w: Window | null) => void;
 }) {
@@ -407,7 +409,7 @@ export function HolePanel({ holeKey, tab: tabProp, onTab, models, run, metre, on
           <Fact k="Data quality" v={hole.n_issues ? `${hole.n_issues} ${hole.n_issues === 1 ? "issue" : "issues"}` : "nothing found"} sub={hole.issues[0] ? issueLabel(hole.issues[0].issue) : undefined} />
         </div>
         {hasReport && <div><H3>Original report</H3><OriginalReport report={rq.data} loading={rq.isPending} /></div>}
-        {hole.lat !== null && <div><H3>Nearby holes</H3><Nearby hole={hole} onOpen={(k) => onOpenHole(k)} onRing={onRing} /></div>}
+        {hole.lat !== null && <div><H3>Nearby holes</H3><Nearby hole={hole} onOpen={(k) => onOpenHole(k)} onRing={onRing} onCompare={onCompare} /></div>}
         {modelPicker}
         <div>
           <H3>Down the hole</H3>
@@ -515,7 +517,7 @@ export function HolePanel({ holeKey, tab: tabProp, onTab, models, run, metre, on
                   <span className="text-[11px] text-slate-500">Compare</span>
                   {([false, true] as const).map((w) => <button key={String(w)} type="button" role="tab" aria-selected={simWhole === w} onClick={() => setSimWhole(w)} className={cn("rounded-full px-2.5 py-0.5 text-[11px] font-medium ring-1", simWhole === w ? "bg-slate-900 text-white ring-slate-900" : "bg-white text-slate-700 ring-slate-200 hover:ring-slate-400")}>{w ? "The whole hole" : "A stretch of core"}</button>)}
                 </div>);
-              if (simWhole) return <div className="flex flex-col gap-3">{asking}{useRun ? <SimilarHoles hole={hole} run={useRun} onOpenHole={(k) => onOpenHole(k)} /> : <Empty>Loading…</Empty>}</div>;
+              if (simWhole) return <div className="flex flex-col gap-3">{asking}{useRun ? <SimilarHoles hole={hole} run={useRun} onOpenHole={(k) => onOpenHole(k)} onCompare={onCompare} /> : <Empty>Loading…</Empty>}</div>;
               return (
                 <div className="flex flex-col gap-3">
                   {asking}
@@ -532,7 +534,7 @@ export function HolePanel({ holeKey, tab: tabProp, onTab, models, run, metre, on
                     <thead><tr>{["Hole", "Interval (m)", "Similarity", "SWIR / TIR", "Region"].map((h) => <th key={h} className={th}>{h}</th>)}</tr></thead>
                     <tbody>{sq.data.results.map((r) => (
                       <tr key={`${r.hole}-${r.from_m}`} onClick={() => simScope === "hole" ? onWindow?.([r.from_m, r.to_m]) : r.key && onOpenHole(r.key, Math.floor(r.from_m))} className={cn((r.key || simScope === "hole") && "cursor-pointer hover:bg-slate-50")}>
-                        <td className={cn(td, "font-medium text-slate-900")}>{r.hole}{r.key && simScope !== "hole" ? <><ArrowRight size={12} className="ml-1 inline" /><a href={`/compare?a=${encodeURIComponent(hole.key)}&b=${encodeURIComponent(r.key)}`} onClick={(e) => e.stopPropagation()} className="ml-2 text-[11px] font-normal text-slate-500 underline-offset-2 hover:underline">compare</a></> : null}</td>
+                        <td className={cn(td, "font-medium text-slate-900")}>{r.hole}{r.key && simScope !== "hole" ? <><ArrowRight size={12} className="ml-1 inline" /><button type="button" onClick={(e) => { e.stopPropagation(); if (r.key) onCompare?.(r.key); }} className="ml-2 text-[11px] font-normal text-slate-500 underline-offset-2 hover:underline">compare</button></> : null}</td>
                         <td className={cn(td, "font-mono")}>{r.from_m.toFixed(0)}–{r.to_m.toFixed(0)}</td><td className={cn(td, "font-mono")}>{r.sim.toFixed(2)}</td>
                         <td className={td}><span className="flex items-center gap-1.5"><i className="inline-block h-2.5 w-2.5 rounded-[2px]" style={{ background: groupColor(r.gs) }} />{groupName(r.gs)} / {groupName(r.gt)}</span></td>
                         <td className={td}>{r.region || "—"}{r.rock ? ` · ${r.rock}` : ""}</td></tr>))}</tbody>
