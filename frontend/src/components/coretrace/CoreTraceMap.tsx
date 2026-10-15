@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronDown, ChevronUp, HelpCircle, MessageCircle, SlidersHorizontal, Upload, X } from "lucide-react";
+import { ChevronDown, ChevronUp, Grip, HelpCircle, LayoutGrid, MessageCircle, SlidersHorizontal, Upload, X } from "lucide-react";
 import { AccountMenu } from "@/components/auth/AccountMenu";
 import { EmailGate } from "@ntlp/geodata-web/email-gate";
 import { VerifyEmailDialog } from "@/components/auth/VerifyEmailDialog";
@@ -129,6 +129,8 @@ export function CoreTraceMap() {
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { setRingKm(null); }, [holeKey]);
   const [mode, setMode] = useState<ColourMode>("target"); const [focus, setFocus] = useState<string | null>(null);
+  // holes that crowd are added up into donuts, or every hole is its own mark: a reader who wants to see the whole field at once turns the grouping off
+  const [grouped, setGrouped] = useState(true);
   const [filtersOpen, setFiltersOpen] = useState(false); const [legendOpen, setLegendOpen] = useState(true);
   // on a phone the legend starts folded to its one line of pickers, so the map keeps the screen
   // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -196,7 +198,7 @@ export function CoreTraceMap() {
 
   return (
     <div className="fixed inset-0 overflow-hidden bg-slate-50 text-slate-900">
-      <div className="absolute inset-0 z-0"><CoreMap holes={onMap} basemap={basemap} colour={colour} card={(h) => holeCard(h, colour(h), typeName, COLOUR_MODES.find((m) => m.id === mode)?.label)} fitTo={state} selected={selected} ringKm={ringKm} overlays={overlays} onSelect={(k) => set({ hole: k, m: null, full: null })} padRight={mobile ? 0 : panelW + chatW} padBottom={mobile && holeKey ? Math.round(vh * 0.56) : 0} /></div>
+      <div className="absolute inset-0 z-0"><CoreMap holes={onMap} cluster={grouped} basemap={basemap} colour={colour} card={(h) => holeCard(h, colour(h), typeName, COLOUR_MODES.find((m) => m.id === mode)?.label)} fitTo={state} selected={selected} ringKm={ringKm} overlays={overlays} onSelect={(k) => set({ hole: k, m: null, full: null })} padRight={mobile ? 0 : panelW + chatW} padBottom={mobile && holeKey ? Math.round(vh * 0.56) : 0} /></div>
 
       {/* the legend: what colour and shape mean, each switchable, in as little room as the map can spare.
           A row picked here leaves every other hole faint; the card folds away to a single line. */}
@@ -216,7 +218,10 @@ export function CoreTraceMap() {
             <div className="flex items-center gap-2 px-3 py-2">
               <span className="text-[11px] font-medium text-slate-500">Colour</span>
               <div className="w-[118px]"><Picker value={mode} label="Colour the holes by" side="top" options={COLOUR_MODES.map((m) => ({ id: m.id, label: m.label }))} onChange={(v) => { setMode(v); setFocus(null); }} /></div>
-              <button type="button" onClick={() => setLegendOpen((o) => !o)} aria-label={legendOpen ? "Fold the legend" : "Open the legend"} className="ml-auto grid size-6 place-items-center rounded text-slate-500 hover:bg-white">
+              <button type="button" onClick={() => setGrouped((g) => !g)} aria-pressed={!grouped} title={grouped ? "Holes that crowd are added up into one mark. Click to show every hole." : "Every hole is its own mark. Click to add up the ones that crowd."}
+                className={cn("ml-auto flex h-6 items-center gap-1 rounded-md px-1.5 text-[11px] font-medium ring-1", grouped ? "bg-white/70 text-slate-600 ring-slate-200 hover:bg-white" : "bg-slate-900 text-white ring-slate-900")}>
+                {grouped ? <LayoutGrid size={12} /> : <Grip size={12} />}{grouped ? "Grouped" : "All holes"}</button>
+              <button type="button" onClick={() => setLegendOpen((o) => !o)} aria-label={legendOpen ? "Fold the legend" : "Open the legend"} className="grid size-6 place-items-center rounded text-slate-500 hover:bg-white">
                 {legendOpen ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
               </button>
             </div>
@@ -255,7 +260,7 @@ export function CoreTraceMap() {
         </div>
       )}
       {view === "map" && mobile && !holeKey && holes.length > 0 && (
-        <LegendSheet modes={COLOUR_MODES} mode={mode} onMode={setMode}
+        <LegendSheet modes={COLOUR_MODES} mode={mode} onMode={setMode} grouped={grouped} onGrouped={setGrouped}
           overlays={OVERLAYS.map((o) => ({ id: o.id, label: o.label, color: o.color, on: !!overlays[o.id] }))} onOverlay={(id) => toggleOverlay(id as Overlay)}
           basemaps={[{ id: "satellite" as Basemap, label: "Satellite" }, { id: "map" as Basemap, label: "Map" }]} basemap={basemap} onBasemap={pickBasemap}
           legend={legend} shapes={shapes} focus={focus} onFocus={setFocus} />
