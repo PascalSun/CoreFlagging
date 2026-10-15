@@ -254,6 +254,20 @@ export function CoreTraceMap() {
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/brand/coretrace-mark.svg" alt="" className="size-8 rounded-full" />CoreFlagging
         </Link>
+        {/* who it is made with: the survey whose core it reads, and the lab that built it; the same links as the landing page */}
+        <div className={cn(glass, "pointer-events-auto hidden h-11 flex-none items-center rounded-full pr-1.5 pl-3 lg:flex")}>
+          <a href="https://www.dmirs.wa.gov.au/gswa" target="_blank" rel="noopener noreferrer" aria-label="Geological Survey of Western Australia, Department of Mines, Petroleum and Exploration" title="Geological Survey of Western Australia" className="flex items-center gap-2 pr-3">
+            {/* the seal on a white disc, as the NTLP mark is: its square white ground would show on the glass */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <span className="grid size-8 flex-none place-items-center rounded-full bg-white ring-1 ring-slate-900/10"><img src="/gswa-logo.png" alt="" className="size-[26px]" /></span>
+            <span className="text-[10.5px] font-semibold leading-tight text-slate-700">Geological Survey of<br />Western Australia</span>
+          </a>
+          <span className="h-6 w-px bg-slate-900/15" aria-hidden />
+          <a href="https://nlp-tlp.org/" target="_blank" rel="noopener noreferrer" aria-label="UWA Centre for Natural and Technical Language Processing" title="UWA Centre for Natural and Technical Language Processing (NTLP)" className="pl-2">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/ntlp-logo.png" alt="" className="size-8 rounded-full" />
+          </a>
+        </div>
         <div className="pointer-events-auto mr-auto flex min-w-0 items-center gap-2">
           <div data-tour="tabs" className={cn(glass, "flex h-11 items-center gap-0.5 rounded-full p-1")} role="tablist" aria-label="View">
             {(["map", "holes"] as const).map((id) => (
