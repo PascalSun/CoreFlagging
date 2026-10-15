@@ -121,7 +121,9 @@ export function ReportPdf({ url, title, page: openAt, subtitle }: ReportPdfProps
         <a href={src} target="_blank" rel="noopener" aria-label="Open in a new tab" className="grid size-6 place-items-center rounded hover:bg-white"><ExternalLink size={13} /></a>
         <button type="button" onClick={() => setFull((f) => !f)} aria-label={full ? "Shrink" : "Enlarge"} className="grid size-6 place-items-center rounded hover:bg-white">{full ? <Minimize2 size={13} /> : <Maximize2 size={13} />}</button>
       </div>
-      <div ref={scrollRef} className="min-h-0 flex-1 overflow-auto bg-slate-200/70 p-2.5">
+      {/* `relative`: page hosts are placed by offsetTop, which must be measured against this scroll box and not the
+          chat panel around it (measured against the panel, every page looked far below the viewport and none was drawn). */}
+      <div ref={scrollRef} className="relative min-h-0 flex-1 overflow-auto bg-slate-200/70 p-2.5">
         {error ? <p className="p-3 text-xs text-red-800">The report could not be opened: {error}</p>
         : !doc ? <p className="flex items-center gap-2 p-3 text-xs text-slate-600"><Loader2 size={13} className="animate-spin" />Opening the report…</p>
         : dims.map((d, i) => (
