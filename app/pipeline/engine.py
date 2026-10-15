@@ -163,6 +163,8 @@ class Engine:
         # the metre library: CORETRACE_LIBRARY, else library_1m.npz beside the model (one row per metre, built by
         # `python -m app.cli build-library`), else the legacy library.npz the bundle shipped with
         libf = Path(os.environ["CORETRACE_LIBRARY"]) if os.environ.get("CORETRACE_LIBRARY") else ((B / "library_1m.npz") if (B / "library_1m.npz").exists() else B / "library.npz")
+        if not libf.exists():                                 # the metre library is built after the service deploys; until it lands, the bundled one serves
+            warnings.warn(f"library {libf} is not there yet; using {B / 'library.npz'}"); libf = B / "library.npz"
         lib = np.load(libf, allow_pickle=False)
         self.L = {k: lib[k] for k in lib.files}; self.L["Z"] = self.L["Z"].astype("f4"); self.library_file = libf
         self.card = json.loads((B / "card.json").read_text())
