@@ -162,16 +162,26 @@ def test_samples_pair_each_swir_sample_with_the_nearest_tir_spectrum(tmp_path, m
     d = tmp_path / "pkg" / "DS"; d.mkdir(parents=True); (d / ".ready").touch()
     monkeypatch.setattr(smp, "ROOT", tmp_path / "pkg")
     monkeypatch.setattr(smp, "package", lambda refs, ds: d)
+    # the SWIR run: groups coded through the file's class table (as TSG writes them), two minerals on the first sample
     swir = SimpleNamespace(sampleheaders=pd.DataFrame({"D": [1.000, 1.008, 1.016], "T": ["t1"] * 3, "L": ["1"] * 3, "X": [0.0, 8.0, 16.0]}),
-                           scalars=pd.DataFrame({}), spectra=np.ones((3, 4)), wavelength=np.array([400.0, 1000.0, 2000.0, 2500.0]))
+                           scalars=pd.DataFrame({"Grp1 sTSAS": np.array([5.0, -3.4e38, 2.0], np.float32), "Min1 sTSAS": ["Chlorite-Fe", "", "Phengite"], "Wt1 sTSAS": np.array([0.7, -3.4e38, 1.0], np.float32),
+                                                 "Grp2 sTSAS": np.array([2.0, -3.4e38, -3.4e38], np.float32), "Min2 sTSAS": ["Muscovite", "", ""], "Wt2 sTSAS": np.array([0.3, -3.4e38, -3.4e38], np.float32)}),
+                           classes={0: SimpleNamespace(name="S_SWIR_TSA705 Groups", classes={2: "WHITE-MICA", 5: "CHLORITE"})},
+                           spectra=np.ones((3, 4)), wavelength=np.array([400.0, 1000.0, 2000.0, 2500.0]))
+    # the TIR run: jCLST columns, names in the clear
     tir = SimpleNamespace(sampleheaders=pd.DataFrame({"D": [1.001, 1.030]}), spectra=np.array([[0.1, 0.2], [0.3, 0.4]]), wavelength=np.array([6000.0, 14000.0]),
-                          scalars=pd.DataFrame({"Min1 sTSAT": ["Quartz", "Albite"], "Grp1 sTSAT": ["SILICA", "PLAGIOCLASE"]}))
+                          scalars=pd.DataFrame({"Min1 sjCLST": ["Quartz", "Albite"], "Grp1 sjCLST": ["SILICA", "PLAGIOCLASE"], "Wt1 sjCLST": np.array([0.9, 1.0], np.float32)}), classes={})
     monkeypatch.setattr(smp, "_spectra_of", lambda d_, ds: swir)
     monkeypatch.setattr(smp, "_tir_of", lambda d_, ds: tir)
     out = smp.samples(["x"], "DS", 0.0, 2.0, spectra=True)
     assert out["tir_wl"] == [6000.0, 14000.0]
     assert [r["tir"] for r in out["samples"]] == [[0.1, 0.2], None, None]     # 1.000 ↔ 1.001; 1.008 and 1.016 are > 5 mm from either
     assert [(r["tir_mineral"], r["tir_group"]) for r in out["samples"]] == [("Quartz", "SILICA"), ("", ""), ("", "")]
+    assert out["samples"][0]["tir_mix"] == [["SILICA", "Quartz", 0.9]]
+    assert out["samples"][0]["swir_mix"] == [["CHLORITE", "Chlorite-Fe", 0.7], ["WHITE-MICA", "Muscovite", 0.3]]   # the coded group read through the class table
+    assert (out["samples"][0]["group"], out["samples"][0]["mineral"], out["samples"][0]["weight"]) == ("CHLORITE", "Chlorite-Fe", 0.7)
+    assert out["samples"][1]["swir_mix"] == [] and out["samples"][1]["group"] == ""                                 # nothing read there
+    assert out["samples"][2]["swir_mix"] == [["WHITE-MICA", "Phengite", 1.0]]
     plain = smp.samples(["x"], "DS", 0.0, 2.0)
     assert "tir" not in plain["samples"][0] and "tir_wl" not in plain
     assert plain["samples"][0]["tir_mineral"] == "Quartz"          # the TIR mineral comes without the spectra too
