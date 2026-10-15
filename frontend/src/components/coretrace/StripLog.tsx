@@ -37,7 +37,7 @@ export function groupOrder(log: SpectralLog | undefined): string[] {
  * what the core is: the TSG software's mineral groups as stacked shares (SWIR, TIR), HyFormer's
  * boundaries (BD) and its rock class (RC); the bar track says how unusual it is. Each track has its
  * own scale — they sit side by side, never on a shared axis. Hover reads a metre, click selects it. */
-export function StripLog({ metres, model, cursor, onCursor, onHover, hasLith, range, onRange, spectral, spectralFine, tokens }: {
+export function StripLog({ metres, model, cursor, onCursor, onHover, hasLith, range, onRange, spectral, spectralFine, tokens, mirror = false }: {
   metres: Metres; model: ModelView | undefined; cursor: number | null; onCursor: (m: number) => void; onHover?: (m: number | null) => void; hasLith: boolean; hasAu?: boolean;
   /** the group make-up of the whole hole at 1 m, and of the window at 0.1 m; without them SWIR and TIR show the leading group per metre */
   spectral?: SpectralLog; spectralFine?: SpectralLog;
@@ -45,6 +45,8 @@ export function StripLog({ metres, model, cursor, onCursor, onHover, hasLith, ra
   tokens?: TokenScores;
   /** draw to this depth range instead of the hole's own: two logs side by side share one axis, or the reader has zoomed in */
   range?: [number, number];
+  /** the mirror image of the column order, the depth axis and Scale column at the right: the right-hand log of two */
+  mirror?: boolean;
   /** when set, the log can be zoomed: the wheel over it and the level buttons change the range (null = whole hole) */
   onRange?: (r: [number, number] | null) => void;
 }) {
@@ -96,11 +98,14 @@ export function StripLog({ metres, model, cursor, onCursor, onHover, hasLith, ra
   const pan = (frac: number) => { if (!onRange || !range) return; const s = range[1] - range[0]; onRange(windowAbout((range[0] + range[1]) / 2 + s * frac, s, hole0, hole1)); };
   const pinch = useRef<number | null>(null);
 
-  const tracks = useMemo<Track[]>(() => [
-    { id: "gs", label: "SWIR", w: 54, kind: "mix", info: TIP.swir }, { id: "gt", label: "TIR", w: 54, kind: "mix", info: TIP.tir },
-    ...(model ? [{ id: "anom", label: "Unusual", w: 54, kind: "bar", info: TIP.unusual } as Track, { id: "rc", label: "RC", w: 30, kind: "cat", info: TIP.rc } as Track,
-      { id: "bd", label: "BD", w: 24, kind: "line", info: TIP.bd } as Track] : []),
-  ], [model]);
+  const tracks = useMemo<Track[]>(() => {
+    const ts: Track[] = [
+      { id: "gs", label: "SWIR", w: 54, kind: "mix", info: TIP.swir }, { id: "gt", label: "TIR", w: 54, kind: "mix", info: TIP.tir },
+      ...(model ? [{ id: "anom", label: "Unusual", w: 54, kind: "bar", info: TIP.unusual } as Track, { id: "rc", label: "RC", w: 30, kind: "cat", info: TIP.rc } as Track,
+        { id: "bd", label: "BD", w: 24, kind: "line", info: TIP.bd } as Track] : []),
+    ];
+    return mirror ? ts.reverse() : ts;
+  }, [model, mirror]);
   const order = useMemo(() => groupOrder(spectral), [spectral]);
   const width = AXIS_W + tracks.reduce((a, t) => a + t.w + GAP, 0);
 
@@ -130,11 +135,11 @@ export function StripLog({ metres, model, cursor, onCursor, onHover, hasLith, ra
     const rowH = Math.max(ppm, 1 / dpr);
     // depth axis: a tick every 10 / 50 / 100 m, whichever leaves room for the label
     const step = [0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 50, 100, 200, 500].find((s) => s * ppm >= 34) ?? 500;
-    g.font = "10px var(--font-geist-mono), ui-monospace, monospace"; g.textAlign = "right"; g.textBaseline = "middle";
+    g.font = "10px var(--font-geist-mono), ui-monospace, monospace"; g.textAlign = mirror ? "left" : "right"; g.textBaseline = "middle";
     for (let d = Math.ceil(m0 / step) * step; d <= m1 + 1; d += step) {
       const y = (d - m0) * ppm;
-      g.fillStyle = GRID; g.fillRect(AXIS_W - 4, Math.round(y), width - AXIS_W + 4, 1);
-      g.fillStyle = MUTED; g.fillText(step < 1 ? d.toFixed(1) : String(Math.round(d)), AXIS_W - 8, Math.min(Math.max(y, 6), height - 6));
+      g.fillStyle = GRID; g.fillRect(mirror ? 0 : AXIS_W - 4, Math.round(y), width - AXIS_W + 4, 1);
+      g.fillStyle = MUTED; g.fillText(step < 1 ? d.toFixed(1) : String(Math.round(d)), mirror ? width - AXIS_W + 8 : AXIS_W - 8, Math.min(Math.max(y, 6), height - 6));
     }
     // the stacked group shares come from the 0.1 m log when it covers what is in view, else from the 1 m one
     const fine = spectralFine && spectralFine.from_m <= m0 + 0.05 && spectralFine.to_m >= m1 + 1 - 0.05 ? spectralFine : undefined;
@@ -155,7 +160,7 @@ export function StripLog({ metres, model, cursor, onCursor, onHover, hasLith, ra
     const tok = tokens && tokens.bin.length && tokens.bin[0] <= Math.round(m0 * 10) + 1 && tokens.bin[tokens.bin.length - 1] >= Math.round((m1 + 1) * 10) - 2 ? tokens : undefined;
     const tokH = Math.max(0.1 * ppm, 1 / dpr);
     const tokFlag = (i: number) => !!tok && tok.flag_at !== null && tok.flag_raw !== null && tok.anom[i] >= tok.flag_at && tok.anom_raw[i] >= tok.flag_raw;
-    let x = AXIS_W;
+    let x = mirror ? 0 : AXIS_W;
     for (const t of tracks) {
       if (t.kind === "bar" || t.kind === "line") { g.fillStyle = "#f8fafc"; g.fillRect(x, 0, t.w, height); }
       if (t.kind === "mix" && stack(t.id === "gs" ? "swir" : "tir", x, t.w)) { x += t.w + GAP; continue; }
@@ -184,7 +189,7 @@ export function StripLog({ metres, model, cursor, onCursor, onHover, hasLith, ra
       x += t.w + GAP;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [metres, model, tracks, width, height, ppm, m0, m1, rawTop, spectral, spectralFine, tokens, order]);
+  }, [metres, model, tracks, width, height, ppm, m0, m1, rawTop, spectral, spectralFine, tokens, order, mirror]);
 
   // keep the selected metre in view: it may be set from a link, a table row or another tab
   useEffect(() => {
@@ -234,12 +239,14 @@ export function StripLog({ metres, model, cursor, onCursor, onHover, hasLith, ra
         </div>)}
       {/* each column's name, and under it an ⓘ that says what the column is (the bubble is drawn by KeyTips) */}
       <div className="flex text-[10px] font-semibold text-slate-600" style={{ height: HEAD_H, width: width + (onRange ? NAV_W : 0) }}>
-        {onRange && <Head label="Scale" info={TIP.scale} w={16} gap={NAV_W - 16} />}
-        <span style={{ width: AXIS_W }} />
+        {onRange && !mirror && <Head label="Scale" info={TIP.scale} w={16} gap={NAV_W - 16} />}
+        {!mirror && <span style={{ width: AXIS_W }} />}
         {tracks.map((t) => <Head key={t.id} label={t.label} info={t.info} w={t.w} gap={GAP} />)}
+        {mirror && <span style={{ width: AXIS_W }} />}
+        {onRange && mirror && <span className="flex justify-end" style={{ width: NAV_W }}><Head label="Scale" info={TIP.scale} w={16} /></span>}
       </div>
       <div className="flex min-h-0 flex-1 gap-0">
-      {onRange && <div className="flex-none pr-1" style={{ width: NAV_W }}><DepthNav metres={metres} model={model} view={view} hole0={hole0} hole1={hole1} onRange={onRange} typeName={typeName} height={boxH} /></div>}
+      {onRange && <div className={cn("flex-none", mirror ? "order-last pl-1" : "pr-1")} style={{ width: NAV_W }}><DepthNav metres={metres} model={model} view={view} hole0={hole0} hole1={hole1} onRange={onRange} typeName={typeName} height={boxH} /></div>}
       <div ref={wrapRef} tabIndex={onRange ? 0 : undefined} className="relative min-h-0 flex-1 overflow-y-auto overflow-x-hidden rounded-md outline-none focus-visible:ring-2 focus-visible:ring-cyan/60"
         onKeyDown={onRange ? (e) => {
           if (e.key === "+" || e.key === "=") { e.preventDefault(); stepLevel(1); } else if (e.key === "-" || e.key === "_") { e.preventDefault(); stepLevel(-1); }

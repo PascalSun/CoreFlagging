@@ -5,8 +5,9 @@ import { useQuery } from "@tanstack/react-query";
 import { Info, X } from "lucide-react";
 import { commodityName, coreScan, inferred, sourceLabel, TARGET_SOURCE_LABEL, type HoleDetail, type ModelView, type SpectralLog } from "@/lib/coreScan";
 import { StripLog, StripKey } from "@/components/coretrace/StripLog";
-import { CORR_TIP, CorrelationView, correlate, type Correlation } from "@/components/coretrace/Correlate";
+import { CORR_SHOW, CORR_TIP, CorrelationView, correlate, type Correlation, type CorrShow } from "@/components/coretrace/Correlate";
 import { coreTypeColor, fmt, pct } from "@/components/coretrace/palette";
+import { cn } from "@/lib/utils";
 
 function useHole(key: string | null) {
   const hq = useQuery({ queryKey: ["core-hole", key], queryFn: () => coreScan.hole(key as string), enabled: !!key });
@@ -18,10 +19,12 @@ function useHole(key: string | null) {
 }
 
 /** One hole's column: who and what it is, and its log. */
-function Column({ hole, mv, spectral, cursor, onCursor, onOpen, missing, win, onWin }: {
+function Column({ hole, mv, spectral, cursor, onCursor, onOpen, missing, win, onWin, mirror }: {
   hole: HoleDetail | undefined; mv: ModelView | undefined; spectral?: SpectralLog; cursor: number | null; onCursor: (m: number) => void; onOpen: (key: string) => void; missing: string;
   /** this log's depth window (null: the whole hole), chosen with its own Scale column and levels */
   win: [number, number] | null; onWin: (w: [number, number] | null) => void;
+  /** the right hole: its columns in the left one's mirror order, the Scale column at the outer edge */
+  mirror?: boolean;
 }) {
   if (!hole) return <div className="flex min-h-[40vh] items-center justify-center p-6 text-sm text-slate-500">{missing}</div>;
   const again = mv?.summary.again?.intervals ?? [];
@@ -43,7 +46,7 @@ function Column({ hole, mv, spectral, cursor, onCursor, onOpen, missing, win, on
           <button key={d.from_m} type="button" onClick={() => onCursor(d.from_m)} className="mr-1 font-mono hover:underline">{d.from_m}–{d.to_m} m</button>))}</p>}
       </div>
       <div className="flex min-h-0 flex-1 justify-center">
-        <StripLog metres={hole.metres} model={mv} spectral={spectral} cursor={cursor} onCursor={onCursor} hasLith={hole.has_lith} hasAu={hole.au_m > 0} range={win ?? undefined} onRange={onWin} />
+        <StripLog metres={hole.metres} model={mv} spectral={spectral} cursor={cursor} onCursor={onCursor} hasLith={hole.has_lith} hasAu={hole.au_m > 0} range={win ?? undefined} onRange={onWin} mirror={mirror} />
       </div>
     </div>
   );
@@ -68,6 +71,8 @@ export function ComparePanel({ a: aKey, b: bKey, winA = null, winB = null, onClo
   const a = useHole(aKey), b = useHole(bKey);
   const [ca, setCa] = useState<number | null>(winA ? Math.floor(winA[0]) : null), [cb, setCb] = useState<number | null>(winB ? Math.floor(winB[0]) : null);
   const [wa, setWa] = useState<[number, number] | null>(winA), [wb, setWb] = useState<[number, number] | null>(winB);
+  // the column beside RC in the middle view
+  const [show, setShow] = useState<CorrShow>("swir");
   // a metre marked outside a log's window brings the window to it, keeping its length
   const follow = (w: [number, number] | null, set: (w: [number, number] | null) => void, m: number) => {
     if (w && (m < w[0] || m + 1 > w[1])) { const s = w[1] - w[0], a0 = Math.max(0, Math.round((m + 0.5 - s / 2) * 10) / 10); set([a0, Math.round((a0 + s) * 10) / 10]); }
@@ -101,12 +106,17 @@ export function ComparePanel({ a: aKey, b: bKey, winA = null, winB = null, onClo
                 <span className="flex items-center gap-1" data-keytip={CORR_TIP.score}>{corr.score.toFixed(2)}<Info size={12} className="text-slate-400" /></span>
                 <span className="flex items-center gap-1" data-keytip={CORR_TIP.rho}>ρ = {corr.rho.toFixed(2)}<Info size={12} className="text-slate-400" /></span>
               </div>
+              <div className="flex justify-center pb-2" role="group" aria-label="Column beside RC">
+                <div className="flex overflow-hidden rounded-md border border-slate-200 text-[11px]">
+                  {CORR_SHOW.map((c) => <button key={c.id} type="button" aria-pressed={show === c.id} onClick={() => setShow(c.id)} className={cn("px-2 py-0.5", show === c.id ? "bg-slate-900 text-white" : "bg-white text-slate-600 hover:bg-slate-50")}>{c.label}</button>)}
+                </div>
+              </div>
               <p className="pb-2 text-center text-[11px] text-slate-500">matched by {corr.basis === "representation" ? "HyFormer\u2019s representation (2 m fingerprints), as Similar core" : corr.basis === "rock class" ? "rock class (RC) for now, until the representation match is available" : "the mineral groups the scanner reads (SWIR and TIR) for now; no model reading on both holes"}</p>
-              <div className="min-h-0 flex-1"><CorrelationView a={{ hole: a.hole!, mv: a.mv, spectral: a.spectral }} b={{ hole: b.hole!, mv: b.mv, spectral: b.spectral }} corr={corr} cursorA={ca} winA={wa} winB={wb} onPick={both} /></div>
+              <div className="min-h-0 flex-1"><CorrelationView a={{ hole: a.hole!, mv: a.mv, spectral: a.spectral }} b={{ hole: b.hole!, mv: b.mv, spectral: b.spectral }} corr={corr} cursorA={ca} winA={wa} winB={wb} onWinA={setWa} onWinB={setWb} onPick={both} show={show} /></div>
             </>
           ) : <div className="m-auto text-center text-xs text-slate-500">{a.loading || b.loading ? "Matching the two holes…" : "These two holes have nothing to match by: neither a spectral log nor a model reading on both."}</div>}
         </div>
-        <Column hole={b.hole} mv={b.mv} spectral={b.spectral} cursor={cb} onCursor={pickB} onOpen={onOpenHole} missing={missing(b, "B")} win={wb} onWin={setWb} />
+        <Column hole={b.hole} mv={b.mv} spectral={b.spectral} cursor={cb} onCursor={pickB} onOpen={onOpenHole} missing={missing(b, "B")} win={wb} onWin={setWb} mirror />
       </div>
       {a.hole && <div className="flex-none border-t border-slate-200/70 bg-white/70 px-4 py-2"><StripKey metres={a.hole.metres} model={a.mv} spectral={a.spectral} /></div>}
     </div>
