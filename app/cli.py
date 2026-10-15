@@ -5,6 +5,8 @@
   python -m app.cli tray-mm [--only ...]                      give stored tray rows their positions along the scan (reads .tsg headers only)
   python -m app.cli spectral-log [--only ...] [--state WA]    hand the platform each mirrored hole's spectral log (reads TSG scalars only)
   python -m app.cli token-scores [--state WA] [--shard i/n]   hand the platform each hole's per-10 cm unusual scores (models re-run on the platform's tokens)
+  python -m app.cli fingerprints [--state WA] [--shard i/n] [--force]   hand the platform each hole's per-metre vectors (models re-run on the platform's tokens)
+  python -m app.cli build-library --out <file.npz> [--state WA] [--model v2]   every metre of a State's holes as a Similar-core library
   python -m app.cli work [--once]                             take jobs from the platform (no HTTP server); --once stops when the queue is empty
 """
 from __future__ import annotations
@@ -20,6 +22,8 @@ def main() -> None:
     w = sub.add_parser("work"); w.add_argument("--once", action="store_true")
     tm = sub.add_parser("tray-mm"); tm.add_argument("--only", nargs="*", default=[]); tm.add_argument("--threads", type=int, default=8)
     ts = sub.add_parser("token-scores"); ts.add_argument("--only", nargs="*", default=[]); ts.add_argument("--state", nargs="*", default=[]); ts.add_argument("--force", action="store_true"); ts.add_argument("--shard", default="", help="i/n: every n-th hole starting at i (0-based), to run several processes")
+    fp = sub.add_parser("fingerprints"); fp.add_argument("--only", nargs="*", default=[]); fp.add_argument("--state", nargs="*", default=[]); fp.add_argument("--force", action="store_true"); fp.add_argument("--shard", default="")
+    bl = sub.add_parser("build-library"); bl.add_argument("--out", required=True); bl.add_argument("--only", nargs="*", default=[]); bl.add_argument("--state", nargs="*", default=["WA"]); bl.add_argument("--model", default="")
     sl = sub.add_parser("spectral-log"); sl.add_argument("--only", nargs="*", default=[]); sl.add_argument("--state", nargs="*", default=[]); sl.add_argument("--workers", type=int, default=4)
     a = ap.parse_args(); logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
     if a.cmd == "register":
@@ -62,6 +66,19 @@ def main() -> None:
         if a.shard:
             i, n = (int(x) for x in a.shard.split("/")); holes = holes[i::n]
         print(json.dumps(backfill([h["key"] for h in holes], runner, a.force))); return
+    if a.cmd in ("fingerprints", "build-library"):
+        from .sources import holes_in_catalogue
+        from . import fingerprints as fpm
+        holes = holes_in_catalogue()
+        if a.only:
+            want = {x.lower() for x in a.only}; holes = [h for h in holes if h["key"].lower() in want]
+        if a.state:
+            want = {x.upper() for x in a.state}; holes = [h for h in holes if h["state"].upper() in want]
+        if a.cmd == "fingerprints":
+            if a.shard:
+                i, n = (int(x) for x in a.shard.split("/")); holes = holes[i::n]
+            print(json.dumps(fpm.backfill([h["key"] for h in holes], runner, a.force))); return
+        print(json.dumps(fpm.build_library([{"key": h["key"], "name": h["name"]} for h in holes], runner, a.model or runner.models.default, Path(a.out)))); return
     if a.cmd == "process":
         pkg = runner.process(a.hole, a.hole, [Path(f) for f in a.folders], progress=lambda s, m, f=None: print(f"[{s}] {m}"))
         out = runner.ws.root / f"{a.hole}.package.json"; out.write_text(json.dumps(pkg, ensure_ascii=False, default=str)); print(out)

@@ -230,3 +230,32 @@ def test_models_forget_drops_a_hole_from_every_engines_cache():
     m = Models.__new__(Models); m._e = {"v2": e}
     m.forget("H1"); m.forget("nothing")
     assert e.cache == {"H2": {}} and e.timing == {} and e.locks == {}
+
+
+def test_metre_vectors_max_pool_the_representation_over_each_metre_and_sit_on_the_unit_sphere():
+    from app.pipeline.engine import metre_vectors, window_vector
+    depth = np.array([10.0, 10.3, 10.7, 11.2, 11.9, 13.5], "f4")                 # metres 10, 11 and 13; nothing at 12
+    E = np.array([[1, 0, 0], [0, 2, 0], [0, 0, 3], [4, 0, 0], [0, 5, 0], [0, 0, 6]], "f4")
+    R = {"depth": depth, "E": E, "metres": np.array([10, 11, 13])}
+    um, V = metre_vectors(R)
+    assert um.tolist() == [10, 11, 13] and V.shape == (3, 3)
+    np.testing.assert_allclose(np.linalg.norm(V, axis=1), 1.0, atol=1e-5)
+    np.testing.assert_allclose(V[0] * np.sqrt(14), [1, 2, 3], atol=1e-4)          # max over the three tokens of metre 10
+    np.testing.assert_allclose(V[1] * np.sqrt(41), [4, 5, 0], atol=1e-4)
+    # a metre asked for that has no token gives a zero vector rather than infinities
+    _, W = metre_vectors(R, [10, 12]); assert W[1].tolist() == [0, 0, 0]
+    # a one-metre window is the metre's own vector; a wider window pools everything in it
+    np.testing.assert_allclose(window_vector(R, 10, 11), V[0], atol=1e-5)
+    np.testing.assert_allclose(window_vector(R, 10, 12) * np.sqrt(16 + 25 + 9), [4, 5, 3], atol=1e-4)
+    assert np.isfinite(window_vector(R, 50, 51)).all()                           # an empty window falls back to the nearest tokens
+
+
+def test_metre_arrays_fingerprint_is_the_metre_vector(monkeypatch):
+    from app import extras
+    depth = np.array([5.0, 5.5, 6.0, 6.5], "f4"); E = np.array([[1, 0], [0, 1], [2, 0], [0, 0.5]], "f4")
+    R = {"depth": depth, "E": E, "metres": np.array([5, 6]), "tir_pred": np.ones((4, 2), "f4")}
+    eng = SimpleNamespace(compute=lambda key: R)
+    tir, fp = extras.metre_arrays(eng, "h")
+    assert tir.shape == (2, 2) and fp.shape == (2, 2)
+    np.testing.assert_allclose(fp[0], [1, 1] / np.sqrt(2), atol=1e-5)             # max over (1,0) and (0,1)
+    np.testing.assert_allclose(fp[1], [2, 0.5] / np.sqrt(4.25), atol=1e-5)
