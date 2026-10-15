@@ -103,8 +103,8 @@ export function CoreChat({ context, onOpen, signedIn, onSignIn }: {
   }), []);
 
   const starters = context.hole
-    ? [`What stands out in ${context.hole}?`, `Find the report for ${context.hole}`, `Summarise the auto log of ${context.hole}`, context.m !== null ? `Why is ${context.m} m in ${context.hole} flagged as unusual?` : `Where is gold most likely in ${context.hole}?`, `Which data-quality issues does ${context.hole} have?`]
-    : ["Which processed holes have gold assays?", "Find the WAMEX report for MND037", "Find holes in the Yilgarn with thermal infrared", "What does the unusual score mean?", "Which data-quality problem is most common?"];
+    ? [`What stands out in ${context.hole}?`, `Find and summarise the report for ${context.hole}`, `Summarise the auto log of ${context.hole}`, context.m !== null ? `Why is ${context.m} m in ${context.hole} flagged as unusual?` : `Where is gold most likely in ${context.hole}?`, `Which data-quality issues does ${context.hole} have?`]
+    : ["Which processed holes have gold assays?", "Find and summarise the WAMEX report for MND037", "Find holes in the Yilgarn with thermal infrared", "What does the unusual score mean?", "Which data-quality problem is most common?"];
 
   if (!signedIn) {
     return (
