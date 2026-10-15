@@ -50,7 +50,7 @@ export function CoreChat({ context, onOpen, signedIn, onSignIn }: {
     }) as typeof fetch,
   }), []);
 
-  const { messages, sendMessage, status, setMessages, addToolOutput, error } = useChat({
+  const { messages, sendMessage, status, setMessages, addToolOutput, error, stop } = useChat({
     transport,
     sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithToolCalls,
     onToolCall: async ({ toolCall }) => {
@@ -83,6 +83,7 @@ export function CoreChat({ context, onOpen, signedIn, onSignIn }: {
     platformFetch("/chats/conversation/", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ messages }) }).catch(() => {});
   }, [signedIn, status, messages]);
   const startOver = () => {
+    if (busy) void stop();
     setMessages([]);
     saved.current = "";
     platformFetch("/chats/conversation/clear/", { method: "POST" }).catch(() => {});
@@ -117,6 +118,11 @@ export function CoreChat({ context, onOpen, signedIn, onSignIn }: {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
+        {messages.length > 0 && (
+          <div className="sticky top-0 z-10 -mx-4 -mt-3 mb-1 flex justify-end bg-gradient-to-b from-white via-white/90 to-transparent px-4 pt-2 pb-3">
+            <button type="button" onClick={startOver} className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-medium text-slate-600 shadow-sm hover:border-slate-400 hover:text-slate-900"><RotateCcw size={11} />New conversation</button>
+          </div>
+        )}
         {messages.length === 0 && (
           <div className="flex flex-col gap-3 px-1 pt-1">
             <p className="text-sm leading-relaxed text-slate-600">Ask in plain words, in any language. Answers come from the scans and the models, with the depths they refer to.</p>
@@ -165,7 +171,6 @@ export function CoreChat({ context, onOpen, signedIn, onSignIn }: {
           <textarea value={input} onChange={(e) => setInput(e.target.value)} rows={1} placeholder={context.hole ? `Ask about ${context.hole}…` : "Ask about the core…"} aria-label="Message"
             onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(input); } }}
             className="max-h-[96px] min-h-[24px] flex-1 resize-none overflow-y-auto bg-transparent text-base leading-[22px] text-slate-700 outline-none placeholder:text-slate-400 sm:text-sm" />
-          {messages.length > 0 && !busy && <button type="button" onClick={startOver} aria-label="New conversation" title="New conversation" className="grid size-7 place-items-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700"><RotateCcw size={14} /></button>}
           <button type="submit" disabled={busy || !input.trim()} aria-label="Send" className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-slate-900 text-white transition-opacity disabled:opacity-40">{busy ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}</button>
         </div>
       </form>
