@@ -149,7 +149,7 @@ export function coretraceTools(token: string) {
     }),
 
     similar_core: tool({
-      description: "Core elsewhere in Western Australia that looks like metre m of a hole: the model's representation of that metre against every metre of the State's library (cosine; holes within 5 km left out, one metre per hole).",
+      description: "Core elsewhere in Western Australia that looks like the 2 m starting at metre m of a hole: the model's fingerprint of that interval against every interval of the State's library (cosine; holes within 5 km left out, one interval per hole).",
       inputSchema: z.object({ hole, m: z.number().int(), model }),
       toModelOutput: modelView(),
       execute: async ({ hole: name, m, model: run }) => {
@@ -157,7 +157,7 @@ export function coretraceTools(token: string) {
           const h = await resolve(name); const mm = await defaultRun(run);
           type S = { results: { hole: string; from_m: number; to_m: number; sim: number; gs_en: string; gt_en: string; rock: string; au: number | null; region: string }[] };
           const d = await get<S>(`/holes/${encodeURIComponent(h.key)}/similar/?m=${m}&model=${encodeURIComponent(mm)}`);
-          return { hole: h.key, state: h.state, from_m: m, to_m: m + 1, matches: d.results.map((x) => ({ hole: x.hole, from_m: x.from_m, to_m: x.to_m, similarity: x.sim, swir: x.gs_en, tir: x.gt_en, rock: x.rock || null, au_ppm: x.au, region: x.region })) };
+          return { hole: h.key, state: h.state, from_m: m, to_m: m + 2, matches: d.results.map((x) => ({ hole: x.hole, from_m: x.from_m, to_m: x.to_m, similarity: x.sim, swir: x.gs_en, tir: x.gt_en, rock: x.rock || null, au_ppm: x.au, region: x.region })) };
         } catch (e) { return err(e); }
       },
     }),

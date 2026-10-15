@@ -1,4 +1,4 @@
-"""The per-metre vectors, for every hole already on the platform.
+"""The per-metre fingerprints, for every hole already on the platform.
 
 Two jobs share one loop: a hole's tokens come back from the platform as the processed .npz, the models run on them
 (the same code as a job), and the metre vectors (engine.metre_vectors) go
@@ -42,7 +42,9 @@ def one(key: str, runner, pf: Platform, force: bool = False) -> str:
         return "not on the platform"
     if not h.get("runs"):
         return "no models"
-    runs = [r for r in h["runs"] if r in runner.models.dirs and (force or not h["runs"][r].get("fp_1m"))]
+    # a hole is skipped when the platform already holds fingerprints of this model's width (the definition changed
+    # width when it changed; --force rewrites regardless)
+    runs = [r for r in h["runs"] if r in runner.models.dirs and (force or h["runs"][r].get("fp_dim") != int(runner.models.get(r).L["Z"].shape[1]))]
     if not runs:
         return "has them"
     try:
@@ -79,7 +81,7 @@ def library_rows(key: str, name: str, runner, pf: Platform, run: str) -> dict | 
     if _fetch(key, runner, pf) is None:
         return None
     try:
-        eng = runner.models.get(run); R = eng.compute(key); um, V = metre_vectors(R)
+        eng = runner.models.get(run); R = eng.compute(key); um, V = metre_vectors(R, eng.H)
         m = np.floor(R["depth"]).astype(int)
         gs = [_mode(R["gs"][m == mm]) if (m == mm).any() else "" for mm in um]
         gt = [_mode(R["gt"][(m == mm) & R["has_t"]]) if ((m == mm) & R["has_t"]).any() else "" for mm in um]

@@ -3,8 +3,8 @@
 The research app computed these on demand from a hole held in memory (engine.metre_view, engine.similar).
 Here they are computed once, when the hole is processed, for every metre:
   tir       the TIR spectrum the model rebuilds from SWIR alone, mean over the metre
-  fp        the metre's vector (the model's representation max-pooled over the metre, unit length), ready to compare
-            with the State library and with any other hole's metres
+  fp        the fingerprint of the 2 m interval that starts at the metre (principal components of the representation,
+            averaged, standardised, unit length), ready to compare with the State library and any other hole's metres
   why       which spectral features set the metre apart from the core around it (no model involved)
 """
 from __future__ import annotations
@@ -31,7 +31,7 @@ def metre_arrays(eng: Engine, key: str) -> tuple[np.ndarray, np.ndarray]:
     tir = np.zeros((len(um), R["tir_pred"].shape[1]), "f4")
     for k, mm in enumerate(um):
         tir[k] = R["tir_pred"][m == mm].mean(0)
-    _, fp = metre_vectors(R, um)
+    _, fp = metre_vectors(R, eng.H, um)
     return tir, fp
 
 
@@ -70,7 +70,7 @@ def _km(L: dict, lat: float, lon: float) -> np.ndarray:
 
 def similar(eng: Engine, x: np.ndarray, hole: str = "", lat: float | None = None, lon: float | None = None, k: int = 10,
             scope: str = "state", radius_km: float = 10.0, region: str = "") -> list[dict]:
-    """Metres of the library closest to vector `x`, within a scope:
+    """Intervals of the library closest to fingerprint `x`, within a scope:
 
     * "state": every other hole, leaving out this one and every hole within 5 km of it (so a match is not just
       the next hole on the same section), one interval per hole;

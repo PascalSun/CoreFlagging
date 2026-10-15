@@ -7,8 +7,8 @@ answers as the evaluation page:
   3 unusual intervals  local contrast of the representation against +-15 m of the same hole, as a State percentile
   4 gold prediction    linear probe on per-metre mean representations, fitted on train + val holes
   5 data quality       issue list from the cleaning pipeline (no model)
-  6 similar intervals  cosine similarity of 1 m vectors (the model's token representation, max-pooled over the metre)
-                       against every metre of the State's library holes
+  6 similar intervals  cosine similarity of 2 m fingerprints (principal components of the representation, averaged,
+                       standardised) against every 2 m interval of the State's library holes
 """
 from __future__ import annotations
 
@@ -23,7 +23,7 @@ from scipy.ndimage import uniform_filter1d
 from . import names as N
 from .fm_model import SEQ_LEN, CoreFM
 
-K_HALF, GAP_TOK, LEN = 20, 10, 20          # segments: 2 m either side, a gap > 1 m is a boundary; LEN: tokens per 2 m (legacy)
+K_HALF, GAP_TOK, LEN = 20, 10, 20          # segments: 2 m either side, a gap > 1 m is a boundary; similar: 2 m intervals
 ANOM_FLAG = 0.98                           # score of a metre = its most unusual 10 cm, as a percentile of the State's training core
 ANOM_TOP = 0.03                            # flagged = the top 3 % of metres in the hole, and above ANOM_FLAG (single 10 cm tokens are noisy,
                                            # so the 98th percentile alone flags 7-16 % of metres)
@@ -118,27 +118,29 @@ def _mode(a):
     return pd.Series(a).value_counts().index[0] if a else ""
 
 
-def metre_vectors(R, metres=None):
-    """One vector per metre: the model's 256-d token representation (R["E"]) max-pooled over the metre's 10 cm tokens,
-    then put on the unit sphere. Cosine between two such vectors is the similarity used everywhere (Similar core,
-    similar holes, the hole-to-hole match). No projection, no standardisation: what the model says, as it says it.
+def metre_vectors(R, H, metres=None):
+    """One fingerprint per metre, as the research code defined it: the 2 m of core starting at the metre (LEN = 20
+    tokens in depth order), the model's representation projected to its principal components (R["F"]), averaged,
+    standardised against the State library (H["i_mu"], H["i_sd"]) and put on the unit sphere. Cosine between two such
+    vectors is the similarity used everywhere (Similar core, similar holes, the hole-to-hole match).
     Returns (metres, V) with V float32 (n_metres, d), in the order of `metres` (default R["metres"])."""
     um = R["metres"] if metres is None else np.asarray(metres)
-    m = np.floor(R["depth"]).astype(int); E = R["E"]
-    V = np.full((len(um), E.shape[1]), -np.inf, "f4"); idx = {int(v): k for k, v in enumerate(um)}
-    rows = np.array([idx.get(int(v), -1) for v in m]); ok = rows >= 0
-    np.maximum.at(V, rows[ok], E[ok])
-    V[~np.isfinite(V).all(1)] = 0
-    return um, V / (np.linalg.norm(V, axis=1, keepdims=True) + 1e-9)
+    o = R["order"]; dep = R["depth"][o]; F = R["F"]
+    V = np.zeros((len(um), F.shape[1]), "f4")
+    for k, mm in enumerate(um):
+        i0 = int(np.searchsorted(dep, float(mm))); i0 = min(max(i0, 0), max(len(o) - LEN, 0))
+        x = F[o[i0:i0 + LEN]].mean(0); x = (x - H["i_mu"]) / H["i_sd"]; V[k] = x / (np.linalg.norm(x) + 1e-9)
+    return um, V
 
 
-def window_vector(R, lo, hi):
-    """The vector of a depth window [lo, hi): the token representation max-pooled over every token in it, on the unit
-    sphere. A one-metre window gives the same vector as metre_vectors; a wider window is one query for the stretch."""
-    sel = (R["depth"] >= lo) & (R["depth"] < hi)
-    if not sel.any():                                   # nothing in the window: the nearest tokens stand in
-        sel = np.zeros(len(R["depth"]), bool); sel[np.argsort(np.abs(R["depth"] - (lo + hi) / 2))[:10]] = True
-    x = R["E"][sel].max(0)
+def window_vector(R, H, lo, hi):
+    """The fingerprint of a depth window [lo, hi): the tokens in it, averaged, standardised and normalised as a
+    metre's fingerprint is. A window of less than 2 m is widened to the 2 m from its start, as the metre search is."""
+    o = R["order"]; dep = R["depth"][o]
+    sel = np.flatnonzero((dep >= lo) & (dep < hi))
+    if len(sel) < LEN:
+        i0 = int(np.searchsorted(dep, float(lo))); i0 = min(max(i0, 0), max(len(o) - LEN, 0)); sel = np.arange(i0, i0 + LEN)
+    x = R["F"][o[sel]].mean(0); x = (x - H["i_mu"]) / H["i_sd"]
     return x / (np.linalg.norm(x) + 1e-9)
 
 
@@ -160,11 +162,10 @@ class Engine:
         with open(B / "heads.pkl", "rb") as f:
             self.H = pickle.load(f)
         self.core = {c["k"]: c for c in self.H["core"]}
-        # the metre library: CORETRACE_LIBRARY, else library_1m.npz beside the model (one row per metre, built by
-        # `python -m app.cli build-library`), else the legacy library.npz the bundle shipped with
-        libf = Path(os.environ["CORETRACE_LIBRARY"]) if os.environ.get("CORETRACE_LIBRARY") else ((B / "library_1m.npz") if (B / "library_1m.npz").exists() else B / "library.npz")
-        if not libf.exists():                                 # the metre library is built after the service deploys; until it lands, the bundled one serves
-            warnings.warn(f"library {libf} is not there yet; using {B / 'library.npz'}"); libf = B / "library.npz"
+        # the interval library the bundle ships with, or CORETRACE_LIBRARY (a rebuilt one, `python -m app.cli build-library`)
+        libf = Path(os.environ["CORETRACE_LIBRARY"]) if os.environ.get("CORETRACE_LIBRARY") else B / "library.npz"
+        if not libf.exists():
+            warnings.warn(f"library {libf} is not there; using {B / 'library.npz'}"); libf = B / "library.npz"
         lib = np.load(libf, allow_pickle=False)
         self.L = {k: lib[k] for k in lib.files}; self.L["Z"] = self.L["Z"].astype("f4"); self.library_file = libf
         self.card = json.loads((B / "card.json").read_text())
@@ -246,7 +247,7 @@ class Engine:
     def _version(self, hole):
         """Results are recomputed when the model or the processed hole changes."""
         f = self.store.proc / f"{hole}.npz"
-        return f"{self.model_info['run']}-{self.model_info['step']}-fp1m-{int(f.stat().st_mtime) if f.exists() else 0}"
+        return f"{self.model_info['run']}-{self.model_info['step']}-fp2m-{int(f.stat().st_mtime) if f.exists() else 0}"
 
     def _compute(self, hole):
         z = np.load(self.store.proc / f"{hole}.npz", allow_pickle=False); R = {k: z[k] for k in z.files}
@@ -254,7 +255,7 @@ class Engine:
         H = self.H
         emb, _ = self._run(R, hide_tir=False)
         emb_t, pt = self._run(R, hide_tir=True)
-        F = H["pca"].transform(emb).astype("f4"); R["F"] = F; R["E"] = emb.astype("f4")   # E: the representation itself, for similarity
+        F = H["pca"].transform(emb).astype("f4"); R["F"] = F
         R["core"] = np.array([H["km_order"][k] for k in H["km"].predict(F)])
         has_t = R["n_tir"] > 0; R["has_t"] = has_t; gt = R["gt"]; okt = has_t & ~np.isin(gt, list(N.BAD))
         # 1 fill in TIR
@@ -444,9 +445,8 @@ class Engine:
                 "anom": round(float(R["lc_pct"][sel].max()), 4), "gold": round(float(R["gold_p"][k]), 4), "core": int(pd.Series(R["core"][sel]).mode().iloc[0])}
 
     def similar(self, hole, d0, k=10):
-        R = self.compute(hole); d0 = float(np.floor(d0)); x = window_vector(R, d0, d0 + 1); q = np.flatnonzero((R["depth"] >= d0) & (R["depth"] < d0 + 1))
-        if len(q) == 0:
-            q = np.argsort(np.abs(R["depth"] - (d0 + 0.5)))[:10]
+        R = self.compute(hole); o = R["order"]; dep = R["depth"][o]; i0 = int(np.searchsorted(dep, d0)); i0 = min(max(i0, 0), max(len(o) - LEN, 0))
+        q = o[i0:i0 + LEN]; x = window_vector(R, self.H, d0, d0 + 2)
         L = self.L; s = L["Z"] @ x.astype("f4"); meta = self.store.meta(hole)["meta"]; s[L["hole"] == hole] = -np.inf
         if meta.get("lat") is not None:                     # other areas only: no hole within 5 km of this one
             p = np.pi / 180; la, lo = meta["lat"], meta["lon"]

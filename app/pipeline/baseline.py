@@ -115,7 +115,7 @@ class BaselineEngine(Engine):
         dsn = R["dsn"]; br = np.r_[0, np.flatnonzero(np.diff(dsn)) + 1, len(dsn)]; R["pieces"] = [(int(br[i]), int(br[i + 1] - br[i])) for i in range(len(br) - 1)]
         H = self.H; has_t = R["n_tir"] > 0; R["has_t"] = has_t; gt = R["gt"]; okt = has_t & ~np.isin(gt, list(N.BAD))
         sw = std_swir(R["swir"], self.s_med, self.s_scale)
-        X40, tz = token_features(R, H, sw, has_t); R["F"] = X40; R["E"] = X40     # E: what this engine compares core by (its 40 principal components)
+        X40, tz = token_features(R, H, sw, has_t); R["F"] = X40
         R["core"] = np.array([H["km_order"][k] for k in H["km"].predict(X40)])
         # 1 fill in TIR: MLP with context; TIR group: logistic on 256 SWIR PCs
         cf = (ctx_feats(sw, R["pieces"]) - self.mx) / self.sx
