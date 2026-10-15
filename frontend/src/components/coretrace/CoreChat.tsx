@@ -50,7 +50,8 @@ function DocumentList({ out }: { out: any }) {
   const [open, setOpen] = useState<string | null>(null);
   const [more, setMore] = useState(false);
   const covering: any[] = out.wamex?.reports_covering_the_collar ?? [];
-  const coveringTotal: number = out.wamex?.reports_covering_the_collar_total ?? covering.length;
+  // the platform's count includes the reports the hole was logged in, which the list above already shows
+  const coveringTotal: number = Math.max(covering.length, (out.wamex?.reports_covering_the_collar_total ?? covering.length) - (out.wamex?.reports_this_hole_was_logged_in?.length ?? 0));
   if (!rows.length) return null;
   const shown = rows.find((r) => r.url === open);
   return (
