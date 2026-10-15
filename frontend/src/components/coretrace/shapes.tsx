@@ -65,7 +65,9 @@ export function drawIcon(id: string): { width: number; height: number; data: Uin
       return { width: n, height: n, data: ctx.getImageData(0, 0, n, n).data };
     }
     if (hatched) { ctx.lineWidth = 2.4 * PX; ctx.strokeStyle = fill; ctx.lineJoin = "round"; ctx.strokeText(glyph, c, c + 0.6 * PX); }   // a halo of the fill keeps the symbol clear of the stripes
-    ctx.fillStyle = inkOn(fill); ctx.fillText(glyph, c, c + 0.6 * PX);
+    // the symbol is always white; on a light fill (gold, uranium, diamonds) a faint dark edge keeps it legible
+    if (inkOn(fill) !== "#ffffff") { ctx.lineWidth = 1.6 * PX; ctx.strokeStyle = "rgba(2,6,23,0.38)"; ctx.lineJoin = "round"; ctx.strokeText(glyph, c, c + 0.6 * PX); }
+    ctx.fillStyle = "#ffffff"; ctx.fillText(glyph, c, c + 0.6 * PX);
     return { width: n, height: n, data: ctx.getImageData(0, 0, n, n).data };
   }
   const lw = Number(w) * PX, r = 6 * PX - lw;
@@ -98,8 +100,8 @@ export function Mark({ shape = "circle", color, ring, size = 12, title, glyph, h
         </g>}
         <g fill="none" stroke="#fff" strokeWidth={1.5}>{outline}</g>
         {glyph === "+" ? <path d={`M${c - r * 0.5} ${c}h${r}M${c} ${c - r * 0.5}v${r}`} stroke={inkOn(color)} strokeWidth={S * 0.1} strokeLinecap="round" />
-          : glyph.trim() && <text x={c} y={c + 0.5} textAnchor="middle" dominantBaseline="central" fontSize={glyph.length >= 3 ? S * 0.36 : glyph.length === 2 ? S * 0.5 : S * 0.58} fontWeight={700} fill={inkOn(color)}
-          stroke={hatched ? color : undefined} strokeWidth={hatched ? S * 0.1 : undefined} paintOrder="stroke" style={{ fontFamily: "ui-sans-serif, system-ui, sans-serif" }}>{glyph}</text>}
+          : glyph.trim() && <text x={c} y={c + 0.5} textAnchor="middle" dominantBaseline="central" fontSize={glyph.length >= 3 ? S * 0.36 : glyph.length === 2 ? S * 0.5 : S * 0.58} fontWeight={700} fill="#fff"
+          stroke={hatched ? color : inkOn(color) !== "#ffffff" ? "rgba(2,6,23,0.38)" : undefined} strokeWidth={hatched ? S * 0.1 : S * 0.05} paintOrder="stroke" style={{ fontFamily: "ui-sans-serif, system-ui, sans-serif" }}>{glyph}</text>}
       </svg>);
   }
   const c = size / 2, r = size / 2 - 1.5;
