@@ -77,21 +77,13 @@ export function classify(h: HoleRow, mode: ColourMode, typeName: Map<number, str
   return { label: fam, color: coreTypeColor(name), order: 0 };
 }
 
-// ---- shape: a second attribute, a few classes only (a reader can tell three or four shapes apart, not eight)
+// ---- shape: one fixed second attribute. Round = the models read the hole; square = the scan is shown as it
+// came (chips, an unusable mask, another band grid). Gold and on/offshore used to be options here; a reader
+// never needed to choose, and the choice made the legend harder to read.
 
-export type ShapeMode = "none" | "gold" | "data" | "setting";
-export const SHAPE_MODES: { id: ShapeMode; short: string }[] = [
-  { id: "gold", short: "Gold" }, { id: "data", short: "Models" }, { id: "setting", short: "On/offshore" }, { id: "none", short: "None" },
-];
 export type ShapeClass = { label: string; shape: Shape; order: number };
 
-export function shapeOf(h: HoleRow, mode: ShapeMode): ShapeClass | null {
-  if (h.status !== "ready" || mode === "none") return null;
-  if (mode === "gold") {
-    if (h.au_pos_m > 0) return { label: "Gold ≥ 0.1 ppm", shape: "triangle", order: 0 };
-    if (h.au_m > 0) return { label: "Assayed, below 0.1", shape: "square", order: 1 };
-    return { label: "No assays", shape: "circle", order: 2 };
-  }
-  if (mode === "data") return h.message ? { label: "Scan only", shape: "square", order: 1 } : { label: "Read by the models", shape: "circle", order: 0 };
-  return h.offshore ? { label: "Offshore well", shape: "diamond", order: 1 } : { label: "Onshore", shape: "circle", order: 0 };
+export function shapeOf(h: HoleRow): ShapeClass | null {
+  if (h.status !== "ready") return null;
+  return h.message ? { label: "Scan only", shape: "square", order: 1 } : { label: "Read by the models", shape: "circle", order: 0 };
 }
