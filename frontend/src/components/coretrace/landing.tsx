@@ -82,7 +82,7 @@ export function CoreHero() {
       <div className="absolute inset-x-0 bottom-0">
         <div className="container-site flex flex-col gap-5 pb-6 md:flex-row md:items-end md:justify-between md:gap-8 md:pb-12">
           <div className="max-w-4xl">
-            <p className="font-display text-lg font-semibold tracking-tight text-white md:text-xl">CoreTRACE</p>
+            <p className="font-display text-lg font-semibold tracking-tight text-white md:text-xl">CoreFlagging</p>
             <h1 className="mt-1.5 font-display text-[34px] font-semibold leading-[1.1] tracking-tight md:mt-2.5 md:text-6xl md:leading-tight">
               <span className="bg-linear-to-r from-white from-40% to-cyan bg-clip-text text-transparent">A second opinion on every metre of core.</span>
             </h1>
@@ -91,7 +91,6 @@ export function CoreHero() {
               <Link href={`${base}/map`} className="flex h-11 items-center gap-2 rounded-full bg-white px-5 font-display text-[15px] font-bold md:h-12 md:px-6 text-ink transition-colors hover:bg-cyan focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan">
                 Open the map<ArrowRight className="size-4" />
               </Link>
-              <Link href={`${base}/findings`} className="flex h-11 items-center rounded-full px-4 font-display text-[15px] font-semibold md:h-12 md:px-5 text-white/85 ring-1 ring-white/35 transition-colors hover:bg-white/10 hover:text-white">See what it found</Link>
             </div>
             <Link href={`${base}/map?upload=1`} className="mt-3 inline-block text-sm text-white/60 underline-offset-4 hover:text-white hover:underline md:mt-4">Or upload your own scan</Link>
           </div>
@@ -349,17 +348,13 @@ const FOUND: [string, string][] = [
   ["5,846 holes", "Read across Australia. Checked against logs and chemistry in Western Australia."],
 ];
 
-/** A short look at the findings, three tested numbers and the way in. */
+/** A short look at the findings: three tested numbers. */
 export function CoreFound() {
-  const { base } = useChrome();
   return (
     <section id="found" className="scroll-mt-24 bg-paper pb-16 md:pb-24">
       <div className="container-site">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <Reveal><h2 className="font-display text-2xl font-medium tracking-tight text-ink md:text-4xl">What it found</h2></Reveal>
-          <Link href={`${base}/findings`} className="inline-flex items-center gap-1.5 font-display text-[15px] font-semibold text-ink underline-offset-4 hover:underline">
-            See the findings<ArrowRight className="size-4" />
-          </Link>
         </div>
         <dl className="mt-8 grid gap-x-10 sm:grid-cols-3">
           {FOUND.map(([n, b]) => (
