@@ -160,6 +160,53 @@ def _col(sp, *names: str):
     return None
 
 
+_TSA = re.compile(r"^(Min|Grp|Wt)([123]) ([su])(TSAS|jCLST|TSAT)$")
+
+
+def _tsa_columns(sp) -> dict[str, object]:
+    """The TSA (SWIR) or jCLST/TSAT (TIR) result columns of a file: the system run when it has one, else the
+    user's. Keys "Min1", "Grp1", "Wt1" … "Wt3"."""
+    found: dict[str, dict[str, object]] = {"s": {}, "u": {}}
+    for c in sp.scalars.columns:
+        m = _TSA.match(c)
+        if m: found[m.group(3)][m.group(1) + m.group(2)] = sp.scalars[c]
+    return found["s"] if "Min1" in found["s"] else found["u"]
+
+
+def _class_table(sp, want: str) -> dict[int, str]:
+    """The class table whose name holds `want` ("Groups" or "Minerals" of the TSA run): a coded column reads
+    through it. pytsg exposes the file's class headers by index."""
+    for ch in (getattr(sp, "classes", None) or {}).values():
+        name = str(getattr(ch, "name", "")); table = getattr(ch, "classes", None)
+        if want in name and isinstance(table, dict): return {int(k): str(v) for k, v in table.items()}
+    return {}
+
+
+def _tsa_reader(sp):
+    """A function i -> [[group, mineral, weight], …] (up to three, heaviest first) for sample i, or [] when the run
+    read nothing there. Coded groups or minerals (floats) resolve through the class tables."""
+    cols = _tsa_columns(sp)
+    groups = _class_table(sp, "Groups"); minerals = _class_table(sp, "Minerals")
+    def name(col, i, table):
+        if col is None: return ""
+        v = col.iloc[i]
+        if v is None: return ""
+        if isinstance(v, (float, np.floating)):
+            if not np.isfinite(v) or v < -1e30: return ""
+            return table.get(int(round(float(v))), "")
+        return str(v).strip()
+    def read(i):
+        out = []
+        for n in "123":
+            g, mn, w = name(cols.get("Grp" + n), i, groups), name(cols.get("Min" + n), i, minerals), cols.get("Wt" + n)
+            wt = None if w is None else float(w.iloc[i])
+            if wt is not None and (not np.isfinite(wt) or wt < -1e30): wt = None
+            if not (g or mn): continue
+            out.append([g, mn, None if wt is None else round(wt, 3)])
+        return out
+    return read
+
+
 def samples(refs: list[str], dataset: str, lo: float, hi: float, spectra: bool = False) -> dict:
     """One row per spectrum sample in [lo, hi): depth, tray, section, mm along the section, the TSG mineral and
     group read there (SWIR), the laser height (mm), and the SWIR spectrum when asked. At most 2,000 samples."""
@@ -167,7 +214,7 @@ def samples(refs: list[str], dataset: str, lo: float, hi: float, spectra: bool =
     i0, i1, D = _window(sp, lo, hi)
     i1 = min(i1, i0 + 2000)
     sh = sp.sampleheaders.iloc[i0:i1]
-    min1 = _col(sp, "Min1 sTSAS", "Min1 uTSAS"); grp1 = _col(sp, "Grp1 sTSAS", "Grp1 uTSAS"); wt1 = _col(sp, "Wt1 sTSAS", "Wt1 uTSAS")
+    swir_tsa = _tsa_reader(sp)
     height = None
     f = _files(d)
     if "hires" in f:
@@ -178,8 +225,7 @@ def samples(refs: list[str], dataset: str, lo: float, hi: float, spectra: bool =
             height = None
     tir = _tir_of(d, dataset)
     tirD = tir.sampleheaders["D"].astype(float).to_numpy() if tir is not None else None
-    tmin1 = _col(tir, "Min1 sTSAT", "Min1 uTSAT", "Min1 sTSAS", "Min1 uTSAS") if tir is not None else None
-    tgrp1 = _col(tir, "Grp1 sTSAT", "Grp1 uTSAT", "Grp1 sTSAS", "Grp1 uTSAS") if tir is not None else None
+    tir_tsa = _tsa_reader(tir) if tir is not None else None
     def tir_index(depth: float):
         """the TIR sample measured within 5 mm of this depth, or None (the TIR file has its own sample list)"""
         if tirD is None or len(tirD) == 0: return None
@@ -191,18 +237,14 @@ def samples(refs: list[str], dataset: str, lo: float, hi: float, spectra: bool =
         if k is None: return None
         v = tir.spectra[k]
         return None if not np.isfinite(v).any() else [round(float(x), 4) for x in v]
-    def cls(col, i):
-        if col is None: return ""
-        v = col.iloc[i]
-        return "" if v is None or (isinstance(v, float) and np.isnan(v)) else str(v)
     rows = []
     for j, i in enumerate(range(i0, i1)):
+        sw = swir_tsa(i); k = tir_index(float(D[i])); tw = tir_tsa(k) if (tir_tsa is not None and k is not None) else []
+        first = sw[0] if sw else ["", "", None]; tfirst = tw[0] if tw else ["", "", None]
         r = {"i": int(i), "depth": round(float(D[i]), 4), "tray": str(sh["T"].iloc[j]), "section": int(float(sh["L"].iloc[j])) if str(sh["L"].iloc[j]).strip() else None,
-             "x_mm": round(float(sh["X"].iloc[j]), 1), "mineral": cls(min1, i), "group": cls(grp1, i),
-             "weight": None if wt1 is None or np.isnan(float(wt1.iloc[i])) else round(float(wt1.iloc[i]), 3),
-             "height_mm": None if height is None or np.isnan(height[j]) else round(float(height[j]), 2)}
-        k = tir_index(float(D[i]))
-        r["tir_mineral"] = cls(tmin1, k) if k is not None else ""; r["tir_group"] = cls(tgrp1, k) if k is not None else ""
+             "x_mm": round(float(sh["X"].iloc[j]), 1), "mineral": first[1], "group": first[0], "weight": first[2],
+             "height_mm": None if height is None or np.isnan(height[j]) else round(float(height[j]), 2),
+             "swir_mix": sw, "tir_mineral": tfirst[1], "tir_group": tfirst[0], "tir_mix": tw}
         if spectra:
             r["swir"] = [round(float(x), 4) for x in sp.spectra[i]]
             r["tir"] = tir_at(float(D[i]))
