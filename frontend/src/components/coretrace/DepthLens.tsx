@@ -125,6 +125,7 @@ export function DepthLens({ hole, mv, win, onWindow, trays, metre, onMetre, type
 
 const round1 = (v: number) => Math.round(v * 10) / 10;
 
+const PRED = "bg-cyan/[0.08] border-b-transparent";   // the tint of a column the model predicts: one band, no row rules across it
 const th10 = "border-b border-slate-200 px-2 py-1.5 text-left text-[11px] font-medium text-slate-500";
 const td10 = "border-b border-slate-100 px-2 py-1.5 align-top text-xs text-slate-700";
 
@@ -166,13 +167,14 @@ function TenMetres({ hole, mv, spectral, from, to, typeName, onWindow }: {
     <section>
       <H4>Every 10 m: what each reading says</H4>
       <table className="w-full border-collapse">
-        <thead><tr>{["Depth (m)", "SWIR", "TIR", "Rock Classification"].map((h) => <th key={h} className={th10}>{h}</th>)}</tr></thead>
+        {/* the model's column is tinted: what HyFormer predicts, beside what the scanner's software read */}
+        <thead><tr>{["Depth (m)", "SWIR", "TIR"].map((h) => <th key={h} className={th10}>{h}</th>)}<th className={cn(th10, PRED, "rounded-t-md")}>Rock Classification</th></tr></thead>
         <tbody>{rows.map((r) => (
           <tr key={r.k} onClick={() => onWindow([r.k, r.k + 10])} className="cursor-pointer hover:bg-slate-50" title={`Open ${r.k}–${r.k + 10} m`}>
             <td className={cn(td10, "font-mono whitespace-nowrap")}>{r.k}–{r.k + 10}{r.n < 10 ? <span className="ml-1 font-sans text-[10px] text-slate-400">({r.n} m of core)</span> : null}</td>
             <td className={td10}>{sw(r.sw, groupColor)}</td>
             <td className={td10}>{sw(r.tr, groupColor)}</td>
-            <td className={td10}>{sw(r.rc, (c) => coreTypeColor(typeName(Number(c))))}</td>
+            <td className={cn(td10, PRED)}>{sw(r.rc, (c) => coreTypeColor(typeName(Number(c))))}</td>
           </tr>))}</tbody>
       </table>
       <p className="pt-1 text-[10.5px] text-slate-400">SWIR and TIR: the share of each mineral group the scanner&rsquo;s TSG software reads, over the 10 m. Rock Classification: the class HyFormer reads in most of its metres, and in what share of them.</p>
