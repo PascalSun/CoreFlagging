@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Info } from "lucide-react";
 import type { Metres, ModelView, SpectralLog, TokenScores } from "@/lib/coreScan";
-import { GRID, INK, MUTED, SERIES, coreTypeBg, coreTypePaint, fmt, groupColor, groupName, pct } from "@/components/coretrace/palette";
+import { GRID, INK, MUTED, SERIES, fmt, groupColor, groupName, pct, coreTypeBg, coreTypePaint } from "@/components/coretrace/palette";
 import { cn } from "@/lib/utils";
 import { DepthNav } from "@/components/coretrace/DepthNav";
 import { ColourNote } from "@/components/coretrace/ColourNote";
@@ -17,7 +17,7 @@ export const TIP = {
   swir: "SWIR: the short-wave infrared mineral groups the scanner's TSG software reads (TSA). Each bar is the share of every group in the interval, weighted by the software's fit: 1 m bars over the whole hole, 10 cm bars once zoomed to 50 m or less. Grey is TSG's Invalid (no usable spectrum).",
   tir: "TIR: the thermal infrared mineral groups the scanner's TSG software reads (jCLST), drawn the same way as SWIR. Empty where the hole has no usable thermal infrared.",
   bd: "BD, boundary detection: HyFormer cuts the hole where its reading of the spectra changes. Each black line is a predicted boundary; the chunks between them are the auto log.",
-  rc: "RC, rock classification: the rock class HyFormer reads (a cluster of its reading), in the colour of the type's leading SWIR mineral, with the rest of its name on top in those minerals' colours: stripes for the other mineral of “A + B” (quartz pink, plagioclase brown), dots for “more X”, a thin dark rule for a second type of the same name (II). One block per metre over the whole hole (the commonest type of its 10 cm pieces); every 10 cm once zoomed to 50 m or less.",
+  rc: "RC, rock classification: the rock class HyFormer reads (a cluster of its reading), each class in a colour of its own, not a mineral's (the key is under the log); a class whose name mixes two minerals is hatched with lines, three with a crosshatch. One block per metre over the whole hole (the commonest type of its 10 cm pieces); every 10 cm once zoomed to 50 m or less.",
   unusual: "Unusual: how far the spectra stand from the core within 15 m (bar length): per metre over the whole hole, per 10 cm once zoomed to 50 m or less. Orange-red bars are flagged: among the hole's top 3% and above the State's 98th percentile; at 10 cm, the piece that carries the flag.",
 };
 
@@ -345,7 +345,7 @@ export function StripKey({ metres, model, spectral }: { metres: Metres; model: M
         <span className="flex items-center gap-1"><Sw c="#9ca3af" />unusual, not flagged</span>
       </>}
       {types.length > 0 && <span className="basis-full" aria-hidden />}
-      {types.length > 0 && <span className="flex items-center gap-1 font-semibold text-slate-900" data-keytip={TIP.rc}>Rock Classification (RC)</span>}
+      {types.length > 0 && <span className="flex items-center gap-1 font-semibold text-slate-900" data-keytip={TIP.rc}>Rock Classification (RC)<ColourNote kind="rc" /></span>}
       {types.map((t) => <span key={t} className="flex items-center gap-1"><Sw c={coreTypeBg(t)} />{t}</span>)}
     </div>
   );

@@ -35,65 +35,60 @@ export function groupName(g: string | null | undefined): string {
   return GROUP_NAME[g] ?? g.charAt(0) + g.slice(1).toLowerCase();
 }
 
-/** A model rock class is named after its minerals ("Quartz + chlorite, more dark mica");
- * it takes the colour of the first SWIR mineral in that name, grey when SWIR sees none. */
-const NAME_KEYS: [string, string][] = [
-  ["chlorite", "CHLORITE"], ["white mica", "WHITE-MICA"], ["kaolin", "KAOLIN"], ["amphibole", "AMPHIBOLE"], ["carbonate", "CARBONATE"],
-  ["smectite", "SMECTITE"], ["dark mica", "DARK-MICA"],
-];
+/** Rock Classification (RC) has colours of its own, not the minerals': a class is a cluster of HyFormer's reading, and
+ * its name only describes it, so it does not take a mineral group's TSG colour (which would read as that mineral).
+ * The colours are Tableau 20, muted beside TSG's pure hues; classes of related name share a hue in two shades
+ * (the two "Plagioclase + chlorite, more amphibole" greens, the "Quartz + chlorite" blues, the "Quartz + white mica"
+ * oranges, the "Quartz (no SWIR response)" browns). A class of another model takes a colour from its name. */
+const RC: Record<string, string> = {
+  "Quartz + chlorite, more dark mica": "#4e79a7", "Quartz + chlorite": "#a0cbe8",
+  "Plagioclase + chlorite, more amphibole": "#59a14f", "Plagioclase + chlorite, more amphibole (II)": "#8cd17d",
+  "Quartz + white mica, more K-feldspar": "#f28e2b", "Quartz + white mica, more smectite": "#ffbe7d",
+  "Quartz (no SWIR response), more dark mica": "#9d7660", "Quartz (no SWIR response), more white mica": "#d7b5a6",
+  "Plagioclase (no SWIR response)": "#79706e", "Carbonate": "#499894", "Quartz + kaolin": "#e15759", "Other Mg-OH minerals + chlorite": "#b07aa1",
+};
+const RC_SPARE = ["#b6992d", "#f1ce63", "#86bcb6", "#ff9d9a", "#d4a6c8", "#fabfd2", "#bab0ac", "#d37295"];
 export function coreTypeColor(name: string | undefined): string {
   if (!name) return NONE;
-  const main = name.split(",")[0].toLowerCase();
-  for (const [k, g] of NAME_KEYS) if (main.includes(k)) return GROUP[g];
-  if (main.includes("plagioclase")) return GROUP.PLAGIOCLASE;
-  if (main.includes("quartz")) return GROUP.SILICA;
-  return OTHER;
+  if (RC[name]) return RC[name];
+  let h = 0; for (const ch of name) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+  return RC_SPARE[h % RC_SPARE.length];
 }
 
-/** A class keeps its colour (above); the rest of its name goes on top as fill, in the minerals' own colours:
- * - the other mineral of "A + B" ("Quartz + chlorite": chlorite's green, quartz's pink) as stripes ("/");
- * - "more X" as dots in X's colour ("more dark mica": dark-mica dots);
- * - a second class of the same name ("(II)") as a thin dark rule across.
- * Every class differs from every other of its colour. */
-export type Fill = { base: string; stripe: string | null; dot: string | null; rule: boolean };
-const LEAD: [RegExp, string][] = [[/^quartz/, "SILICA"], [/^plagioclase/, "PLAGIOCLASE"], [/^other mg-oh/, "OTHER-MGOH"], [/^other al-oh/, "OTHER-ALOH"], [/^carbonate/, "CARBONATE"]];
-const MINERAL: [string, string][] = [...NAME_KEYS, ["quartz", "SILICA"], ["plagioclase", "PLAGIOCLASE"], ["k-feldspar", "K-FELDSPAR"], ["other mg-oh", "OTHER-MGOH"],
-  ["other al-oh", "OTHER-ALOH"], ["epidote", "EPIDOTE"], ["serpentine", "SERPENTINE"], ["tourmaline", "TOURMALINE"], ["sulphate", "SULPHATE"], ["pyroxene", "PYROXENE"],
-  ["olivine", "OLIVINE"], ["garnet", "GARNET"], ["oxide", "OXIDE"], ["phosphate", "PHOSPHATE"]];
-export function coreTypeFill(name: string | undefined): Fill {
-  const base = coreTypeColor(name);
-  if (!name) return { base, stripe: null, dot: null, rule: false };
-  const n = name.toLowerCase(); const comma = n.indexOf(","); const head = comma < 0 ? n : n.slice(0, comma), rest = comma < 0 ? "" : n.slice(comma + 1);
-  const lead = LEAD.find(([re]) => re.test(head))?.[1];
-  const stripe = head.includes("+") && lead && GROUP[lead] !== base ? GROUP[lead] : null;
-  const x = /more ([^,(]+)/.exec(rest)?.[1] ?? ""; const xm = MINERAL.find(([k]) => x.includes(k))?.[1];
-  return { base, stripe, dot: xm ? GROUP[xm] : null, rule: /\(ii+\)/.test(n) };
+/** A class whose name mixes minerals is hatched over its colour, to say so: one mineral ("Carbonate") solid; two
+ * ("Quartz + kaolin", "Quartz (no SWIR response), more white mica") single diagonal lines; three ("Quartz + chlorite,
+ * more dark mica") a crosshatch. */
+export type Hatch = "solid" | "diag" | "cross";
+export function coreTypeHatch(name: string | undefined): Hatch {
+  if (!name) return "solid";
+  const n = name.toLowerCase().replace(/\(no swir response\)|\(ii+\)/g, ""); const comma = n.indexOf(",");
+  const head = comma < 0 ? n : n.slice(0, comma);
+  const k = head.split("+").length + (/more /.test(comma < 0 ? "" : n.slice(comma)) ? 1 : 0);
+  return k >= 3 ? "cross" : k === 2 ? "diag" : "solid";
 }
-const FILL_INK = "rgba(15,23,42,0.5)";
-const fillKey = (f: Fill) => [f.base, f.stripe, f.dot, f.rule].join("|");
-/** A CSS `background` for a class: its colour with its fill over it, on a 6 px tile. */
+const HATCH_INK = "rgba(15,23,42,0.38)";
+/** A CSS `background` for a class: its colour with its hatch over it. */
 export function coreTypeBg(name: string | undefined): string {
-  const f = coreTypeFill(name); const L: string[] = [];
-  if (f.rule) L.push(`repeating-linear-gradient(0deg, ${FILL_INK} 0 0.8px, transparent 0.8px 6px)`);
-  if (f.dot) L.push(`radial-gradient(circle at 3px 3px, ${f.dot} 0 1.2px, ${FILL_INK} 1.2px 1.7px, transparent 1.8px) 0 0 / 6px 6px`);
-  if (f.stripe) L.push(`repeating-linear-gradient(135deg, ${f.stripe} 0 1.7px, transparent 1.7px 4.24px)`);
-  return [...L, f.base].join(", ");
+  const c = coreTypeColor(name), h = coreTypeHatch(name), L = `${HATCH_INK} 0 1px, transparent 1px 4.24px`;
+  if (h === "diag") return `repeating-linear-gradient(135deg, ${L}), ${c}`;
+  if (h === "cross") return `repeating-linear-gradient(135deg, ${L}), repeating-linear-gradient(45deg, ${L}), ${c}`;
+  return c;
 }
-/** The same for a canvas: a pattern (or the plain colour), made once per fill and context. */
+/** The same for a canvas: a pattern (or the plain colour), made once per class and context. */
 const PAT = new WeakMap<CanvasRenderingContext2D, Map<string, CanvasPattern | string>>();
 export function coreTypePaint(g: CanvasRenderingContext2D, name: string | undefined): CanvasPattern | string {
-  const f = coreTypeFill(name);
-  if ((!f.stripe && !f.dot && !f.rule) || typeof document === "undefined") return f.base;
+  const c = coreTypeColor(name), h = coreTypeHatch(name);
+  if (h === "solid" || typeof document === "undefined") return c;
   let m = PAT.get(g); if (!m) { m = new Map(); PAT.set(g, m); }
-  const key = fillKey(f); const hit = m.get(key); if (hit) return hit;
-  // a 6 px tile drawn at 4x, the pattern scaled back down so the marks stay crisp on a dense screen
+  const key = `${c}|${h}`; const hit = m.get(key); if (hit) return hit;
+  // a 6 px tile drawn at 4x, the pattern scaled back down so the lines stay crisp on a dense screen
   const S = 6, R = 4, t = document.createElement("canvas"); t.width = t.height = S * R;
-  const q = t.getContext("2d"); if (!q) return f.base;
-  q.scale(R, R); q.fillStyle = f.base; q.fillRect(0, 0, S, S);
-  if (f.stripe) { q.strokeStyle = f.stripe; q.lineWidth = 1.7; q.beginPath(); for (const c of [0, S, 2 * S]) { q.moveTo(c + 1, -1); q.lineTo(-1, c + 1); } q.stroke(); }
-  if (f.dot) { q.beginPath(); q.arc(3, 3, 1.45, 0, Math.PI * 2); q.fillStyle = FILL_INK; q.fill(); q.beginPath(); q.arc(3, 3, 1.2, 0, Math.PI * 2); q.fillStyle = f.dot; q.fill(); }
-  if (f.rule) { q.fillStyle = FILL_INK; q.fillRect(0, 0, S, 0.8); }
-  const p = g.createPattern(t, "repeat"); if (!p) return f.base;
+  const q = t.getContext("2d"); if (!q) return c;
+  q.scale(R, R); q.fillStyle = c; q.fillRect(0, 0, S, S); q.strokeStyle = HATCH_INK; q.lineWidth = 1; q.beginPath();
+  for (const o of [0, S, 2 * S]) { q.moveTo(o + 1, -1); q.lineTo(-1, o + 1); }                       // "/"
+  if (h === "cross") for (const o of [-S, 0, S]) { q.moveTo(o - 1, -1); q.lineTo(o + S + 1, S + 1); } // "\"
+  q.stroke();
+  const p = g.createPattern(t, "repeat"); if (!p) return c;
   p.setTransform(new DOMMatrix().scale(1 / R));
   m.set(key, p); return p;
 }

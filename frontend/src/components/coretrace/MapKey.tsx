@@ -174,7 +174,7 @@ export function MapKeyBody({ rows, hidden, onHidden, years, onYears, again }: {
   return (
     <>
       {SHOW_ROCK_TYPES && order.core.length > 0 && (
-        <Section title="Dominant rock types" info="The rock type the models read most often down the hole, by its leading mineral. Raw-scan holes have no model reading and so no rock type: they show while every rock type is on, and drop out once any is hidden." onReset={reset("core")}>
+        <Section title="Dominant rock types" info="The rock class (RC) the model reads most often down the hole, in its RC colour. Raw-scan holes have no model reading and so no rock type: they show while every rock type is on, and drop out once any is hidden." onReset={reset("core")}>
           {(more.core ? order.core : order.core.slice(0, 5)).map((k) => row("core", k, { bar: (count.core.get(k) ?? 0) / cmax }))}
           <More open={more.core} n={order.core.length - 5} onClick={() => setMore((m) => ({ ...m, core: !m.core }))} />
         </Section>

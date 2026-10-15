@@ -13,22 +13,15 @@ type Look = { color: string; label: string; ring?: string; wait?: boolean; shape
 type Key = "name" | "state" | "target" | "depth" | "again" | "gold" | "issues";
 const PAGE = 100;
 
-// the strips colour each rock type by its leading mineral; one example name per colour gives the key (behind the ⓘ)
-const KEY: [string, string][] = [
-  ["Chlorite", "Quartz + chlorite"], ["White mica", "Quartz + white mica"], ["Kaolin", "Quartz + kaolin"], ["Carbonate", "Carbonate"],
-  ["Amphibole", "Amphibole"], ["Smectite", "Smectite"], ["Dark mica", "Dark mica"], ["Plagioclase, no SWIR minerals", "Plagioclase"],
-  ["Quartz, no SWIR minerals", "Quartz"], ["Other", "Other"],
-];
-
 /** The key to the rock-type strips: an ⓘ by the column's name, opening on hover or focus. */
-function RockKey() {
+function RockKey({ typeName }: { typeName: Map<number, string> }) {
   return (
     <span className="group relative inline-flex">
       <button type="button" aria-label="What the colours mean" className="grid size-4 place-items-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-800 focus-visible:text-slate-800"><Info size={12} /></button>
-      <span role="tooltip" className="pointer-events-none absolute top-full left-1/2 z-30 mt-1.5 hidden w-60 -translate-x-1/2 rounded-xl border border-slate-200 bg-white p-3 text-left text-[11px] font-normal text-slate-600 shadow-glass group-focus-within:block group-hover:block">
-        <span className="mb-2 block leading-snug">Down the hole, top to bottom, each rock type coloured by its leading mineral:</span>
+      <span role="tooltip" className="pointer-events-none absolute top-full left-1/2 z-30 mt-1.5 hidden w-72 -translate-x-1/2 rounded-xl border border-slate-200 bg-white p-3 text-left text-[11px] font-normal text-slate-600 shadow-glass group-focus-within:block group-hover:block">
+        <span className="mb-2 block leading-snug">Down the hole, top to bottom, each rock class (RC) in its own colour:</span>
         <span className="grid grid-cols-1 gap-1">
-          {KEY.map(([label, name]) => <span key={label} className="flex items-center gap-1.5"><i className="inline-block size-2.5 flex-none rounded-[2px]" style={{ background: coreTypeBg(name) }} />{label}</span>)}
+          {[...typeName].sort((a, b) => a[0] - b[0]).map(([k, name]) => <span key={k} className="flex items-center gap-1.5"><i className="inline-block size-2.5 flex-none rounded-[2px]" style={{ background: coreTypeBg(name) }} />{name}</span>)}
           <span className="flex items-center gap-1.5"><i className="inline-block size-2.5 flex-none rounded-[2px] ring-1 ring-slate-200" style={{ background: NONE }} />No model reading</span>
         </span>
       </span>
@@ -111,7 +104,7 @@ export function HoleTable({ holes, q, onQ, look, typeName, onOpen, onAsk, loadin
               {head("name", "Hole")}{head("state", "State", "w-16")}
               <th scope="col" className="sticky top-0 z-10 bg-white/95 px-3 py-2 font-medium backdrop-blur">Company · project · region</th>
               {head("target", "Drilled for", "w-28")}
-              <th scope="col" className="sticky top-0 z-20 w-44 bg-white/95 px-3 py-2 font-medium backdrop-blur"><span className="inline-flex items-center gap-1">Dominant rock types<RockKey /></span></th>
+              <th scope="col" className="sticky top-0 z-20 w-44 bg-white/95 px-3 py-2 font-medium backdrop-blur"><span className="inline-flex items-center gap-1">Dominant rock types<RockKey typeName={typeName} /></span></th>
               {head("depth", "Depth", "w-20 text-right")}{head("again", "Look again", "w-28")}{head("gold", "Gold assays", "w-28")}{head("issues", "Issues", "w-16 text-right")}
             </tr>
           </thead>

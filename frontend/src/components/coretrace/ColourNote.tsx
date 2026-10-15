@@ -16,9 +16,14 @@ export const COLOUR_NOTES = {
     body: "A plain fill is the hole's own record: WA from the DMIRS HyLogger drillhole package (DASC), South Australia from SARIG, Victoria from the Earth Resources bores database. A hatched fill (≈ in the list) is an inference, because the survey records no target on the hole: Queensland and the NT take the commodities of the exploration report or permit the hole belongs to; NSW and Tasmania take the nearest known mineral deposit within 5 km (Geoscience Australia), the project's namesake first. The colours are CoreFlagging's own, with the chemical symbol (Au, Cu, Ni…) on each mark so the colour need not be remembered.",
     link: { href: "https://dasc.dmirs.wa.gov.au/", label: "DASC: Datasets › Interim data › Drillholes › HyLogger drillhole package" },
   },
+  rc: {
+    title: "Rock Classification colours",
+    body: "A rock class (RC) is a cluster of HyFormer's reading; its name only describes what the class is mostly made of. So the classes have colours of their own (Tableau 20, muted beside the minerals' pure TSG hues) rather than a mineral's, which would read as that mineral. Classes of related name share a hue in two shades: the two “Plagioclase + chlorite, more amphibole” greens, the “Quartz + chlorite” blues, the “Quartz + white mica” oranges, the “Quartz (no SWIR response)” browns. A class whose name mixes minerals is hatched over its colour: lines for two (“Quartz + kaolin”), a crosshatch for three (“Quartz + chlorite, more dark mica”); one mineral (“Carbonate”) is solid.",
+    link: null,
+  },
   mineral: {
     title: "Mineral colours",
-    body: "The HyLogger / TSG standard colours for spectral groups, the same as in the NVCL summary reports and any TSG plot: the same colour for the same group on every page, SWIR and TIR alike. Grey is TSG's Invalid (no usable spectrum). A rock class (RC) takes the colour of its leading mineral.",
+    body: "The HyLogger / TSG standard colours for spectral groups, the same as in the NVCL summary reports and any TSG plot: the same colour for the same group on every page, SWIR and TIR alike. Grey is TSG's Invalid (no usable spectrum).",
     link: null,
   },
 } as const;

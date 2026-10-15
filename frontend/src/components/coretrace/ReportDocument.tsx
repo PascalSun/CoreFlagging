@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import type { CoreModelInfo, HoleDetail, ModelView, Tray } from "@/lib/coreScan";
 import { coreScan, readDate, surveyOf } from "@/lib/coreScan";
 import { HatchDefs, hatchFill } from "@/components/coretrace/HatchDefs";
-import { GRID, INK, MUTED, NONE, SERIES, coreTypeBg, fmt, groupColor, groupName, issueLabel, lithColor, pct } from "@/components/coretrace/palette";
+import { GRID, INK, MUTED, NONE, SERIES, fmt, groupColor, groupName, issueLabel, lithColor, pct, coreTypeBg } from "@/components/coretrace/palette";
 import { CORE_TEAM } from "@/components/coretrace/team";
 import { useT } from "@/lib/i18n";
 

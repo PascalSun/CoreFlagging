@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import type { Metres, ModelView } from "@/lib/coreScan";
-import { SERIES, coreTypePaint, groupColor } from "@/components/coretrace/palette";
+import { SERIES, groupColor, coreTypePaint } from "@/components/coretrace/palette";
 import { MIN_SPAN, fmtWindow, windowAbout } from "@/lib/depth";
 
 /** The whole hole in one narrow column beside the zoomed log, so a reader always knows where the window
