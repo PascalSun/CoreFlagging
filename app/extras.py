@@ -3,7 +3,8 @@
 The research app computed these on demand from a hole held in memory (engine.metre_view, engine.similar).
 Here they are computed once, when the hole is processed, for every metre:
   tir       the TIR spectrum the model rebuilds from SWIR alone, mean over the metre
-  fp        the fingerprint of the 2 m interval that starts at the metre, ready to compare with the State library
+  fp        the metre's vector (the model's representation max-pooled over the metre, unit length), ready to compare
+            with the State library and with any other hole's metres
   why       which spectral features set the metre apart from the core around it (no model involved)
 """
 from __future__ import annotations
@@ -14,7 +15,7 @@ import numpy as np
 
 from . import labels
 from .pipeline import names as N
-from .pipeline.engine import FEAT_ZH, FEATS, LEN, Engine, _f
+from .pipeline.engine import FEAT_ZH, FEATS, Engine, _f, metre_vectors
 
 FEAT_EN = {"alb": "overall brightness", "vis_slope": "visible reddening (iron oxides)", "d900": "900 nm iron-oxide absorption depth", "d1400": "1400 nm hydroxyl absorption depth",
            "d1900": "1900 nm water absorption depth", "d2160": "2160 nm kaolinite shoulder", "d2200": "2200 nm Al-OH absorption depth (white mica, clays)",
@@ -27,12 +28,10 @@ FEAT_EN = {"alb": "overall brightness", "vis_slope": "visible reddening (iron ox
 def metre_arrays(eng: Engine, key: str) -> tuple[np.ndarray, np.ndarray]:
     """(tir, fp): one row per metre of the hole, in the order of hole_view()['m']."""
     R = eng.compute(key); um = R["metres"]; m = np.floor(R["depth"]).astype(int)
-    o = R["order"]; dep = R["depth"][o]; F = R["F"]; H = eng.H
-    tir = np.zeros((len(um), R["tir_pred"].shape[1]), "f4"); fp = np.zeros((len(um), F.shape[1]), "f4")
+    tir = np.zeros((len(um), R["tir_pred"].shape[1]), "f4")
     for k, mm in enumerate(um):
         tir[k] = R["tir_pred"][m == mm].mean(0)
-        i0 = int(np.searchsorted(dep, float(mm))); i0 = min(max(i0, 0), max(len(o) - LEN, 0))      # as engine.similar
-        x = F[o[i0:i0 + LEN]].mean(0); x = (x - H["i_mu"]) / H["i_sd"]; fp[k] = x / (np.linalg.norm(x) + 1e-9)
+    _, fp = metre_vectors(R, um)
     return tir, fp
 
 
@@ -70,7 +69,7 @@ def _km(L: dict, lat: float, lon: float) -> np.ndarray:
 
 def similar(eng: Engine, x: np.ndarray, hole: str = "", lat: float | None = None, lon: float | None = None, k: int = 10,
             scope: str = "state", radius_km: float = 10.0, region: str = "") -> list[dict]:
-    """Intervals of the library closest to fingerprint `x`, within a scope:
+    """Metres of the library closest to vector `x`, within a scope:
 
     * "state": every other hole, leaving out this one and every hole within 5 km of it (so a match is not just
       the next hole on the same section), one interval per hole;
