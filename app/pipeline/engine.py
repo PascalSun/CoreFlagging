@@ -129,6 +129,8 @@ class Engine:
         self.s_med, self.s_scale, self.t_med, self.t_scale = sp["s_med"], sp["s_scale"], sp["t_med"], sp["t_scale"]
         ck = torch.load(B / "model.pt", map_location="cpu", weights_only=False)
         self.model = CoreFM(len(self.swir_wl), len(self.tir_sel), ck["args"]["d"], ck["args"]["layers"]); self.model.load_state_dict(ck["model"]); self.model.eval()
+        # CORETRACE_DEVICE=cuda|cpu; a GPU when there is one. The outputs match the CPU to float precision.
+        self.device = torch.device(os.environ.get("CORETRACE_DEVICE") or ("cuda" if torch.cuda.is_available() else "cpu")); self.model.to(self.device)
         self.model_info = {"run": ck.get("run"), "step": ck.get("step")}
         with open(B / "heads.pkl", "rb") as f:
             self.H = pickle.load(f)
@@ -170,12 +172,15 @@ class Engine:
             m = {"hide_s": z, "hide_t": ~b["pad"], "band_s": torch.zeros_like(b["swir"], dtype=torch.bool), "band_t": torch.zeros_like(b["tir"], dtype=torch.bool)}
         return b, m
 
-    def _run(self, R, hide_tir, bs=16):
+    def _run(self, R, hide_tir, bs=None):
         n = len(R["depth"]); hh = np.zeros((n, self.model.norm.normalized_shape[0]), "f4"); pt = np.zeros((n, len(self.tir_sel)), "f4") if hide_tir else None
-        jobs = window_jobs(R["pieces"])
+        jobs = window_jobs(R["pieces"]); bs = bs or (64 if self.device.type == "cuda" else 16); dev = self.device
         with torch.inference_mode():
             for i in range(0, len(jobs), bs):
-                chunk = jobs[i:i + bs]; b, m = self._batch(R, chunk, hide_tir); h, _, t = self.model(b, m); h = h.numpy(); t = t.numpy()
+                chunk = jobs[i:i + bs]; b, m = self._batch(R, chunk, hide_tir)
+                if dev.type != "cpu":
+                    b = {k: v.to(dev) for k, v in b.items()}; m = None if m is None else {k: v.to(dev) for k, v in m.items()}
+                h, _, t = self.model(b, m); h = h.cpu().numpy(); t = t.cpu().numpy()
                 for j, (s, n_, lo, hi) in enumerate(chunk):
                     hh[s + lo:s + hi] = h[j, lo:hi]
                     if hide_tir:
