@@ -64,6 +64,13 @@ export function DepthLens({ hole, mv, win, onWindow, trays, metre, onMetre, type
 
       {level === "hole" || level === "10m" ? (
         <>
+          {flags.length > 0 && (
+            <section>
+              <H4>Metres that stand out, in this window</H4>
+              <ul className="flex flex-wrap gap-1.5">{flags.map((r) => (
+                <li key={r.from_m}><button type="button" onClick={() => onWindow([r.from_m - 0.5, r.to_m + 0.5])} className="rounded-full border border-orange/50 bg-orange/10 px-2 py-0.5 font-mono text-[11px] text-slate-800 hover:border-orange">{r.from_m}–{r.to_m} m · {r.raw.toFixed(2)}</button></li>))}</ul>
+            </section>
+          )}
           {again.length > 0 && (
             <section>
               <H4>Where the model disagrees with the log, in this window</H4>
@@ -72,13 +79,6 @@ export function DepthLens({ hole, mv, win, onWindow, trays, metre, onMetre, type
             </section>
           )}
           <TenMetres hole={hole} mv={mv} spectral={spectral} from={from} to={to} typeName={typeName} onWindow={onWindow} />
-          {flags.length > 0 && (
-            <section>
-              <H4>Metres that stand out, in this window</H4>
-              <ul className="flex flex-wrap gap-1.5">{flags.map((r) => (
-                <li key={r.from_m}><button type="button" onClick={() => onWindow([r.from_m - 0.5, r.to_m + 0.5])} className="rounded-full border border-orange/50 bg-orange/10 px-2 py-0.5 font-mono text-[11px] text-slate-800 hover:border-orange">{r.from_m}–{r.to_m} m · {r.raw.toFixed(2)}</button></li>))}</ul>
-            </section>
-          )}
           {metres.length <= 12 && trayMetres(trays, metres).map((m) => <TrayPhoto key={m} holeKey={hole.key} trays={trays} metre={m} onMetre={onMetre} />)}
           {metres.length > 12 && <p className="text-[11px] text-slate-500">Zoom to 10 m or closer to see the photographs of each metre.</p>}
         </>
