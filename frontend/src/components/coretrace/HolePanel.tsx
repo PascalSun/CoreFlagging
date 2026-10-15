@@ -262,14 +262,12 @@ function Report({ hole, models, mvw, run, trays }: { hole: HoleDetail; models: C
     try { await downloadReportPdf(docRef.current, `CoreFlagging_${safe(hole.name)}_report.pdf`, `CoreFlagging scan report · ${hole.name} · ${models.find((m) => m.run === run)?.name ?? run}`); }
     finally { setMaking(false); }
   };
-  const exportSegs = async () => save(await coreScan.segmentsCsv(hole.key, run), `${safe(hole.name)}_${run}_auto_log.csv`);
   const exportIssues = () => save(csv([["hole", "issue", "dataset", "depth_from", "depth_to", "value", "evidence"],
     ...hole.issues.map((i) => [hole.name, issueLabel(i.issue), i.dataset, i.depth_from, i.depth_to, i.value, i.evidence])]), `${safe(hole.name)}_quality.csv`);
   return (
     <div className="flex flex-col gap-4">
       <div className="grid grid-cols-2 items-center gap-2 sm:flex sm:flex-wrap">
         <button type="button" onClick={pdf} disabled={making || (!mvw && hole.results.length > 0)} className="col-span-2 flex items-center justify-center gap-1.5 rounded-lg bg-slate-900 px-3 py-2.5 text-xs font-medium text-white hover:bg-slate-800 disabled:opacity-60 sm:col-span-1 sm:justify-start sm:py-2">{making ? <Loader2 size={14} className="animate-spin" /> : <FileDown size={14} />}{making ? "Making the PDF…" : "Download PDF"}</button>
-        <button type="button" onClick={exportSegs} disabled={!mvw} className="flex items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-40 sm:justify-start"><Download size={14} />Auto log (CSV)</button>
         <button type="button" onClick={exportIssues} className="flex items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 sm:justify-start"><Download size={14} />Quality issues (CSV)</button>
         <span className="col-span-2 text-[11px] text-slate-500">The PDF is this page, as shown.</span>
       </div>

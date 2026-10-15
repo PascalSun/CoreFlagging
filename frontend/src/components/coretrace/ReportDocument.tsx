@@ -37,6 +37,8 @@ const td = "border-b border-slate-100 py-1.5 pr-3 align-top text-[11.5px] text-s
 const num = "tabular-nums text-right";
 
 const SHOW_MODEL_TABLE = false;
+/** The auto log's table of segments, hidden from the report with the Auto log tab (its boundaries still mark the strip). */
+const SHOW_AUTO_LOG = false;
 
 /** The hole drawn across the page: what the scan reads and what the model makes of it, metre by
  * metre, each track on its own scale, with the auto-log boundaries and the flagged metres marked. */
@@ -234,7 +236,7 @@ export function ReportDocument({ hole, mv, run, models, trays, nodeRef }: {
       </Section>
       )}
 
-      {mv && (
+      {SHOW_AUTO_LOG && mv && (
         <Section n={next()} title="Auto log" intro={`${mv.segments.length} segments cut by ${model?.name ?? run} where its reading of the spectra changes. Descriptions are written by rule from the TSG software's minerals; a geologist has not reviewed them.`}>
           <table className="w-full border-collapse">
             <thead><tr><th className={`${th} w-[78px]`}>Depth (m)</th><th className={`${th} w-[150px]`}>Core type</th><th className={th}>Minerals</th></tr></thead>
