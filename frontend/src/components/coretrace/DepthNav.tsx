@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 import type { Metres, ModelView } from "@/lib/coreScan";
 import { SERIES, coreTypeColor, groupColor } from "@/components/coretrace/palette";
-import { fmtWindow, windowAbout } from "@/lib/depth";
+import { MIN_SPAN, fmtWindow, windowAbout } from "@/lib/depth";
 
 /** The whole hole in one narrow column beside the zoomed log, so a reader always knows where the window
  * is: the model's core type (or the SWIR mineral group) down the hole, the flagged metres as orange ticks,
@@ -59,8 +59,8 @@ export function DepthNav({ metres, model, view, hole0, hole1, onRange, typeName,
     const dr = drag.current; if (!dr) return;
     const dd = (e.clientY - dr.y0) / ppm; const [a, b] = dr.win;
     if (dr.kind === "move") onRange(windowAbout((a + b) / 2 + dd, b - a, hole0, hole1));
-    else if (dr.kind === "top") { const na = Math.max(hole0, Math.min(b - 0.3, a + dd)); onRange([Math.round(na * 10) / 10, b]); }
-    else { const nb = Math.min(hole1, Math.max(a + 0.3, b + dd)); onRange([a, Math.round(nb * 10) / 10]); }
+    else if (dr.kind === "top") { const na = Math.max(hole0, Math.min(b - MIN_SPAN, a + dd)); onRange([Math.round(na * 10) / 10, b]); }
+    else { const nb = Math.min(hole1, Math.max(a + MIN_SPAN, b + dd)); onRange([a, Math.round(nb * 10) / 10]); }
   };
   const onUp = (e: React.PointerEvent<HTMLDivElement>) => { drag.current = null; e.currentTarget.releasePointerCapture(e.pointerId); };
 

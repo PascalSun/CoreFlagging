@@ -4,15 +4,15 @@ export type Window = [number, number];
 
 /** The levels the depth axis snaps to, by window length. */
 export const LEVELS: { id: string; label: string; span: number | null }[] = [
-  { id: "hole", label: "Whole hole", span: null }, { id: "10m", label: "10 m", span: 10 }, { id: "1m", label: "1 m", span: 1 }, { id: "10cm", label: "10 cm", span: 0.3 },
+  { id: "hole", label: "Whole hole", span: null }, { id: "10m", label: "10 m", span: 10 }, { id: "1m", label: "1 m", span: 1 }, { id: "10cm", label: "10 cm", span: 0.1 },
 ];
-export const MIN_SPAN = 0.3;
+export const MIN_SPAN = 0.1;   // one ten-centimetre bin
 
 /** Which level a window is at: the finest whose span it fits. */
 export function levelOf(win: Window | null): string {
   if (!win) return "hole";
   const s = win[1] - win[0];
-  return s <= 0.5 ? "10cm" : s <= 2.5 ? "1m" : s <= 25 ? "10m" : "hole";
+  return s <= 0.15 ? "10cm" : s <= 2.5 ? "1m" : s <= 25 ? "10m" : "hole";
 }
 
 const r1 = (v: number) => Math.round(v * 10) / 10;
@@ -20,8 +20,9 @@ const r1 = (v: number) => Math.round(v * 10) / 10;
 /** A window of `span` metres about `centre`, kept inside the hole and on tenths of a metre. */
 export function windowAbout(centre: number, span: number, hole0: number, hole1: number): Window {
   const s = Math.max(MIN_SPAN, Math.min(hole1 - hole0, span));
-  const a = Math.max(hole0, Math.min(hole1 - s, centre - s / 2));
-  return [r1(a), r1(a + s)];
+  // the start on a tenth, the end a whole span on from it: rounding both ends could stretch 10 cm to 20
+  const a = r1(Math.max(hole0, Math.min(hole1 - s, centre - s / 2)));
+  return [a, r1(Math.min(hole1, a + s))];
 }
 
 /** The window at a level about a centre: null for the whole hole. */

@@ -223,7 +223,7 @@ export function WindowStart({ hole, mv, onWindow }: { hole: HoleDetail; mv: Mode
   const d0 = hole.metres.m[0] ?? 0, d1 = (hole.metres.m[hole.metres.m.length - 1] ?? 0) + 1;
   const flags = [...(mv?.anomaly.runs ?? [])].sort((a, b) => b.raw - a.raw).slice(0, 6);
   const again = (mv?.summary.again?.intervals ?? []).slice(0, 6);
-  const levels = [{ label: "10 m", span: 10 }, { label: "1 m", span: 1 }, { label: "10 cm", span: 0.3 }];
+  const levels = [{ label: "10 m", span: 10 }, { label: "1 m", span: 1 }, { label: "10 cm", span: 0.1 }];
   return (
     <div className="flex flex-col gap-5">
       <section>
