@@ -18,8 +18,9 @@ import { DepthLens, type Window, WindowStart } from "@/components/coretrace/Dept
 import { cn } from "@/lib/utils";
 
 export type Tab = "window" | "metre" | "again" | "log" | "gold" | "similar" | "quality" | "report";
+// "gold" is hidden: its view is kept below, but no tab opens it and a link with ?tab=gold falls back to This metre
 const TABS: { id: Tab; label: string }[] = [
-  { id: "window", label: "Window" }, { id: "metre", label: "This metre" }, { id: "again", label: "Look again" }, { id: "log", label: "Auto log" }, { id: "gold", label: "Gold" },
+  { id: "window", label: "Window" }, { id: "metre", label: "This metre" }, { id: "again", label: "Look again" }, { id: "log", label: "Auto log" },
   { id: "similar", label: "Similar core" }, { id: "quality", label: "Data quality" }, { id: "report", label: "Report" },
 ];
 
@@ -415,7 +416,7 @@ export function HolePanel({ holeKey, tab: tabProp, onTab, models, run, metre, on
         </button>
         <p className="text-[11px] leading-relaxed text-slate-500">{displayOnly
           ? "Metre by metre: tray photographs, spectra, the TSG software's minerals, logged rock and assays, the data-quality checks, and a printable report."
-          : "Metre by metre: tray photographs, spectra, where to look again, the auto log, gold likelihood, similar core across the State, and a printable report."}</p>
+          : "Metre by metre: tray photographs, spectra, where to look again, the auto log, similar core across the State, and a printable report."}</p>
       </div>
     );
   } else {
