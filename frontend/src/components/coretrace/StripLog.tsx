@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Metres, ModelView } from "@/lib/coreScan";
-import { GRID, INK, MUTED, SERIES, coreTypeColor, fmt, groupColor, groupName, lithColor, pct } from "@/components/coretrace/palette";
+import { GRID, INK, MUTED, SERIES, coreTypeColor, fmt, groupColor, groupName, pct } from "@/components/coretrace/palette";
 import { cn } from "@/lib/utils";
 import { DepthNav } from "@/components/coretrace/DepthNav";
 import { ColourNote } from "@/components/coretrace/ColourNote";
@@ -12,11 +12,12 @@ type Track = { id: string; label: string; w: number; kind: "cat" | "bar" };
 const AXIS_W = 44, GAP = 6, HEAD_H = 30, NAV_W = 30;
 
 /** The hole from top to bottom, one row per metre, drawn to depth. Categorical tracks say
- * what the core is (software minerals, logged rock, the model's core type); bar tracks say
- * how much (how unusual, how likely gold, the assay). Each track has its own scale — they
- * sit side by side, never on a shared axis. Hover reads a metre, click selects it. */
-export function StripLog({ metres, model, cursor, onCursor, onHover, hasLith, hasAu, range, onRange }: {
-  metres: Metres; model: ModelView | undefined; cursor: number | null; onCursor: (m: number) => void; onHover?: (m: number | null) => void; hasLith: boolean; hasAu: boolean;
+ * what the core is (software minerals, the model's core type); the bar track says how unusual
+ * it is. Each track has its own scale — they sit side by side, never on a shared axis. Hover
+ * reads a metre, click selects it. Type2 is a copy of Type, holding the place of a second
+ * reading of the core type to come. */
+export function StripLog({ metres, model, cursor, onCursor, onHover, hasLith, range, onRange }: {
+  metres: Metres; model: ModelView | undefined; cursor: number | null; onCursor: (m: number) => void; onHover?: (m: number | null) => void; hasLith: boolean; hasAu?: boolean;
   /** draw to this depth range instead of the hole's own: two logs side by side share one axis, or the reader has zoomed in */
   range?: [number, number];
   /** when set, the log can be zoomed: the wheel over it and the level buttons change the range (null = whole hole) */
@@ -72,11 +73,9 @@ export function StripLog({ metres, model, cursor, onCursor, onHover, hasLith, ha
 
   const tracks = useMemo<Track[]>(() => [
     { id: "gs", label: "SWIR", w: 22, kind: "cat" }, { id: "gt", label: "TIR", w: 22, kind: "cat" },
-    ...(hasLith ? [{ id: "lith", label: "Rock", w: 22, kind: "cat" } as Track] : []),
-    ...(model ? [{ id: "core", label: "Type", w: 30, kind: "cat" } as Track, { id: "anom", label: "Unusual", w: 54, kind: "bar" } as Track,
-      { id: "gold", label: "Gold", w: 54, kind: "bar" } as Track] : []),
-    ...(hasAu ? [{ id: "au", label: "Au ppm", w: 46, kind: "bar" } as Track] : []),
-  ], [hasLith, hasAu, model]);
+    ...(model ? [{ id: "core", label: "Type", w: 30, kind: "cat" } as Track, { id: "core2", label: "Type2", w: 30, kind: "cat" } as Track,
+      { id: "anom", label: "Unusual", w: 54, kind: "bar" } as Track] : []),
+  ], [model]);
   const width = AXIS_W + tracks.reduce((a, t) => a + t.w + GAP, 0);
 
   // a zoomed range runs from its start to its end; the whole hole from its first metre to its last (inclusive)
@@ -86,7 +85,6 @@ export function StripLog({ metres, model, cursor, onCursor, onHover, hasLith, ha
   const idx = useMemo(() => new Map(metres.m.map((m, i) => [m, i])), [metres.m]);
   const midx = useMemo(() => new Map((model?.m ?? []).map((m, i) => [m, i])), [model]);
   const typeName = useMemo(() => new Map((model?.core_types ?? []).map((c) => [c.k, c.name])), [model]);
-  const auMax = useMemo(() => Math.max(0.5, ...metres.au.map((v) => v ?? 0)), [metres.au]);
   const rawTop = model ? Math.max(model.anomaly.flag_raw * 1.4, 1e-6) : 1;
   const flagged = (i: number) => !!model && model.anom_raw[i] >= model.anomaly.flag_raw && model.anom[i] >= model.anomaly.flag_at;
 
@@ -119,22 +117,19 @@ export function StripLog({ metres, model, cursor, onCursor, onHover, hasLith, ha
         const m = metres.m[i], y = (m - m0) * ppm, j = midx.get(m);
         if (t.id === "gs") { g.fillStyle = groupColor(metres.gs[i]); g.fillRect(x, y, t.w, rowH); }
         else if (t.id === "gt") { g.fillStyle = groupColor(metres.gt[i]); g.fillRect(x, y, t.w, rowH); }
-        else if (t.id === "lith") { g.fillStyle = lithColor(metres.lith[i]); g.fillRect(x, y, t.w, rowH); }
-        else if (t.id === "au") { const v = metres.au[i]; if (v !== null && v > 0) { g.fillStyle = v >= 0.1 ? INK : "#9ca3af"; g.fillRect(x, y, Math.max(1, Math.min(1, v / auMax) * t.w), rowH); } }
         else if (model && j !== undefined) {
-          if (t.id === "core") { g.fillStyle = coreTypeColor(typeName.get(model.core[j])); g.fillRect(x, y, t.w, rowH); }
+          if (t.id === "core" || t.id === "core2") { g.fillStyle = coreTypeColor(typeName.get(model.core[j])); g.fillRect(x, y, t.w, rowH); }
           else if (t.id === "anom") { g.fillStyle = flagged(j) ? SERIES.orange : "#9ca3af"; g.fillRect(x, y, Math.max(1, Math.min(1, model.anom_raw[j] / rawTop) * t.w), rowH); }
-          else if (t.id === "gold") { g.fillStyle = SERIES.blue; g.fillRect(x, y, Math.max(1, model.gold[j] * t.w), rowH); }
         }
       }
-      if (t.id === "core" && model) {            // the auto log: a line at every boundary the model drew
+      if ((t.id === "core" || t.id === "core2") && model) {            // the auto log: a line at every boundary the model drew
         g.fillStyle = INK;
         for (const s of model.segments) { const y = (s.from_m - m0) * ppm; if (y > 0.5) g.fillRect(x - 2, Math.round(y), t.w + 4, 1); }
       }
       x += t.w + GAP;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [metres, model, tracks, width, height, ppm, m0, m1, auMax, rawTop]);
+  }, [metres, model, tracks, width, height, ppm, m0, m1, rawTop]);
 
   // keep the selected metre in view: it may be set from a link, a table row or another tab
   useEffect(() => {
@@ -227,7 +222,7 @@ export function StripLog({ metres, model, cursor, onCursor, onHover, hasLith, ha
             {model && tj !== undefined ? (
               <>
                 <div title={typeName.get(model.core[tj])}>{typeName.get(model.core[tj]) ?? "—"}</div>
-                <div>unusual {pct(model.anom[tj])}{flagged(tj) ? " (flagged)" : ""} · gold {fmt(model.gold[tj])}{metres.au[ti] !== null ? <> · Au {fmt(metres.au[ti], 2)} ppm</> : null}</div>
+                <div>unusual {pct(model.anom[tj])}{flagged(tj) ? " (flagged)" : ""}{metres.au[ti] !== null ? <> · Au {fmt(metres.au[ti], 2)} ppm</> : null}</div>
               </>
             ) : metres.au[ti] !== null ? <div>Au {fmt(metres.au[ti], 2)} ppm</div> : null}
           </>
@@ -240,7 +235,7 @@ export function StripLog({ metres, model, cursor, onCursor, onHover, hasLith, ha
 const Sw = ({ c }: { c: string }) => <span className="inline-block h-2.5 w-2.5 flex-none rounded-[2px]" style={{ background: c }} />;
 
 /** What the colours and bars of the strip log mean. */
-export function StripLegend({ metres, model, hasLith, hasAu }: { metres: Metres; model: ModelView | undefined; hasLith: boolean; hasAu: boolean }) {
+export function StripLegend({ metres, model }: { metres: Metres; model: ModelView | undefined; hasLith?: boolean; hasAu?: boolean }) {
   const groups = useMemo(() => {
     const n = new Map<string, number>();
     for (const g of [...metres.gs, ...metres.gt]) if (g && g !== "INVALID" && g !== "nan") n.set(g, (n.get(g) ?? 0) + 1);
@@ -258,12 +253,9 @@ export function StripLegend({ metres, model, hasLith, hasAu }: { metres: Metres;
         {model && <span className="flex items-center gap-1"><span className="inline-block h-px w-3 bg-slate-900" />auto-log boundary</span>}
         {model && <span className="flex items-center gap-1"><Sw c={SERIES.orange} />unusual, flagged</span>}
         {model && <span className="flex items-center gap-1"><Sw c="#9ca3af" />unusual, not flagged</span>}
-        {model && <span className="flex items-center gap-1"><Sw c={SERIES.blue} />gold likelihood (0–1)</span>}
-        {hasAu && <span className="flex items-center gap-1"><Sw c={INK} />assay ≥ 0.1 ppm</span>}
-        {hasLith && <span className="text-slate-400">Rock: logged classes in GSWA map colours, named on hover</span>}
       </div>
       <div className="flex flex-wrap gap-x-2">
-        <ColourNote kind="mineral" />{hasLith && <ColourNote kind="rock" />}
+        <ColourNote kind="mineral" />
       </div>
     </div>
   );

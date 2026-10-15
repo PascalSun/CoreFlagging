@@ -28,8 +28,9 @@ export function marks(t: Tray, m: number, to: number = m + 1): [number, number, 
   return out;
 }
 
-export function TrayPhoto({ holeKey, trays, metre, onMetre, range }: { holeKey: string; trays: Tray[]; metre: number; onMetre: (m: number) => void;
-  /** box this depth range instead of the whole metre (a zoomed window) */
+// The photograph is shown plain: no box over the metre or the window (the full-screen viewer still marks the metre).
+export function TrayPhoto({ holeKey, trays, metre, onMetre }: { holeKey: string; trays: Tray[]; metre: number; onMetre: (m: number) => void;
+  /** the depth range in view (a zoomed window); not drawn on the photograph */
   range?: [number, number];
 }) {
   const k = trays.findIndex((t) => t.from_m <= metre + 0.5 && metre + 0.5 <= t.to_m + 0.05);
@@ -39,8 +40,6 @@ export function TrayPhoto({ holeKey, trays, metre, onMetre, range }: { holeKey: 
   const [zoomed, setZoomed] = useState(false);
   if (!trays.length) return <div className="rounded-lg border border-dashed border-slate-200 px-3 py-5 text-center text-xs text-slate-400">No tray photographs for this hole.</div>;
   if (!tray) return <div className="rounded-lg border border-dashed border-slate-200 px-3 py-5 text-center text-xs text-slate-400">No tray photograph covers {metre}–{metre + 1} m.</div>;
-  const boxes = range ? marks(tray, range[0], range[1]) : marks(tray, metre);
-  const marked = range ? `${range[0].toFixed(2)}–${range[1].toFixed(2)} m` : `${metre}–${metre + 1} m`;
   const go = (d: number) => { const t = trays[k + d]; if (t) onMetre(Math.max(0, Math.floor(t.from_m + 0.001))); };
   const frame = (cls: string) => (
     <div className={`relative overflow-hidden rounded-lg bg-slate-900 ${cls}`} style={{ aspectRatio: `${tray.width || 1800} / ${tray.height || 672}` }}>
@@ -49,10 +48,6 @@ export function TrayPhoto({ holeKey, trays, metre, onMetre, range }: { holeKey: 
         ? <img src={img.data} alt={`Core tray ${tray.n}, ${tray.from_m.toFixed(1)} to ${tray.to_m.toFixed(1)} m`} className="absolute inset-0 h-full w-full object-fill" />
         : <div className="absolute inset-0 grid place-items-center text-xs text-slate-400">{img.isError ? "Photograph not available" : "Loading photograph…"}</div>}
       {img.isPlaceholderData && <span className="absolute right-2 top-2 z-10 flex items-center gap-1.5 rounded-full bg-black/70 px-2.5 py-1 text-[11px] text-white"><Loader2 size={12} className="animate-spin" />Loading tray {tray.n}</span>}
-      {img.data && !img.isPlaceholderData && boxes.map(([x0, y0, x1, y1], i) => (
-        <div key={i} className="pointer-events-none absolute border-2 border-cyan shadow-[0_0_0_1px_rgba(0,0,0,0.5)]"
-          style={{ left: `${x0 * 100}%`, top: `${y0 * 100}%`, width: `${Math.max((x1 - x0) * 100, 0.6)}%`, height: `${(y1 - y0) * 100}%` }} />
-      ))}
     </div>
   );
   return (
@@ -69,7 +64,7 @@ export function TrayPhoto({ holeKey, trays, metre, onMetre, range }: { holeKey: 
         {k > 0 && <button type="button" onClick={() => go(-1)} aria-label="Previous tray" title="Previous tray" className="absolute left-2 top-1/2 z-10 grid size-9 -translate-y-1/2 place-items-center rounded-full bg-black/65 text-white ring-1 ring-white/30 hover:bg-black/85"><ChevronLeft size={20} /></button>}
         {k < trays.length - 1 && <button type="button" onClick={() => go(1)} aria-label="Next tray" title="Next tray" className="absolute right-2 top-1/2 z-10 grid size-9 -translate-y-1/2 place-items-center rounded-full bg-black/65 text-white ring-1 ring-white/30 hover:bg-black/85"><ChevronRight size={20} /></button>}
       </div>
-      <p className="pt-1 text-[11px] text-slate-500">{boxes.length ? `The box marks ${marked}.` : "This metre's position on the tray is not recorded."} Click for full resolution.</p>
+      <p className="pt-1 text-[11px] text-slate-500">Click for full resolution.</p>
       {zoomed && <TrayViewer holeKey={holeKey} trays={trays} start={k} metre={metre} onClose={() => setZoomed(false)} />}
     </div>
   );
