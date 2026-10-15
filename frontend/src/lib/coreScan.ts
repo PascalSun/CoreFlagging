@@ -120,7 +120,9 @@ export type SpectralLog = { key: string; step: number; from_m: number; to_m: num
 /** Two holes matched metre by metre by HyFormer's 2 m fingerprints (the platform's /match/; see docs/hole-match-api.md). */
 export type HoleMatch = { model: string; window_m: number; step_m: number; score: number; rho: number;
   a: { key: string; name: string; from_m: number; to_m: number; n: number }; b: { key: string; name: string; from_m: number; to_m: number; n: number };
-  links: { a_m: number; b_m: number; sim: number }[] };
+  links: { a_m: number; b_m: number; sim: number }[];
+  /** with full=1: every metre of A against every metre of B, `sim[i][j]` the cosine of `a_m[i]` and `b_m[j]` */
+  matrix?: { a_m: number[]; b_m: number[]; sim: number[][] } };
 /** A model's reading of every 10 cm token of a hole: the per-metre `anom` of ModelView is the maximum of these
  * over the metre, the per-metre `core` their mode. `bin` is the depth in 10 cm (bin 123 = 12.3–12.4 m), `anom` the State percentile, `anom_raw` the
  * contrast against ±15 m; a metre is flagged when its highest token reaches both `flag_at` and `flag_raw`. */
@@ -228,7 +230,7 @@ export const coreScan = {
   spectralLog: (key: string, step: 1 | 0.1, from?: number, to?: number) =>
     json<SpectralLog>(`/holes/${enc(key)}/spectral-log/?step=${step}${from !== undefined && to !== undefined ? `&from=${from}&to=${to}` : ""}`),
   /** Hole A's metres linked to their likeliest metres of hole B by the model's fingerprints; 404 until the platform has it. */
-  match: (a: string, b: string, run: string) => json<HoleMatch>(`/holes/${enc(a)}/match/?with=${enc(b)}${run ? `&model=${enc(run)}` : ""}`),
+  match: (a: string, b: string, run: string, full = false) => json<HoleMatch>(`/holes/${enc(a)}/match/?with=${enc(b)}${run ? `&model=${enc(run)}` : ""}${full ? "&full=1" : ""}`),
   /** A model's unusual score per 10 cm token: the whole hole, or a depth window in metres. 404 while a hole has none. */
   tokenScores: (key: string, run: string, from?: number, to?: number) =>
     json<TokenScores>(`/holes/${enc(key)}/models/${enc(run)}/tokens/${from !== undefined && to !== undefined ? `?from=${from}&to=${to}` : ""}`),

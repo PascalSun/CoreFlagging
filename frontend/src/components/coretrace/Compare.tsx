@@ -78,11 +78,20 @@ export function ComparePanel({ a: aKey, b: bKey, winA = null, winB = null, onClo
     if (w && (m < w[0] || m + 1 > w[1])) { const s = w[1] - w[0], a0 = Math.max(0, Math.round((m + 0.5 - s / 2) * 10) / 10); set([a0, Math.round((a0 + s) * 10) / 10]); }
   };
   // HyFormer's fingerprints, matched by the platform; until it answers (or where it cannot), a stand-in by rock class
-  const mq = useQuery({ queryKey: ["core-match", aKey, bKey, a.run], queryFn: () => coreScan.match(aKey, bKey, a.run), enabled: !!a.run && !!a.hole && !!b.hole, staleTime: 60 * 60_000, retry: false });
+  // the whole matrix when the platform will give it (refused past 2 million pairs), else its own links
+  const mq = useQuery({ queryKey: ["core-match", aKey, bKey, a.run], queryFn: () => coreScan.match(aKey, bKey, a.run, true).catch(() => coreScan.match(aKey, bKey, a.run)), enabled: !!a.run && !!a.hole && !!b.hole, staleTime: 60 * 60_000, retry: false });
   const corr = useMemo<Correlation | null>(() => {
+    const mx = mq.data?.matrix;
+    if (mq.data && mx?.a_m.length && mx.b_m.length) {
+      // each metre of the left hole in view linked to its top-1 metre of the right hole in view, by cosine
+      const inA = (m: number) => !wa || (m + 1 > wa[0] && m < wa[1]), inB = (m: number) => !wb || (m + 1 > wb[0] && m < wb[1]);
+      const js = mx.b_m.map((m, j) => [m, j] as const).filter(([m]) => inB(m)); const links: Correlation["links"] = [];
+      mx.a_m.forEach((am, i) => { if (!inA(am) || !js.length) return; let bj = js[0][1]; for (const [, j] of js) if (mx.sim[i][j] > mx.sim[i][bj]) bj = j; links.push({ a: am, b: mx.b_m[bj], sim: mx.sim[i][bj] }); });
+      return { links, score: mq.data.score, rho: mq.data.rho, basis: "representation" };
+    }
     if (mq.data?.links.length) return { links: mq.data.links.map((l) => ({ a: l.a_m, b: l.b_m, sim: l.sim })), score: mq.data.score, rho: mq.data.rho, basis: "representation" };
     return a.hole && b.hole ? correlate({ hole: a.hole, mv: a.mv, spectral: a.spectral }, { hole: b.hole, mv: b.mv, spectral: b.spectral }) : null;
-  }, [mq.data, a.hole, a.mv, a.spectral, b.hole, b.mv, b.spectral]);
+  }, [mq.data, wa, wb, a.hole, a.mv, a.spectral, b.hole, b.mv, b.spectral]);
   const missing = (x: typeof a, which: string) => (x.error ? `Hole ${which} could not be opened.` : "Loading…");
   // a metre on one log marks its match on the other
   const both = (x: number, y: number) => { setCa(x); setCb(y); follow(wa, setWa, x); follow(wb, setWb, y); };
@@ -93,7 +102,7 @@ export function ComparePanel({ a: aKey, b: bKey, winA = null, winB = null, onClo
       <div className="flex items-start justify-between gap-3 border-b border-white/60 px-4 py-3">
         <div className="min-w-0">
           <h2 className="truncate text-sm font-semibold text-slate-800">{a.hole && b.hole ? `${a.hole.name} and ${b.hole.name}` : "Two holes"}</h2>
-          <p className="text-xs text-slate-500">Each metre of {a.hole?.name ?? "the left hole"} is linked to the metre of {b.hole?.name ?? "the right hole"} it is most like. Click a chunk between them, or a metre on either log, to mark it and its match.</p>
+          <p className="text-xs text-slate-500">Each metre of {a.hole?.name ?? "the left hole"} is linked to the one metre of {b.hole?.name ?? "the right hole"} it is most like (in the window, when there is one). Point at a metre between them to light its link; click it, or a metre on either log, to mark it and its match.</p>
         </div>
         <button type="button" onClick={onClose} aria-label="Close the comparison" className="grid h-8 w-8 flex-none place-items-center rounded-lg text-slate-500 hover:bg-slate-100"><X size={16} /></button>
       </div>

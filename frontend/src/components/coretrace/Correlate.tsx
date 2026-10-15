@@ -108,7 +108,7 @@ const GOLD = "#c9a24a", LINE = "#94a3b8";
 /** The column drawn beside RC in the middle view, each side. */
 export type CorrShow = "swir" | "tir" | "anom" | "bd";
 export const CORR_SHOW: { id: CorrShow; label: string }[] = [{ id: "swir", label: "SWIR" }, { id: "tir", label: "TIR" }, { id: "anom", label: "Unusual" }, { id: "bd", label: "BD" }];
-const PICK = " Here: point at a block of the left hole (its auto-log chunk) to light its links; click it to mark it and its match.";
+const PICK = " Here: point at a metre of the left hole to light its link; click it to mark it and its match.";
 const SHOW_TIP: Record<CorrShow, string> = { swir: TIP.swir, tir: TIP.tir, anom: TIP.unusual, bd: TIP.bd };
 const SCALE_TIP = "Scale: the whole hole in miniature, the box the window on the strips beside it. Click to move the window there; set it with the log's own Scale column and levels.";
 
@@ -116,8 +116,8 @@ type Side = { s: CorrSide; win: [number, number] | null; h0: number; h1: number;
 
 /** The two holes on one depth axis (or, once either log has a window, each on its own), mirrored about the links
  * between them: from the outside in, the Scale column (only with a window), the chosen column (SWIR, TIR, Unusual
- * or BD) and RC, whose blocks the links join. The block under the pointer (or the one holding the selected metre,
- * else the best-matched one in view) and its links in gold; click a block to go to it and its match. */
+ * or BD) and RC, whose metres the links join. The metre under the pointer (or the selected one) and its link in
+ * gold; click a metre to mark it and its match. */
 export function CorrelationView({ a, b, corr, cursorA, onPick, winA = null, winB = null, onWinA, onWinB, show }: {
   a: CorrSide; b: CorrSide; corr: Correlation; cursorA: number | null; onPick: (aM: number, bM: number) => void;
   /** each log's window: the strips draw just that, and a Scale column beside them shows where it is */
@@ -152,17 +152,13 @@ export function CorrelationView({ a, b, corr, cursorA, onPick, winA = null, winB
   const x1 = xRcA + RCW + 2, x2 = xRcB - 2;
   const inR = (S: Side, d: number) => d >= S.r[0] && d < S.r[1];
 
-  const segsA = useMemo(() => a.mv?.segments ?? [], [a.mv]);
-  // the blocks that can be picked: the left hole's chunks inside its window
-  const pickable = (i: number) => segsA[i].to_m > A.r[0] && segsA[i].from_m < A.r[1];
-  const lit = (() => {
-    if (hover !== null) return hover;
-    if (cursorA !== null) { const i = segsA.findIndex((s, j) => cursorA >= s.from_m && cursorA < s.to_m && pickable(j)); if (i >= 0) return i; }
-    let bi = -1, bs = -1;
-    segsA.forEach((s, i) => { if (!pickable(i)) return; const ls = corr.links.filter((l) => l.a >= s.from_m && l.a < s.to_m && inR(A, l.a) && inR(B, l.b)); if (ls.length >= 2) { const m = ls.reduce((t, l) => t + l.sim, 0) / ls.length; if (m > bs) { bs = m; bi = i; } } });
-    return bi;
-  })();
-  const inLit = (l: Link) => lit >= 0 && !!segsA[lit] && l.a >= segsA[lit].from_m && l.a < segsA[lit].to_m && inR(A, l.a);
+  // the metre lit in gold, with its link: under the pointer, else the selected one when it is in view
+  const lit = hover ?? (cursorA !== null && inR(A, cursorA) ? cursorA : null);
+  const inLit = (l: Link) => lit !== null && l.a === lit;
+  const metreAt = (clientY: number, el: SVGGraphicsElement) => {
+    const d = A.r[0] + (clientY - el.ownerSVGElement!.getBoundingClientRect().top - PAD) / A.k; const m = Math.floor(d);
+    return d >= A.r[0] && d < A.r[1] && corr.links.some((l) => l.a === m) ? m : null;
+  };
 
   // one column of a hole, metre by metre, over its side's range
   const column = (S: Side, kind: CorrShow | "rc", x: number, w: number) => {
@@ -219,7 +215,6 @@ export function CorrelationView({ a, b, corr, cursorA, onPick, winA = null, winB
   // a link's end outside the other window is drawn at that window's edge, dashed
   const clampY = (S: Side, d: number) => Math.min(PAD + H, Math.max(PAD, S.y(d)));
   const showLabel = CORR_SHOW.find((c) => c.id === show)!.label;
-  const litSeg = lit >= 0 ? segsA[lit] : undefined;
   return (
     <div ref={ref} className="relative h-full w-full">
       <svg width={box.w} height={box.h} className="block">
@@ -233,16 +228,11 @@ export function CorrelationView({ a, b, corr, cursorA, onPick, winA = null, winB
         <g clipPath={`url(#${cid}a)`}>{column(A, show, xShA, SHOWW)}{column(A, "rc", xRcA, RCW)}</g>
         <g clipPath={`url(#${cid}b)`}>{column(B, "rc", xRcB, RCW)}{column(B, show, xShB, SHOWW)}</g>
         {scale(A, xScA, onWinA)}{scale(B, xScB, onWinB)}
-        {/* the left hole's blocks: hover lights one and its links, a click marks it and its match */}
-        <g clipPath={`url(#${cid}a)`}>
-          {segsA.map((g, i) => pickable(i) && (
-            <rect key={g.seg} x={xShA} y={A.y(g.from_m)} width={xRcA + RCW - xShA} height={Math.max((g.to_m - g.from_m) * A.k, 1)} fill="transparent" className="cursor-pointer"
-              onMouseEnter={() => setHover(i)} onMouseLeave={() => setHover(null)}
-              onClick={() => { const ls = corr.links.filter((l) => l.a >= g.from_m && l.a < g.to_m && inR(A, l.a)).sort((p, q) => q.sim - p.sim); onPick(Math.floor(Math.max(g.from_m, A.r[0])), ls[0]?.b ?? b0); }}>
-              <title>{`${g.from_m.toFixed(1)}–${g.to_m.toFixed(1)} m · ${g.core_type_name}`}</title>
-            </rect>))}
-          {litSeg && <rect x={xShA - 1} y={A.y(litSeg.from_m)} width={xRcA + RCW - xShA + 2} height={Math.max((litSeg.to_m - litSeg.from_m) * A.k, 2)} fill="none" stroke={GOLD} strokeWidth={2} className="pointer-events-none" />}
-        </g>
+        {/* the left hole, metre by metre: hover lights a metre and its link, a click marks it and its match */}
+        <rect x={xShA} y={PAD} width={xRcA + RCW - xShA} height={H} fill="transparent" className="cursor-pointer"
+          onMouseMove={(e) => setHover(metreAt(e.clientY, e.currentTarget))} onMouseLeave={() => setHover(null)}
+          onClick={(e) => { const m = metreAt(e.clientY, e.currentTarget); const l = m === null ? undefined : corr.links.find((x) => x.a === m); if (l) onPick(l.a, l.b); }} />
+        {lit !== null && <g clipPath={`url(#${cid}a)`}><rect x={xShA - 1} y={A.y(lit)} width={xRcA + RCW - xShA + 2} height={Math.max(A.k, 2)} fill="none" stroke={GOLD} strokeWidth={2} className="pointer-events-none" /></g>}
         {winA && head(xScA + SC / 2, "Scale", SCALE_TIP)}{head(xShA + SHOWW / 2, showLabel, SHOW_TIP[show])}{head(xRcA + RCW / 2, "RC", TIP.rc + PICK)}
         {head(xRcB + RCW / 2, "RC", TIP.rc)}{head(xShB + SHOWW / 2, showLabel, SHOW_TIP[show])}{winB && head(xScB + SC / 2, "Scale", SCALE_TIP)}
         {label(xShA + (xRcA + RCW - xShA) / 2, PAD + H + 11, `${fmtM(Math.min(A.r[1], a1))} m`, "middle")}
