@@ -53,6 +53,15 @@ class Platform:
         r = self.http.post(f"holes/{quote(key, safe='')}/tray-rows/", json={"trays": trays}); r.raise_for_status()
         return int(r.json().get("updated", 0))
 
+    def spectral_log(self, key: str, log: dict) -> bool:
+        """Hand the platform a hole's spectral log on its own (the backfill). False when the platform has no such hole."""
+        body = json.dumps(log, ensure_ascii=False, default=lambda o: o.item() if hasattr(o, "item") else str(o)).encode()
+        r = self.http.post(f"holes/{quote(key, safe='')}/spectral-log/", files={"log": ("log.json", body, "application/json")})
+        if r.status_code == 404:
+            return False
+        r.raise_for_status()
+        return True
+
     def done(self, job: dict) -> None:
         self.http.post(f"jobs/{job['job']}/done/", json={"token": job["token"]}).raise_for_status()
 
