@@ -268,7 +268,7 @@ function Report({ hole, models, mvw, run, trays }: { hole: HoleDetail; models: C
         <button type="button" onClick={pdf} disabled={making || (!mvw && hole.results.length > 0)} className="col-span-2 flex items-center justify-center gap-1.5 rounded-lg bg-slate-900 px-3 py-2.5 text-xs font-medium text-white hover:bg-slate-800 disabled:opacity-60 sm:col-span-1 sm:justify-start sm:py-2">{making ? <Loader2 size={14} className="animate-spin" /> : <FileDown size={14} />}{making ? "Making the PDF…" : "Download PDF"}</button>
         <button type="button" onClick={exportSegs} disabled={!mvw} className="flex items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-40 sm:justify-start"><Download size={14} />Auto log (CSV)</button>
         <button type="button" onClick={exportIssues} className="flex items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 sm:justify-start"><Download size={14} />Quality issues (CSV)</button>
-        <span className="col-span-2 text-[11px] text-slate-500">The PDF is this page, as shown, for the model selected above.</span>
+        <span className="col-span-2 text-[11px] text-slate-500">The PDF is this page, as shown.</span>
       </div>
       <div ref={frameRef} className="w-full">
         <div className="overflow-hidden rounded-md shadow-[0_1px_3px_rgba(15,23,42,0.12),0_8px_28px_rgba(15,23,42,0.08)] ring-1 ring-slate-200" style={{ width: PAGE_W * scale, height: docH * scale || undefined }}>
@@ -281,8 +281,8 @@ function Report({ hole, models, mvw, run, trays }: { hole: HoleDetail; models: C
   );
 }
 
-export function HolePanel({ holeKey, tab: tabProp, onTab, models, run, onRun, metre, onMetre, wide, onWide, onClose, onOpenHole, onDeleted, onRing, win = null, onWindow }: {
-  holeKey: string; tab: string; onTab: (t: Tab) => void; models: CoreModelInfo[]; run: string; onRun: (r: string) => void; metre: number | null; onMetre: (m: number | null) => void;
+export function HolePanel({ holeKey, tab: tabProp, onTab, models, run, metre, onMetre, wide, onWide, onClose, onOpenHole, onDeleted, onRing, win = null, onWindow }: {
+  holeKey: string; tab: string; onTab: (t: Tab) => void; models: CoreModelInfo[]; run: string; metre: number | null; onMetre: (m: number | null) => void;
   wide: boolean; onWide: (w: boolean) => void; onClose: () => void; onOpenHole: (key: string, m?: number) => void; onDeleted: () => void;
   /** draw (or clear) a ring of this many km around the hole on the map */
   onRing?: (km: number | null) => void;
@@ -305,7 +305,6 @@ export function HolePanel({ holeKey, tab: tabProp, onTab, models, run, onRun, me
   const tq = useQuery({ queryKey: ["core-trays", holeKey], queryFn: () => coreScan.trays(holeKey), enabled: ready, staleTime: 60_000 });
   // hovering over the log previews a metre on the right; a click keeps it. The preview follows the pointer
   // after a short pause, so sweeping down the hole does not fetch every metre on the way
-  const [compare, setCompare] = useState(false);
   const [peekRaw, setPeekRaw] = useState<number | null>(null);
   const [peek, setPeek] = useState<number | null>(null);
   useEffect(() => { const t = setTimeout(() => setPeek(peekRaw), peekRaw === null ? 0 : 140); return () => clearTimeout(t); }, [peekRaw]);
@@ -350,29 +349,12 @@ export function HolePanel({ holeKey, tab: tabProp, onTab, models, run, onRun, me
     </div>
   );
 
-  // One model by default. The others exist so the research can compare training objectives: the three CoreTrace
-  // variants give near-identical results, and "Conventional methods" is the baseline without a foundation model.
-  // They stay one click away for whoever wants to compare, and out of sight for everyone else.
+  // One model only. The other runs (three CoreTrace training variants and the conventional-methods baseline)
+  // still exist in the service for the research, and a deep link with ?run= still opens one, but the page
+  // no longer offers to switch: the picker confused readers more than it helped.
   const defaultRun = models.find((m) => m.default)?.run ?? runs[0];
-  const comparing = compare || (!!useRun && useRun !== defaultRun);
-  const modelPicker = runs.length > 1 && (
-    <div className="flex flex-col gap-1.5">
-      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-slate-500">
-        <span>Read by <b className="font-semibold text-slate-800">{useRun === defaultRun ? "CoreTrace" : models.find((m) => m.run === useRun)?.name ?? useRun}</b>{useRun === defaultRun ? ", a foundation model for core spectra" : ""}</span>
-        <button type="button" onClick={() => { if (comparing) { setCompare(false); if (useRun !== defaultRun) onRun(defaultRun); } else setCompare(true); }}
-          className="font-medium text-slate-700 underline-offset-2 hover:text-slate-900 hover:underline">{comparing ? "Back to the default" : "Compare models"}</button>
-      </div>
-      {comparing && (
-        <div className="rounded-lg border border-slate-200 bg-slate-50/70 p-2">
-          <div className="grid grid-cols-2 gap-1 text-xs" role="group" aria-label="Model">
-            {runs.map((r) => { const m = models.find((x) => x.run === r); return (
-              <button key={r} type="button" onClick={() => onRun(r)} title={m?.description} aria-pressed={r === useRun}
-                className={cn("truncate rounded-md px-2.5 py-1.5 text-left font-medium ring-1", r === useRun ? "bg-slate-900 text-white ring-slate-900" : "bg-white text-slate-600 ring-slate-200 hover:bg-slate-50")}>{m?.name ?? r}</button>); })}
-          </div>
-          <p className="mt-1.5 text-[11px] leading-snug text-slate-500">The three CoreTrace models differ only in how they were trained and read core almost the same way. &ldquo;Conventional methods&rdquo; uses no foundation model: compare against it to see what the model adds.</p>
-        </div>
-      )}
-    </div>
+  const modelPicker = runs.length > 0 && (
+    <p className="text-[11px] text-slate-500">Read by <b className="font-semibold text-slate-800">{useRun === defaultRun ? "CoreTrace" : models.find((m) => m.run === useRun)?.name ?? useRun}</b>{useRun === defaultRun ? ", a foundation model for core spectra" : ""}</p>
   );
 
   let body: React.ReactNode;
