@@ -323,6 +323,8 @@ export function HolePanel({ holeKey, tab: tabProp, onTab, models, run, metre, on
   const slq = useQuery({ queryKey: ["core-spectral", holeKey], queryFn: () => coreScan.spectralLog(holeKey, 1), enabled: ready && wide, staleTime: 60 * 60_000, retry: false });
   const fineWin = win && win[1] - win[0] <= 50 ? win : null;
   const slf = useQuery({ queryKey: ["core-spectral", holeKey, fineWin], queryFn: () => coreScan.spectralLog(holeKey, 0.1, fineWin![0], fineWin![1]), enabled: ready && wide && !!fineWin, staleTime: 60 * 60_000, retry: false, placeholderData: keepPreviousData });
+  // the model's reading per 10 cm token (core type, unusual score) for the same window: RC and Unusual draw at 10 cm with it
+  const tkq = useQuery({ queryKey: ["core-tokens", holeKey, mq.data?.run, fineWin], queryFn: () => coreScan.tokenScores(holeKey, mq.data!.run, fineWin![0], fineWin![1]), enabled: ready && wide && !!fineWin && !!mq.data, staleTime: 60 * 60_000, retry: false, placeholderData: keepPreviousData });
   // the original report: only holes whose scan names a WAMEX report have one
   const hasReport = !!hole?.meta.wamex;
   const rq = useQuery({ queryKey: ["core-report", holeKey], queryFn: () => coreScan.report(holeKey), enabled: hasReport, staleTime: 60 * 60_000, retry: false });
@@ -431,7 +433,7 @@ export function HolePanel({ holeKey, tab: tabProp, onTab, models, run, metre, on
       // page as one, with the log a fixed height at the top and the tabs held at the top of the screen as you read
       <div className="flex flex-col lg:min-h-0 lg:flex-1 lg:flex-row">
         <div className="flex h-[min(380px,52vh)] flex-none flex-col items-center border-b border-slate-200/70 p-3 lg:h-auto lg:min-h-0 lg:items-stretch lg:border-r lg:border-b-0 lg:px-5 lg:py-4">
-          <StripLog range={win ?? undefined} onRange={onWindow} metres={hole.metres} model={mvw} spectral={slq.data} spectralFine={fineWin ? slf.data : undefined} cursor={metre} onHover={tab === "metre" ? setPeekRaw : undefined} onCursor={(m) => { setPeekRaw(null); jump(m); if (tab === "report" || tab === "quality") setTab("metre"); }} hasLith={hole.has_lith} hasAu={hole.au_m > 0} />
+          <StripLog range={win ?? undefined} onRange={onWindow} metres={hole.metres} model={mvw} spectral={slq.data} spectralFine={fineWin ? slf.data : undefined} tokens={fineWin ? tkq.data : undefined} cursor={metre} onHover={tab === "metre" ? setPeekRaw : undefined} onCursor={(m) => { setPeekRaw(null); jump(m); if (tab === "report" || tab === "quality") setTab("metre"); }} hasLith={hole.has_lith} hasAu={hole.au_m > 0} />
         </div>
         <div className="@container flex min-w-0 flex-col lg:min-h-0 lg:flex-1">
           {/* on a phone the model line scrolls away; only the tabs stay */}

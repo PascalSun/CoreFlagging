@@ -191,10 +191,10 @@ def test_token_scores_backfill_runs_the_models_on_the_platforms_tokens_and_clean
     from app import extras, token_scores
     from app.workspace import Workspace
     ws = Workspace(tmp_path); n = 25
-    R = {"lc_pct": np.linspace(0, 1, n), "lc": np.linspace(0, 4, n)}
+    R = {"lc_pct": np.linspace(0, 1, n), "lc": np.linspace(0, 4, n), "core": np.arange(n) % 4}
     eng = SimpleNamespace(compute=lambda key: R)
-    anom, raw = extras.token_arrays(eng, "H1")
-    assert anom.dtype == np.dtype("<f4") and raw.dtype == np.dtype("<f4") and len(anom) == len(raw) == n and anom[-1] == 1.0
+    anom, raw, core = extras.token_arrays(eng, "H1")
+    assert anom.dtype == np.dtype("<f4") and raw.dtype == np.dtype("<f4") and core.dtype == np.dtype("<i2") and len(anom) == len(raw) == len(core) == n and anom[-1] == 1.0
     forgotten = []
     runner = SimpleNamespace(ws=ws, models=SimpleNamespace(dirs={"v2": None, "v9": None}, get=lambda run: eng), forget=lambda key: (ws.remove(key), forgotten.append(key)))
     sent = {}
@@ -215,10 +215,10 @@ def test_token_scores_backfill_runs_the_models_on_the_platforms_tokens_and_clean
     assert token_scores.one("H0", runner, FakePlatform({}), False) == "no models"
     assert token_scores.one("H1", runner, FakePlatform({"v2": {"token_scores": True}}), False) == "has them"
     assert token_scores.one("H1", runner, FakePlatform({"v2": {"token_scores": True}}), True) == "sent"
-    assert sent["H1"] == ["anom__v2", "raw__v2"]
+    assert sent["H1"] == ["anom__v2", "core__v2", "raw__v2"]
     # only the runs this service has models for, and only those still missing scores
     assert token_scores.one("H2", runner, FakePlatform({"v2": {"token_scores": False}, "v9": {"token_scores": True}, "old": {"token_scores": False}}), False) == "sent"
-    assert sent["H2"] == ["anom__v2", "raw__v2"]
+    assert sent["H2"] == ["anom__v2", "core__v2", "raw__v2"]
     assert not list(ws.proc.iterdir())                       # the platform is the record: nothing kept
     assert forgotten == ["H1", "H2"]                         # ... and the engines forget the hole too
 

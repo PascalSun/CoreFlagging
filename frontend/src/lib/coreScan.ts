@@ -117,10 +117,12 @@ export type SpectralSide = { n: number; n_result: number; mix: Record<string, nu
 /** The TSG mineral-group make-up down the hole, worked out once when the hole was read (1 m or 0.1 m intervals). */
 export type SpectralLog = { key: string; step: number; from_m: number; to_m: number; swir_groups: string[]; tir_groups: string[]; tir: string;
   rows: { from_m: number; swir: SpectralSide | null; tir: SpectralSide | null }[] };
-/** A model's unusual score for every 10 cm token of a hole: the per-metre `anom` of ModelView is the maximum of these
- * over the metre. `bin` is the depth in 10 cm (bin 123 = 12.3–12.4 m), `anom` the State percentile, `anom_raw` the
+/** A model's reading of every 10 cm token of a hole: the per-metre `anom` of ModelView is the maximum of these
+ * over the metre, the per-metre `core` their mode. `bin` is the depth in 10 cm (bin 123 = 12.3–12.4 m), `anom` the State percentile, `anom_raw` the
  * contrast against ±15 m; a metre is flagged when its highest token reaches both `flag_at` and `flag_raw`. */
-export type TokenScores = { run: string; step_m: 0.1; n: number; flag_at: number | null; flag_raw: number | null; bin: number[]; anom: number[]; anom_raw: number[] };
+export type TokenScores = { run: string; step_m: 0.1; n: number; flag_at: number | null; flag_raw: number | null; bin: number[]; anom: number[]; anom_raw: number[];
+  /** the model's core type per token (its per-metre value is the mode); absent for a hole read before the service sent it */
+  core?: number[]; core_types: { k: number; name: string; share: number }[] };
 export type Metres = { m: number[]; gs: string[]; ms: string[]; gt: string[]; lith: string[]; lith_raw: string[]; au: (number | null)[] };
 
 export type HoleDetail = HoleRow & {

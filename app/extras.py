@@ -35,11 +35,12 @@ def metre_arrays(eng: Engine, key: str) -> tuple[np.ndarray, np.ndarray]:
     return tir, fp
 
 
-def token_arrays(eng: Engine, key: str) -> tuple[np.ndarray, np.ndarray]:
-    """(anom, raw): the unusual score of every 10 cm token, in the tokens' order (the order of the processed .npz, which is
-    the order the platform keeps them in). The per-metre `anom` of hole_view() is the maximum of these over the metre."""
+def token_arrays(eng: Engine, key: str) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """(anom, raw, core): the unusual score and the core type of every 10 cm token, in the tokens' order (the order of the
+    processed .npz, which is the order the platform keeps them in). Per metre, hole_view() takes the maximum of anom and the
+    mode of core."""
     R = eng.compute(key)
-    return R["lc_pct"].astype("<f4"), R["lc"].astype("<f4")
+    return R["lc_pct"].astype("<f4"), R["lc"].astype("<f4"), np.asarray(R["core"]).astype("<i2")
 
 
 def metre_why(eng: Engine, key: str) -> list[list[dict]]:
