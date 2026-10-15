@@ -7,13 +7,13 @@ import type { Chem } from "@/lib/package";
 const esc = (v: unknown) => { const s = v === null || v === undefined ? "" : String(v); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
 const kind = (d: AgainInterval) => (d.direction === "model_ultramafic" ? "model reads ultramafic, log does not" : "log says ultramafic, model does not");
 
-/** One hole's sheet: its disagreements and its flagged metres, with the reader's verdicts. */
-export function csvRows(hole: string, run: string, ds: AgainInterval[], flags: ModelView["anomaly"]["runs"], verdictOf: (kind: "log" | "flag", from: number, to: number) => string,
+/** One hole's sheet: its disagreements and its flagged metres. */
+export function csvRows(hole: string, run: string, ds: AgainInterval[], flags: ModelView["anomaly"]["runs"],
   chem: (from: number, to: number) => Chem = () => ({ n: 0, mgo: null, ni: null, cr: null, au: null, cu: null })): string {
-  const head = ["hole", "model", "kind", "from_m", "to_m", "length_m", "logged", "model_reads", "share", "um_minerals", "assays_n", "assay_max_ppm", "wamex_samples", "mgo_pct_median", "ni_ppm_median", "cr_ppm_median", "flagged_m", "verdict"];
+  const head = ["hole", "model", "kind", "from_m", "to_m", "length_m", "logged", "model_reads", "share", "um_minerals", "assays_n", "assay_max_ppm", "wamex_samples", "mgo_pct_median", "ni_ppm_median", "cr_ppm_median", "flagged_m"];
   const rows: unknown[][] = [
-    ...ds.map((d) => { const c = chem(d.from_m, d.to_m); return [hole, run, kind(d), d.from_m, d.to_m, d.length_m, d.logged, d.reads, d.share.toFixed(2), d.um_minerals === null ? "" : d.um_minerals.toFixed(2), d.assays.n, d.assays.max ?? "", c.n, c.mgo ?? "", c.ni ?? "", c.cr ?? "", d.flagged, verdictOf("log", d.from_m, d.to_m)]; }),
-    ...flags.map((r) => { const c = chem(r.from_m, r.to_m); return [hole, run, "stands out from its surroundings", r.from_m, r.to_m, r.to_m - r.from_m, "", "", "", "", "", "", c.n, c.mgo ?? "", c.ni ?? "", c.cr ?? "", r.to_m - r.from_m, verdictOf("flag", r.from_m, r.to_m)]; }),
+    ...ds.map((d) => { const c = chem(d.from_m, d.to_m); return [hole, run, kind(d), d.from_m, d.to_m, d.length_m, d.logged, d.reads, d.share.toFixed(2), d.um_minerals === null ? "" : d.um_minerals.toFixed(2), d.assays.n, d.assays.max ?? "", c.n, c.mgo ?? "", c.ni ?? "", c.cr ?? "", d.flagged]; }),
+    ...flags.map((r) => { const c = chem(r.from_m, r.to_m); return [hole, run, "stands out from its surroundings", r.from_m, r.to_m, r.to_m - r.from_m, "", "", "", "", "", "", c.n, c.mgo ?? "", c.ni ?? "", c.cr ?? "", r.to_m - r.from_m]; }),
   ];
   return [head, ...rows].map((r) => r.map(esc).join(",")).join("\n") + "\n";
 }
