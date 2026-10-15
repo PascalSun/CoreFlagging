@@ -15,7 +15,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
   }));
   return (
     <QueryClientProvider client={client}>
-      <LocaleProvider>{children}</LocaleProvider>
+      <LocaleProvider fixed="en">{children}</LocaleProvider>
     </QueryClientProvider>
   );
 }

@@ -1701,11 +1701,13 @@ function detect(): Locale {
   return "en";
 }
 
-export function LocaleProvider({ children }: { children: ReactNode }) {
+/** `fixed` pins one language whatever the browser or a saved choice says (a site with its pages in one language). */
+export function LocaleProvider({ children, fixed }: { children: ReactNode; fixed?: Locale }) {
   // Start as "en" for a hydration-stable first paint, then adopt the detected locale.
-  const [locale, setLocaleState] = useState<Locale>("en");
-  useEffect(() => { setLocaleState(detect()); }, []);
+  const [locale, setLocaleState] = useState<Locale>(fixed ?? "en");
+  useEffect(() => { setLocaleState(fixed ?? detect()); }, [fixed]);
   const setLocale = (l: Locale) => {
+    if (fixed) return;
     setLocaleState(l);
     try { localStorage.setItem("locale", l); } catch { /* private mode */ }
   };
