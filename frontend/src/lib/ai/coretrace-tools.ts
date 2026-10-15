@@ -112,6 +112,23 @@ export function coretraceTools(token: string) {
       },
     }),
 
+    unusual_10cm: tool({
+      description: "The model's unusual score for every 10 cm of a depth window (up to 50 m): which 10 cm pieces make a metre stand out. Each row is a 10 cm bin with its State percentile and raw contrast against the 15 m either side; a metre is flagged when its highest 10 cm reaches both thresholds returned. Use after hole_log to see where in a flagged interval the signal sits.",
+      inputSchema: z.object({ hole, from_m: z.number().describe("Top of the window in metres."), to_m: z.number().describe("Bottom of the window in metres, at most 50 m below the top."), model }),
+      toModelOutput: modelView(),
+      execute: async ({ hole: name, from_m, to_m, model: run }) => {
+        try {
+          const h = await resolve(name); const m = await defaultRun(run);
+          if (!(to_m > from_m) || to_m - from_m > 50) return { error: "to_m must be above from_m and at most 50 m below it" };
+          type T = { flag_at: number | null; flag_raw: number | null; bin: number[]; anom: number[]; anom_raw: number[] };
+          const t = await get<T>(`/holes/${encodeURIComponent(h.key)}/models/${encodeURIComponent(m)}/tokens/?from=${from_m}&to=${to_m}`);
+          return { hole: h.key, state: h.state, model: m, flag_thresholds: { state_percentile: t.flag_at, raw_contrast: t.flag_raw },
+            bins: t.bin.map((b, i) => ({ from_m: Math.round(b) / 10, state_percentile: r3(t.anom[i]), raw_contrast: r3(t.anom_raw[i]),
+              above_flag: t.flag_at !== null && t.flag_raw !== null && t.anom[i] >= t.flag_at && t.anom_raw[i] >= t.flag_raw })) };
+        } catch (e) { return err(e); }
+      },
+    }),
+
     metre_detail: tool({
       description: "One metre of one hole: logged rock and assay, the TSG software's minerals in it and in the 15 m around it, the spectral features that set it apart, and the model's readings (core type, unusual percentile, gold likelihood, TIR group filled in from SWIR).",
       inputSchema: z.object({ hole, m: z.number().int().describe("Depth in metres; the metre from m to m+1."), model }),

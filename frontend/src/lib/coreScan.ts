@@ -117,6 +117,10 @@ export type SpectralSide = { n: number; n_result: number; mix: Record<string, nu
 /** The TSG mineral-group make-up down the hole, worked out once when the hole was read (1 m or 0.1 m intervals). */
 export type SpectralLog = { key: string; step: number; from_m: number; to_m: number; swir_groups: string[]; tir_groups: string[]; tir: string;
   rows: { from_m: number; swir: SpectralSide | null; tir: SpectralSide | null }[] };
+/** A model's unusual score for every 10 cm token of a hole: the per-metre `anom` of ModelView is the maximum of these
+ * over the metre. `bin` is the depth in 10 cm (bin 123 = 12.3–12.4 m), `anom` the State percentile, `anom_raw` the
+ * contrast against ±15 m; a metre is flagged when its highest token reaches both `flag_at` and `flag_raw`. */
+export type TokenScores = { run: string; step_m: 0.1; n: number; flag_at: number | null; flag_raw: number | null; bin: number[]; anom: number[]; anom_raw: number[] };
 export type Metres = { m: number[]; gs: string[]; ms: string[]; gt: string[]; lith: string[]; lith_raw: string[]; au: (number | null)[] };
 
 export type HoleDetail = HoleRow & {
@@ -216,6 +220,9 @@ export const coreScan = {
   /** The SWIR / TIR group make-up: the whole hole at 1 m, or a window of up to 50 m at 0.1 m. 404 when the hole has none. */
   spectralLog: (key: string, step: 1 | 0.1, from?: number, to?: number) =>
     json<SpectralLog>(`/holes/${enc(key)}/spectral-log/?step=${step}${from !== undefined && to !== undefined ? `&from=${from}&to=${to}` : ""}`),
+  /** A model's unusual score per 10 cm token: the whole hole, or a depth window in metres. 404 while a hole has none. */
+  tokenScores: (key: string, run: string, from?: number, to?: number) =>
+    json<TokenScores>(`/holes/${enc(key)}/models/${enc(run)}/tokens/${from !== undefined && to !== undefined ? `?from=${from}&to=${to}` : ""}`),
   /** One bin's own mean spectra. */
   bin: (key: string, bin: number) => json<BinSpectra>(`/holes/${enc(key)}/bins/${bin}/`),
   /** The holes within `km` of this one, nearest first, each with its distance. */
