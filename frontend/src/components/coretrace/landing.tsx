@@ -101,10 +101,20 @@ export function CoreHero() {
             </div>
             <p className="text-[11px] text-white/50 md:hidden">Hole {T.hole}, tray {T.tray}. GSWA, NVCL, CC BY 4.0.</p>
             <p className="hidden max-w-sm text-xs leading-relaxed text-white/55 md:block md:text-right">Hole {T.hole}, tray {T.tray}, {T.from.toFixed(1)}–{T.to.toFixed(1)} m. Under each row, the mineral the scan reads every 10 cm. Geological Survey of Western Australia, NVCL, CC BY 4.0.</p>
-            <a href="https://nlp-tlp.org/" target="_blank" rel="noopener noreferrer" aria-label="UWA Centre for Natural and Technical Language Processing" className="hidden md:block">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/ntlp-logo.png" alt="" className="size-14 rounded-full ring-1 ring-white/20" />
-            </a>
+            <div className="hidden items-center gap-3 md:flex">
+              <a href="https://nlp-tlp.org/" target="_blank" rel="noopener noreferrer" aria-label="UWA Centre for Natural and Technical Language Processing">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/ntlp-logo.png" alt="" className="size-14 rounded-full ring-1 ring-white/20" />
+              </a>
+              <a href="https://criticalresources.org.au/" target="_blank" rel="noopener noreferrer" aria-label="ARC Training Centre in Critical Resources for the Future" className="flex h-14 items-center rounded-lg bg-white px-3 ring-1 ring-white/20">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/critical-resources-logo.svg" alt="" className="h-9 w-auto" />
+              </a>
+              <a href="https://www.dmirs.wa.gov.au/gswa" target="_blank" rel="noopener noreferrer" aria-label="Geological Survey of Western Australia, Department of Mines, Petroleum and Exploration" className="flex h-14 items-center">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/gswa-dmpe-logo-white.png" alt="" className="h-11 w-auto" />
+              </a>
+            </div>
           </div>
         </div>
       </div>
@@ -265,11 +275,21 @@ export function CoreTeam() {
       <div className="container-site flex flex-col gap-8">
         <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
           <Reveal><h2 className="font-display text-3xl font-medium tracking-tight text-ink md:text-5xl">The team built this.</h2></Reveal>
-          <a href="https://nlp-tlp.org/" target="_blank" rel="noopener noreferrer" className="flex items-center gap-3">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/ntlp-logo.png" alt="" className="size-12 rounded-full" />
-            <span className="max-w-[17rem] text-[15px] leading-snug text-ink-soft">UWA Centre for Natural and Technical Language Processing</span>
-          </a>
+          <div className="flex flex-wrap items-center gap-x-8 gap-y-4">
+            <a href="https://nlp-tlp.org/" target="_blank" rel="noopener noreferrer" className="flex items-center gap-3">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/ntlp-logo.png" alt="" className="size-12 rounded-full" />
+              <span className="max-w-[17rem] text-[15px] leading-snug text-ink-soft">UWA Centre for Natural and Technical Language Processing</span>
+            </a>
+            <a href="https://criticalresources.org.au/" target="_blank" rel="noopener noreferrer" aria-label="ARC Training Centre in Critical Resources for the Future">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/critical-resources-logo.svg" alt="" className="h-10 w-auto" />
+            </a>
+            <a href="https://www.dmirs.wa.gov.au/gswa" target="_blank" rel="noopener noreferrer" aria-label="Geological Survey of Western Australia, Department of Mines, Petroleum and Exploration" className="flex h-12 items-center rounded-lg bg-ink px-3">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/gswa-dmpe-logo-white.png" alt="" className="h-9 w-auto" />
+            </a>
+          </div>
         </div>
         <ul className="-mx-5 flex snap-x gap-4 overflow-x-auto px-5 pb-2 md:mx-0 md:grid md:grid-cols-3 md:overflow-visible md:px-0 xl:grid-cols-5">
           {CORE_TEAM.map((m) => (
