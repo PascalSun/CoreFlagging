@@ -37,6 +37,8 @@ const th = "border-b border-slate-300 py-1.5 pr-3 text-left align-bottom text-[1
 const td = "border-b border-slate-100 py-1.5 pr-3 align-top text-[11.5px] text-slate-800";
 const num = "tabular-nums text-right";
 
+const SHOW_MODEL_TABLE = false;
+
 /** The hole drawn across the page: what the scan reads and what the model makes of it, metre by
  * metre, each track on its own scale, with the auto-log boundaries and the flagged metres marked. */
 function HoleFigure({ hole, mv }: { hole: HoleDetail; mv: ModelView }) {
@@ -209,7 +211,8 @@ export function ReportDocument({ hole, mv, run, models, trays, nodeRef }: {
         ) : <p className="text-[11.5px] text-slate-700">The checks found nothing to report.</p>}
       </Section>
 
-{hole.results.length > 0 && (
+{/* the models-side-by-side table is a research view; hidden from the report with the model picker (Oct 2026) */}
+{SHOW_MODEL_TABLE && hole.results.length > 0 && (
       <Section n={next()} title="The models side by side" intro={`TIR agreement compares the mineral group a model fills in from SWIR alone with the TSG software's reading of the measured TIR.${hole.au_m ? " Gold AUC ranks this hole's assayed metres: 0.5 is chance, 1 is perfect." : ""}`}>
         <table data-keep className="w-full border-collapse">
           <thead><tr><th className={th}>Model</th><th className={`${th} ${num}`}>Auto-log segments</th><th className={`${th} ${num}`}>Unusual metres</th><th className={`${th} ${num}`}>TIR agreement</th>{hole.au_m ? <th className={`${th} ${num}`}>Gold AUC</th> : null}</tr></thead>
