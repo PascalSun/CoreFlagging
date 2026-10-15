@@ -151,3 +151,23 @@ def test_linescan_decodes_only_the_chunks_of_the_window(tmp_path, monkeypatch):
     im = np.asarray(Image.open(io.BytesIO(jpg)).convert("RGB"))
     assert im.shape == (10, ns, 3)
     assert abs(int(im[0, 0, 0]) - 90) < 6 and abs(int(im[-1, 0, 0]) - 140) < 6      # top rows from chunk 1 (90), bottom from chunk 2 (140)
+
+
+def test_samples_pair_each_swir_sample_with_the_nearest_tir_spectrum(tmp_path, monkeypatch):
+    """The TIR file has its own sample list: a SWIR sample gets the TIR measured within 5 mm of it, or none."""
+    from app import samples as smp
+    from types import SimpleNamespace
+    import pandas as pd
+    d = tmp_path / "pkg" / "DS"; d.mkdir(parents=True); (d / ".ready").touch()
+    monkeypatch.setattr(smp, "ROOT", tmp_path / "pkg")
+    monkeypatch.setattr(smp, "package", lambda refs, ds: d)
+    swir = SimpleNamespace(sampleheaders=pd.DataFrame({"D": [1.000, 1.008, 1.016], "T": ["t1"] * 3, "L": ["1"] * 3, "X": [0.0, 8.0, 16.0]}),
+                           scalars=pd.DataFrame({}), spectra=np.ones((3, 4)), wavelength=np.array([400.0, 1000.0, 2000.0, 2500.0]))
+    tir = SimpleNamespace(sampleheaders=pd.DataFrame({"D": [1.001, 1.030]}), spectra=np.array([[0.1, 0.2], [0.3, 0.4]]), wavelength=np.array([6000.0, 14000.0]))
+    monkeypatch.setattr(smp, "_spectra_of", lambda d_, ds: swir)
+    monkeypatch.setattr(smp, "_tir_of", lambda d_, ds: tir)
+    out = smp.samples(["x"], "DS", 0.0, 2.0, spectra=True)
+    assert out["tir_wl"] == [6000.0, 14000.0]
+    assert [r["tir"] for r in out["samples"]] == [[0.1, 0.2], None, None]     # 1.000 ↔ 1.001; 1.008 and 1.016 are > 5 mm from either
+    plain = smp.samples(["x"], "DS", 0.0, 2.0)
+    assert "tir" not in plain["samples"][0] and "tir_wl" not in plain
