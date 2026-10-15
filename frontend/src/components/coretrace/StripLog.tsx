@@ -181,8 +181,9 @@ export function StripLog({ metres, model, cursor, onCursor, onHover, hasLith, ra
 
   const at = (clientY: number): number | null => {
     const cv = canvasRef.current; if (!cv) return null;
-    const m = Math.floor((clientY - cv.getBoundingClientRect().top) / ppm) + m0;
-    if (m < m0 || m > m1) return null;
+    // the metre under the pointer: floor of the depth itself, so a window that starts mid-metre (401.5 m) still lands on 401
+    const d = (clientY - cv.getBoundingClientRect().top) / ppm + m0, m = Math.floor(d);
+    if (d < m0 || d > m1 + 1) return null;
     if (idx.has(m)) return m;
     for (let k = 1; k <= 6; k++) { if (idx.has(m - k)) return m - k; if (idx.has(m + k)) return m + k; }   // inside a gap: the nearest metre that has core
     return null;
@@ -240,7 +241,8 @@ export function StripLog({ metres, model, cursor, onCursor, onHover, hasLith, ra
             onTouchStart={onRange ? (e) => { if (e.touches.length === 2) pinch.current = Math.abs(e.touches[0].clientY - e.touches[1].clientY); } : undefined}
             onTouchMove={onRange ? (e) => { if (e.touches.length !== 2 || pinch.current === null) return; e.preventDefault(); const cv = canvasRef.current; if (!cv) return; const now = Math.abs(e.touches[0].clientY - e.touches[1].clientY); const mid = (e.touches[0].clientY + e.touches[1].clientY) / 2; zoomAt((mid - cv.getBoundingClientRect().top) / ppm + m0, pinch.current / Math.max(1, now)); pinch.current = now; } : undefined}
             onTouchEnd={onRange ? () => { pinch.current = null; } : undefined} />
-          {cursor !== null && cursor >= m0 && cursor <= m1 && (
+          {/* the selected metre; not drawn when it fills most of the view (zoomed to it), where it would only tint the log */}
+          {cursor !== null && cursor >= Math.floor(m0) && cursor <= m1 && ppm < height * 0.6 && (
             <div className="pointer-events-none absolute left-0 border-y border-cyan bg-cyan/20" style={{ top: (cursor - m0) * ppm - 1, height: Math.max(ppm, 2) + 2, width }} />
           )}
           {tipM !== null && ti !== undefined && (

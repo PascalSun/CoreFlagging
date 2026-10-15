@@ -8,19 +8,19 @@ import { PAGE_W, ReportDocument } from "@/components/coretrace/ReportDocument";
 import { ACTIVE, inferred, TARGET_SOURCE_LABEL, abstractParts, commodityName, coreScan, readDate, reportFileKind, sourceLabel, surveyOf, type SimilarScope, type CoreModelInfo, type HoleDetail, type HoleReport, type MetreView, type ModelView, type Tray } from "@/lib/coreScan";
 import { ISSUE_LABEL, STATUS_LABEL, SERIES, coreTypeColor, fmt, groupColor, groupName, issueLabel, mineralName, pct } from "@/components/coretrace/palette";
 import { LINE, SpectraChart } from "@/components/coretrace/SpectraChart";
-import { StripKey, StripLog } from "@/components/coretrace/StripLog";
+import { StripKey, StripLog, groupOrder } from "@/components/coretrace/StripLog";
 import { TrayViewer } from "@/components/coretrace/DeepZoom";
 import { TrayPhoto } from "@/components/coretrace/TrayPhoto";
 import { LookAgain } from "@/components/coretrace/LookAgain";
 import { SimilarHoles } from "@/components/coretrace/SimilarHoles";
 import { Nearby } from "@/components/coretrace/Nearby";
-import { DepthLens, type Window, WindowStart } from "@/components/coretrace/DepthLens";
+import { DepthLens, levelOf, type Window, WindowStart } from "@/components/coretrace/DepthLens";
 import { cn } from "@/lib/utils";
 
 export type Tab = "window" | "metre" | "again" | "log" | "gold" | "similar" | "quality" | "report";
-// "gold" is hidden: its view is kept below, but no tab opens it and a link with ?tab=gold falls back to This metre
+// "gold" is hidden: its view is kept below, but no tab opens it and a link with ?tab=gold falls back to Window
 const TABS: { id: Tab; label: string }[] = [
-  { id: "window", label: "Window" }, { id: "metre", label: "This metre" }, { id: "again", label: "Look again" }, { id: "log", label: "Auto log" },
+  { id: "window", label: "Window" }, { id: "again", label: "Look again" }, { id: "log", label: "Auto log" },
   { id: "similar", label: "Similar core" }, { id: "quality", label: "Data quality" }, { id: "report", label: "Report" },
 ];
 
@@ -292,7 +292,8 @@ export function HolePanel({ holeKey, tab: tabProp, onTab, models, run, metre, on
 }) {
   const qc = useQueryClient();
   // the open tab lives in the address, so a link (or the assistant) can open a hole on any tab
-  const tab: Tab = tabProp === "unusual" ? "again" : TABS.some((t) => t.id === tabProp) ? (tabProp as Tab) : "metre";   // "unusual" was the tab's old name
+  // "unusual" was Look again's old name; "metre" (This metre) became the Window tab's 1 m level
+  const tab: Tab = tabProp === "unusual" ? "again" : TABS.some((t) => t.id === tabProp) ? (tabProp as Tab) : "window";
   const setTab = onTab;
   const hq = useQuery({ queryKey: ["core-hole", holeKey], queryFn: () => coreScan.hole(holeKey), refetchInterval: (q) => (q.state.data && ACTIVE.includes(q.state.data.status) ? 2500 : false),
     refetchIntervalInBackground: true });   // an upload is left to run in another tab; it should be done when the reader comes back
@@ -306,10 +307,10 @@ export function HolePanel({ holeKey, tab: tabProp, onTab, models, run, metre, on
   const tq = useQuery({ queryKey: ["core-trays", holeKey], queryFn: () => coreScan.trays(holeKey), enabled: ready, staleTime: 60_000 });
   // hovering over the log previews a metre on the right; a click keeps it. The preview follows the pointer
   // after a short pause, so sweeping down the hole does not fetch every metre on the way
-  const [peekRaw, setPeekRaw] = useState<number | null>(null);
-  const [peek, setPeek] = useState<number | null>(null);
-  useEffect(() => { const t = setTimeout(() => setPeek(peekRaw), peekRaw === null ? 0 : 140); return () => clearTimeout(t); }, [peekRaw]);
-  const shown = peek ?? metre;
+  // the metre the Window tab reads in full at its 1 m level: the selected one when it is in the window, else the
+  // window's middle metre
+  const shown = tab === "window" && win && levelOf(win) === "1m"
+    ? (metre !== null && metre >= Math.floor(win[0]) && metre < win[1] ? metre : Math.floor((win[0] + win[1]) / 2)) : null;
   const eq = useQuery({ queryKey: ["core-metre", holeKey, shown, useRun], queryFn: () => coreScan.metre(holeKey, shown as number, useRun),
     enabled: ready && wide && shown !== null && (!!useRun || displayOnly), staleTime: 5 * 60_000, retry: false, placeholderData: keepPreviousData });
   // what the similar-core search asks about: the zoomed window when there is one (up to 50 m), else the 2 m at the metre
@@ -323,12 +324,23 @@ export function HolePanel({ holeKey, tab: tabProp, onTab, models, run, metre, on
   const slq = useQuery({ queryKey: ["core-spectral", holeKey], queryFn: () => coreScan.spectralLog(holeKey, 1), enabled: ready && wide, staleTime: 60 * 60_000, retry: false });
   const fineWin = win && win[1] - win[0] <= 50 ? win : null;
   const slf = useQuery({ queryKey: ["core-spectral", holeKey, fineWin], queryFn: () => coreScan.spectralLog(holeKey, 0.1, fineWin![0], fineWin![1]), enabled: ready && wide && !!fineWin, staleTime: 60 * 60_000, retry: false, placeholderData: keepPreviousData });
+  const order = useMemo(() => groupOrder(slq.data), [slq.data]);
   // the original report: only holes whose scan names a WAMEX report have one
   const hasReport = !!hole?.meta.wamex;
   const rq = useQuery({ queryKey: ["core-report", holeKey], queryFn: () => coreScan.report(holeKey), enabled: hasReport, staleTime: 60 * 60_000, retry: false });
   const typeName = useMemo(() => { const n = new Map((mvw?.core_types ?? []).map((c) => [c.k, c.name])); return (k: number) => n.get(k) ?? "—"; }, [mvw]);
   const res = hole?.results.find((r) => r.run === useRun);
   const jump = (m: number) => { onMetre(m); };
+  // a metre in full: the Window tab at 1 m on it (what This metre used to be)
+  const openMetre = (m: number) => { onMetre(m); onWindow?.([m, m + 1]); };
+  // opened on a metre (a link with ?m=, the summary's "open the full log" on a metre): go to it at 1 m, once,
+  // as the full log opens; "Whole hole" afterwards stays on the whole hole
+  const wasWide = useRef(false);
+  useEffect(() => {
+    if (wide && !wasWide.current && ready && !win && metre !== null && tab === "window") openMetre(metre);
+    if (ready) wasWide.current = wide;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wide, ready]);
   const del = async () => {
     if (!hole || !window.confirm(`Delete "${hole.name}" and everything computed from it? This cannot be undone.`)) return;
     await coreScan.remove(hole.key); qc.invalidateQueries({ queryKey: ["core-holes"] }); onDeleted();
@@ -384,7 +396,7 @@ export function HolePanel({ holeKey, tab: tabProp, onTab, models, run, metre, on
     const tops = res?.summary.main_types ?? [];
     body = (
       <div className="flex flex-col gap-4 p-4">
-        <TrayStrip holeKey={hole.key} trays={trays} at={mvw?.anomaly.runs[0]?.peak_m ?? null} onOpen={(m) => { onMetre(m); onWide(true); }} />
+        <TrayStrip holeKey={hole.key} trays={trays} at={mvw?.anomaly.runs[0]?.peak_m ?? null} onOpen={(m) => openMetre(m)} />
         {displayOnly && <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs leading-relaxed text-slate-700">{hole.message}</p>}
         {hole.source === "nvcl" && hole.state && hole.state !== "WA" && <p className="rounded-lg bg-sky-50 px-3 py-2 text-[11px] text-sky-900">The models were trained on GSWA&rsquo;s Western Australian core. This hole comes from the {surveyOf(hole.state)} library, outside that training set, so read its core types, unusual scores and gold ranking with more caution. Similar core is searched in WA only.</p>}
         {(hole.split === "train" || hole.split === "val") && <p className="rounded-lg bg-amber-50 px-3 py-2 text-[11px] text-amber-900">The models saw this hole in training. Results here will look better than on core they have not seen.</p>}
@@ -410,7 +422,7 @@ export function HolePanel({ holeKey, tab: tabProp, onTab, models, run, metre, on
               <li><b className="font-semibold text-slate-900">{res.summary.n_segments} segments</b> in the auto log, over {res.summary.metres} m of core.</li>
               {hole.has_lith && (() => { const n = res.summary.again?.n ?? 0; return <li><b className="font-semibold text-slate-900">{n ? `${n} ${n === 1 ? "interval" : "intervals"}` : "No interval"}</b> where the model&rsquo;s reading disagrees with the log, by the ultramafic rule.{n ? <> <button type="button" className="font-medium text-slate-900 underline decoration-slate-300 underline-offset-2 hover:decoration-slate-900" onClick={() => { setTab("again"); onWide(true); }}>Look again</button></> : null}</li>; })()}
               <li><b className="font-semibold text-slate-900">{res.anomaly.n_flag_m} unusual {res.anomaly.n_flag_m === 1 ? "metre" : "metres"}</b> flagged against the core around them.</li>
-              {res.summary.gold_top !== null && <li>Highest gold likelihood at <button type="button" className="font-semibold text-slate-900 underline decoration-slate-300 underline-offset-2 hover:decoration-slate-900" onClick={() => { onMetre(res.summary.gold_top as number); onWide(true); }}>{res.summary.gold_top} m</button>{res.gold.auc !== null ? <>; against this hole&rsquo;s assays the ranking scores AUC {fmt(res.gold.auc)}</> : null}.</li>}
+              {res.summary.gold_top !== null && <li>Highest gold likelihood at <button type="button" className="font-semibold text-slate-900 underline decoration-slate-300 underline-offset-2 hover:decoration-slate-900" onClick={() => openMetre(res.summary.gold_top as number)}>{res.summary.gold_top} m</button>{res.gold.auc !== null ? <>; against this hole&rsquo;s assays the ranking scores AUC {fmt(res.gold.auc)}</> : null}.</li>}
               {res.tir.measured && res.tir.acc !== null && <li>TIR mineral group filled in from SWIR alone agrees with the measured TIR in <b className="font-semibold text-slate-900">{pct(res.tir.acc)}</b> of bins.</li>}
               {!res.tir.measured && <li>No thermal infrared was measured; the model fills in a TIR mineral group for every metre from SWIR.</li>}
             </ul>
@@ -431,14 +443,20 @@ export function HolePanel({ holeKey, tab: tabProp, onTab, models, run, metre, on
       // page as one, with the log a fixed height at the top and the tabs held at the top of the screen as you read
       <div className="flex flex-col lg:min-h-0 lg:flex-1 lg:flex-row">
         <div className="flex h-[min(380px,52vh)] flex-none flex-col items-center border-b border-slate-200/70 p-3 lg:h-auto lg:min-h-0 lg:items-stretch lg:border-r lg:border-b-0 lg:px-5 lg:py-4">
-          <StripLog range={win ?? undefined} onRange={onWindow} metres={hole.metres} model={mvw} spectral={slq.data} spectralFine={fineWin ? slf.data : undefined} cursor={metre} onHover={tab === "metre" ? setPeekRaw : undefined} onCursor={(m) => { setPeekRaw(null); jump(m); if (tab === "report" || tab === "quality") setTab("metre"); }} hasLith={hole.has_lith} hasAu={hole.au_m > 0} />
+          <StripLog range={win ?? undefined} onRange={onWindow} metres={hole.metres} model={mvw} spectral={slq.data} spectralFine={fineWin ? slf.data : undefined} cursor={metre} onCursor={(m) => {
+            // a click on the log selects the metre; on the Window tab (above 1 m) and on the pages that do not read the
+            // log, it opens the metre at 1 m
+            if (tab === "report" || tab === "quality") { setTab("window"); openMetre(m); }
+            else if (tab === "window" && (!win || levelOf(win) === "hole" || levelOf(win) === "10m")) openMetre(m);
+            else jump(m);
+          }} hasLith={hole.has_lith} hasAu={hole.au_m > 0} />
         </div>
         <div className="@container flex min-w-0 flex-col lg:min-h-0 lg:flex-1">
           {/* on a phone the model line scrolls away; only the tabs stay */}
           <div className="px-4 pt-3 lg:hidden">{modelPicker}</div>
           <div className="sticky top-0 z-10 flex flex-col gap-2 border-b border-slate-200/70 bg-white/95 px-4 pt-3 backdrop-blur lg:relative lg:bg-transparent lg:backdrop-blur-none">
             {/* the next metre is on its way: a bar along the foot of the tabs, the current metre left as it is */}
-            {tab === "metre" && shown !== null && eq.data && eq.data.metre !== shown && (
+            {tab === "window" && shown !== null && eq.data && eq.data.metre !== shown && (
               <div className="pointer-events-none absolute inset-x-0 -bottom-px h-[3px] overflow-hidden bg-cyan/15" aria-hidden>
                 <div className="h-full w-1/3 animate-[ct-slide_1s_ease-in-out_infinite] bg-cyan" />
                 <style>{`@keyframes ct-slide{0%{transform:translateX(-100%)}100%{transform:translateX(300%)}}`}</style>
@@ -446,7 +464,7 @@ export function HolePanel({ holeKey, tab: tabProp, onTab, models, run, metre, on
             )}
             <div className="max-lg:hidden">{modelPicker}</div>
             <div className="flex gap-1 max-lg:flex-wrap max-lg:gap-1.5 max-lg:pb-3 lg:overflow-x-auto lg:[scrollbar-width:none]" role="tablist">
-              {TABS.filter((t) => !displayOnly || t.id === "metre" || t.id === "quality" || t.id === "report").map((t) => (
+              {TABS.filter((t) => !displayOnly || t.id === "window" || t.id === "quality" || t.id === "report").map((t) => (
                 <button key={t.id} role="tab" aria-selected={tab === t.id} type="button" onClick={() => setTab(t.id)}
                   className={cn("flex-none text-xs font-medium lg:border-b-2 lg:px-2.5 lg:py-2 max-lg:rounded-full max-lg:px-3 max-lg:py-1.5 max-lg:ring-1",
                     tab === t.id ? "lg:border-slate-900 text-slate-900 max-lg:bg-slate-900 max-lg:text-white max-lg:ring-slate-900" : "lg:border-transparent text-slate-500 hover:text-slate-800 max-lg:bg-white max-lg:ring-slate-200")}>
@@ -457,9 +475,10 @@ export function HolePanel({ holeKey, tab: tabProp, onTab, models, run, metre, on
           </div>
           <div className="p-4 lg:min-h-0 lg:flex-1 lg:overflow-y-auto">
             {displayOnly && <p className="mb-4 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs leading-relaxed text-slate-700">{hole.message}</p>}
-            {tab === "window" && (win ? <DepthLens hole={hole} mv={mvw} win={win} onWindow={(w) => onWindow?.(w)} trays={trays} metre={metre} onMetre={(m) => { jump(m); setTab("metre"); }} typeName={typeName} />
+            {tab === "window" && (win ? <DepthLens hole={hole} mv={mvw} win={win} onWindow={(w) => onWindow?.(w)} trays={trays} metre={metre} onMetre={openMetre} typeName={typeName}
+              spectralFine={fineWin ? slf.data : undefined} order={order}
+              metreDetail={<MetreTab hole={hole} metre={shown} previewing={false} mv={eq.data} loading={eq.isLoading || eq.isPlaceholderData} trays={trays} onMetre={openMetre} typeName={typeName} />} />
               : <WindowStart hole={hole} mv={mvw} onWindow={(w) => onWindow?.(w)} />)}
-            {tab === "metre" && <MetreTab hole={hole} metre={shown} previewing={peek !== null && peek !== metre} mv={eq.data} loading={eq.isLoading || eq.isPlaceholderData} trays={trays} onMetre={jump} typeName={typeName} />}
             {tab === "log" && (mvw ? (
               <div className="flex flex-col gap-3">
                 <p className="text-xs leading-relaxed text-slate-600">The model cuts the hole where its reading of the spectra changes, then each piece is described from the TSG software&rsquo;s minerals. {mvw.segments.length} segments, typically {fmt(mvw.segments.map((s) => s.length_m).sort((a, b) => a - b)[Math.floor(mvw.segments.length / 2)], 1)} m long. Click a row to go there.</p>
@@ -480,7 +499,7 @@ export function HolePanel({ holeKey, tab: tabProp, onTab, models, run, metre, on
                 <table className="w-full border-collapse">
                   <thead><tr>{["Metre", "Gold likelihood", ...(hole.au_m ? ["Assay (ppm)"] : [])].map((h) => <th key={h} className={th}>{h}</th>)}</tr></thead>
                   <tbody>{goldTop.map((g) => (
-                    <tr key={g.m} onClick={() => { jump(g.m); setTab("metre"); }} className="cursor-pointer hover:bg-slate-50">
+                    <tr key={g.m} onClick={() => { setTab("window"); openMetre(g.m); }} className="cursor-pointer hover:bg-slate-50">
                       <td className={cn(td, "font-mono")}>{g.m}–{g.m + 1}</td>
                       <td className={td}><span className="flex items-center gap-2"><span className="h-2 rounded-r-[4px]" style={{ width: `${g.p * 60}%`, background: SERIES.blue }} /><span className="font-mono">{g.p.toFixed(2)}</span></span></td>
                       {hole.au_m ? <td className={cn(td, "font-mono")}>{g.au !== null ? g.au.toFixed(2) : "—"}</td> : null}</tr>))}</tbody>

@@ -88,13 +88,16 @@ export function CoreTraceMap() {
   const hq = useQuery({ queryKey: ["core-holes", authed], queryFn: coreScan.holes, staleTime: 60_000, refetchInterval: (qq) => (qq.state.data?.holes.some((h) => h.mine && ACTIVE.includes(h.status)) ? 4000 : false), refetchIntervalInBackground: true });
   const holes = useMemo(() => hq.data?.holes ?? [], [hq.data]);
   const typeName = useMemo(() => new Map((hq.data?.core_types ?? []).map((c) => [c.k, c.name])), [hq.data]);
-  const tab = sp.get("tab") || "metre";
+  const tab = sp.get("tab") || "window";
   /** The assistant names holes as readers do; find the one it means and open it. */
   const openFromChat = (t: OpenTarget): boolean => {
     const n = t.hole.trim().toLowerCase();
     const h = holes.find((x) => x.key.toLowerCase() === n || x.name.toLowerCase() === n) ?? holes.find((x) => x.name.toLowerCase().replace(/[^a-z0-9]/g, "") === n.replace(/[^a-z0-9]/g, ""));
     if (!h) return false;
-    set({ hole: h.key, m: t.m === undefined ? null : String(t.m), full: h.status === "ready" && (t.m !== undefined || t.tab) ? "1" : null, tab: t.tab && t.tab !== "metre" ? t.tab : null, view: null });   // the hole is shown on the map, whichever tab was open
+    // a metre (with no other tab) opens in the Window tab at 1 m, where This metre used to be
+    const atMetre = t.m !== undefined && (!t.tab || t.tab === "metre");
+    set({ hole: h.key, m: t.m === undefined ? null : String(t.m), full: h.status === "ready" && (t.m !== undefined || t.tab) ? "1" : null, tab: t.tab && t.tab !== "metre" ? t.tab : null,
+      w: atMetre && t.m !== undefined ? `${t.m}-${t.m + 1}` : null, view: null });   // the hole is shown on the map, whichever tab was open
     return true;
   };
   const selected = holes.find((h) => h.key === holeKey) ?? null;
@@ -289,7 +292,7 @@ export function CoreTraceMap() {
       {/* the hole: a panel at the right on a wide screen, a bottom sheet on a phone */}
       {holeKey && !mobile && (
         <aside className="absolute z-30 overflow-hidden rounded-2xl border border-white/60 bg-white/90 shadow-glass backdrop-blur-xl" style={{ top: 68, bottom: 12, width: panelW, right: chatW + ctlW + 12 }}>
-          <HolePanel key={holeKey} holeKey={holeKey} tab={tab} onTab={(t) => set({ tab: t === "metre" ? null : t })} models={models} run={run} metre={metre} onMetre={(m) => set({ m: m === null ? null : String(m) })}
+          <HolePanel key={holeKey} holeKey={holeKey} tab={tab} onTab={(t) => set({ tab: t === "window" ? null : t })} models={models} run={run} metre={metre} onMetre={(m) => set({ m: m === null ? null : String(m) })}
             wide={wide} onWide={(w) => set({ full: w ? "1" : null })} onClose={() => set({ hole: null, m: null, full: null, tab: null, w: null })} win={win} onWindow={(r) => set(r ? { w: `${r[0]}-${r[1]}`, full: "1", tab: "window" } : { w: null, tab: null })}
             onOpenHole={(k, m) => set({ hole: k, m: m === undefined ? null : String(m), full: "1" })}
             onDeleted={() => set({ hole: null, m: null, full: null })} onRing={setRingKm} />
@@ -297,7 +300,7 @@ export function CoreTraceMap() {
       )}
       {holeKey && mobile && (
         <HoleSheet full={wide || sheetFull} onFull={(f) => { setSheetFull(f); if (!f && wide) set({ full: null }); }} onClose={() => set({ hole: null, m: null, full: null, tab: null })}>
-          <HolePanel key={holeKey} holeKey={holeKey} tab={tab} onTab={(t) => set({ tab: t === "metre" ? null : t })} models={models} run={run} metre={metre} onMetre={(m) => set({ m: m === null ? null : String(m) })}
+          <HolePanel key={holeKey} holeKey={holeKey} tab={tab} onTab={(t) => set({ tab: t === "window" ? null : t })} models={models} run={run} metre={metre} onMetre={(m) => set({ m: m === null ? null : String(m) })}
             wide={wide} onWide={(w) => set({ full: w ? "1" : null })} onClose={() => set({ hole: null, m: null, full: null, tab: null, w: null })} win={win} onWindow={(r) => set(r ? { w: `${r[0]}-${r[1]}`, full: "1", tab: "window" } : { w: null, tab: null })}
             onOpenHole={(k, m) => set({ hole: k, m: m === undefined ? null : String(m), full: "1" })}
             onDeleted={() => set({ hole: null, m: null, full: null })} onRing={setRingKm} />

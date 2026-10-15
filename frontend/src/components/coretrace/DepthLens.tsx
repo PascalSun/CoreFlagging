@@ -3,11 +3,10 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight, Maximize2 } from "lucide-react";
-import { coreScan, type HoleDetail, type ModelView, type Sample, type Tray } from "@/lib/coreScan";
+import { coreScan, type HoleDetail, type ModelView, type SpectralLog, type Tray } from "@/lib/coreScan";
 import { LINE, SpectraChart } from "@/components/coretrace/SpectraChart";
 import { TrayPhoto } from "@/components/coretrace/TrayPhoto";
 import { coreTypeColor, fmt, groupColor, groupName, mineralName, pct } from "@/components/coretrace/palette";
-import { useState as useStateReact } from "react";
 import { cn } from "@/lib/utils";
 
 import { LEVELS, MIN_SPAN, fmtSpan, fmtWindow, levelOf, windowAt, type Window } from "@/lib/depth";
@@ -18,11 +17,16 @@ const th = "border-b border-slate-200 px-2 py-1.5 text-left text-[11px] font-med
 const td = "border-b border-slate-100 px-2 py-1.5 align-top text-xs text-slate-700";
 
 /** One window of a hole, read at the level its length calls for: a long window lists what the model found in
- * it; a metre or two shows the 10 cm bins with their spectra and the photographs; the finest shows one bin.
+ * it; a metre shows everything about that metre (`metreDetail`: the model's reading, the photograph, the spectra
+ * against the core around it) and its 10 cm bins; the finest shows the bins and the photographs.
  * The model's reading never goes below the metre it was made at. */
-export function DepthLens({ hole, mv, win, onWindow, trays, metre, onMetre, typeName }: {
+export function DepthLens({ hole, mv, win, onWindow, trays, metre, onMetre, typeName, metreDetail, spectralFine, order = [] }: {
   hole: HoleDetail; mv: ModelView | undefined; win: Window; onWindow: (w: Window | null) => void; trays: Tray[];
   metre: number | null; onMetre: (m: number) => void; typeName: (k: number) => string;
+  /** shown at the 1 m level: the old "This metre" page, for the metre in the window */
+  metreDetail?: React.ReactNode;
+  /** the window's 0.1 m group make-up, and the order the groups stack in (the whole hole's) */
+  spectralFine?: SpectralLog; order?: string[];
 }) {
   const [from, to] = win; const span = to - from; const level = levelOf(win);
   const d0 = hole.metres.m[0] ?? 0, d1 = (hole.metres.m[hole.metres.m.length - 1] ?? 0) + 1;
@@ -92,8 +96,9 @@ export function DepthLens({ hole, mv, win, onWindow, trays, metre, onMetre, type
         </>
       ) : (
         <>
-          {/* the metre level: the model's reading of each metre in the window, then the 10 cm bins */}
-          {mv && metres.length > 0 && (
+          {/* the metre level: the model's reading of each metre in the window (one card per metre when the window
+              spans more than one), everything about the metre, then the 10 cm bins */}
+          {mv && (level !== "1m" || metres.length > 1) && metres.length > 0 && (
             <section>
               <H4>HyFormer reads, per metre</H4>
               <div className="grid grid-cols-2 gap-2 @2xl:grid-cols-3">{metres.map((m) => { const j = midx.get(m); if (j === undefined) return null; return (
@@ -105,16 +110,16 @@ export function DepthLens({ hole, mv, win, onWindow, trays, metre, onMetre, type
               <p className="pt-1 text-[10.5px] text-slate-400">The model reads the core by the metre; below that, what you see is the scanner&rsquo;s own reading and the photograph.</p>
             </section>
           )}
-          {hole.source === "nvcl" && span <= 2.5 && <SampleLevel hole={hole} from={from} to={to} />}
+          {level === "1m" && metreDetail}
           <section>
             <H4>Every 10 cm: what the scanner read</H4>
             {bq.data ? (
-              <BinStrip bins={bq.data.bins} from={from} to={to} pick={pick} hover={hover} onHover={setHover} onPick={(b) => setPick(pick === b ? null : b)} onZoom={(b) => onWindow([b / 10, b / 10 + MIN_SPAN])} />
+              <BinStrip bins={bq.data.bins} from={from} to={to} pick={pick} hover={hover} onHover={setHover} onPick={(b) => setPick(pick === b ? null : b)} onZoom={(b) => onWindow([b / 10, b / 10 + MIN_SPAN])} log={spectralFine} order={order} />
             ) : <p className="text-xs text-slate-500">{bq.isPending ? "Reading the bins…" : "No bins in this window."}</p>}
             {shownBin !== null && sq.data && (
               <div className="mt-3 flex flex-col gap-3 rounded-lg border border-slate-200 bg-white p-3">
                 <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-xs"><b className="font-semibold text-slate-900">{sq.data.from_m.toFixed(1)}–{(sq.data.from_m + 0.1).toFixed(1)} m</b>
-                  <span>SWIR <b className="font-medium">{groupName(sq.data.gs)}</b>{sq.data.ms ? ` · ${mineralName(sq.data.ms)}` : ""}</span><span>TIR <b className="font-medium">{groupName(sq.data.gt)}</b></span>
+                  <span>SWIR <b className="font-medium">{mixOf(spectralFine, shownBin, "swir") ?? groupName(sq.data.gs)}</b>{sq.data.ms ? ` · ${mineralName(sq.data.ms)}` : ""}</span><span>TIR <b className="font-medium">{mixOf(spectralFine, shownBin, "tir") ?? groupName(sq.data.gt)}</b></span>
                   <span className="text-slate-500">{sq.data.n_swir} samples{sq.data.n_tir ? `, ${sq.data.n_tir} with TIR` : ", no TIR"}</span>
                   {hover !== null && pick !== hover && <span className="text-slate-400">· hovering; click a bin to keep it</span>}</div>
                 <SpectraChart title="SWIR, this 10 cm" unit="nm" xTicks={[500, 1000, 1500, 2000, 2500]} xFmt={nm} height={140} lines={[{ name: "this bin", color: LINE.measured, x: sq.data.swir_wl, y: sq.data.swir }]} />
@@ -122,7 +127,8 @@ export function DepthLens({ hole, mv, win, onWindow, trays, metre, onMetre, type
               </div>
             )}
           </section>
-          {trayMetres(trays, metres).map((m) => <TrayPhoto key={m} holeKey={hole.key} trays={trays} metre={m} onMetre={onMetre} range={span <= 2.5 ? [Math.max(from, m), Math.min(to, m + 4)] : undefined} />)}
+          {/* at 1 m the metre's own photograph is in the detail above */}
+          {level !== "1m" && trayMetres(trays, metres).map((m) => <TrayPhoto key={m} holeKey={hole.key} trays={trays} metre={m} onMetre={onMetre} />)}
         </>
       )}
     </div>
@@ -130,49 +136,6 @@ export function DepthLens({ hole, mv, win, onWindow, trays, metre, onMetre, type
 }
 
 const round1 = (v: number) => Math.round(v * 10) / 10;
-
-/** The finest level: the line-scan photograph of the window at full resolution beside every ~8 mm sample's
- * TSG mineral, both from the mirrored package through the service (the first look at a hole unpacks it:
- * a few seconds). Hover a sample for its depth and mineral. */
-function SampleLevel({ hole, from, to }: { hole: HoleDetail; from: number; to: number }) {
-  const lo = Math.floor(from * 100) / 100, hi = Math.ceil(to * 100) / 100;
-  const sq = useQuery({ queryKey: ["core-samples", hole.key, lo, hi], queryFn: () => coreScan.samples(hole.key, lo, hi), staleTime: 60 * 60_000, retry: false });
-  const [imgState, setImgState] = useStateReact<"loading" | "ok" | "none">("loading");
-  const [hov, setHov] = useStateReact<Sample | null>(null);
-  const url = coreScan.linescanUrl(hole.key, lo, hi, 420);
-  const samples = sq.data?.samples ?? [];
-  const span = hi - lo; const y = (d: number) => `${Math.max(0, Math.min(100, ((d - lo) / span) * 100))}%`;
-  return (
-    <section>
-      <H4>Every sample ({sq.data?.step_mm ? `${Math.round(sq.data.step_mm)} mm` : "~8 mm"}): the line scan and the scanner&rsquo;s mineral</H4>
-      {sq.isError && <p className="text-[11px] text-slate-500">{(sq.error as { status?: number }).status === 404 ? "This hole has no package to read at sample level." : "The sample level is not available right now (the service may be unpacking the package; try again in a moment)."}</p>}
-      <div className="flex gap-3">
-        {/* the line scan runs top to bottom at the window's scale; the mineral ticks sit beside it at the same scale */}
-        <div className="relative w-[120px] flex-none overflow-hidden rounded-md bg-slate-100" style={{ height: 420 }}>
-          {imgState !== "none" && <img src={url} alt={`Line scan, ${lo}–${hi} m`} onLoad={() => setImgState("ok")} onError={() => setImgState("none")} className="h-full w-full object-fill" />}
-          {imgState === "loading" && <div className="absolute inset-0 grid place-items-center text-[10px] text-slate-400">reading the line scan…</div>}
-          {imgState === "none" && <div className="absolute inset-0 grid place-items-center px-2 text-center text-[10px] text-slate-400">no line scan for this window yet</div>}
-          {hov && <div className="pointer-events-none absolute inset-x-0 border-t border-cyan" style={{ top: y(hov.depth) }} />}
-        </div>
-        <div className="relative w-7 flex-none rounded bg-slate-50" style={{ height: 420 }} onMouseLeave={() => setHov(null)}>
-          {samples.map((s, i) => { const next = samples[i + 1]?.depth ?? s.depth + (sq.data?.step_mm ?? 8) / 1000; return (
-            <div key={s.i} onMouseEnter={() => setHov(s)} title={`${s.depth.toFixed(3)} m · ${mineralName(s.mineral) || "no mineral read"}`}
-              className="absolute inset-x-0" style={{ top: y(s.depth), height: `${Math.max(0.2, ((next - s.depth) / span) * 100)}%`, background: s.mineral ? groupColor(s.group) : "#e2e8f0" }} />); })}
-        </div>
-        <div className="min-w-0 flex-1 text-xs text-slate-700">
-          {hov ? (
-            <div className="rounded-lg border border-slate-200 bg-white p-3">
-              <div className="font-semibold text-slate-900">{hov.depth.toFixed(3)} m</div>
-              <div>{mineralName(hov.mineral) || "No SWIR mineral read"}{hov.group ? <span className="text-slate-500"> · {groupName(hov.group)}</span> : null}{hov.weight !== null ? <span className="text-slate-500"> · weight {hov.weight}</span> : null}</div>
-              <div className="text-[11px] text-slate-500">tray {hov.tray}{hov.section !== null ? `, section ${hov.section}` : ""}, {hov.x_mm.toFixed(0)} mm along{hov.height_mm !== null ? ` · surface ${hov.height_mm.toFixed(1)} mm` : ""}</div>
-            </div>
-          ) : <p className="text-[11px] leading-relaxed text-slate-500">{samples.length ? `${samples.length} samples in this window. Move over the colour strip to read one.` : sq.isPending ? "Reading the samples…" : ""}</p>}
-          <p className="mt-2 text-[10.5px] leading-relaxed text-slate-400">The model does not read at this scale; what you see here is the scanner&rsquo;s own mineral per sample and its photograph, from the TSG package.</p>
-        </div>
-      </div>
-    </section>
-  );
-}
 
 /** One photograph per tray the window touches: the first metre of the window on each tray (a tray holds ~3.5 m). */
 function trayMetres(trays: Tray[], metres: number[]): number[] {
@@ -185,33 +148,57 @@ function trayMetres(trays: Tray[], metres: number[]): number[] {
   return out;
 }
 
-/** The 10 cm bins of a window as two coloured rows (SWIR group over TIR group), to scale, with a depth rule. */
-function BinStrip({ bins, from, to, pick, hover, onHover, onPick, onZoom }: {
+/** "Chlorite 55%, Invalid 30%, Carbonate 8%": the leading groups of a 10 cm bin in the 0.1 m log, or null. */
+function mixOf(log: SpectralLog | undefined, bin: number | null, side: "swir" | "tir", n = 3): string | null {
+  if (!log || bin === null) return null;
+  const sd = log.rows.find((r) => Math.round(r.from_m * 10) === bin)?.[side];
+  if (!sd || !sd.n_result) return null;
+  return Object.entries(sd.mix).sort((a, b) => b[1] - a[1]).slice(0, n).map(([g, v]) => `${groupName(g)} ${pct(v)}`).join(", ");
+}
+
+/** The 10 cm bins of a window as two rows (SWIR over TIR), to scale, with a depth rule. Each bin is the share of
+ * every TSG group in it, stacked top to bottom in the order the log on the left uses; without a spectral log, the
+ * bin's leading group. */
+function BinStrip({ bins, from, to, pick, hover, onHover, onPick, onZoom, log, order }: {
   bins: { bin: number; from_m: number; n_swir: number; n_tir: number; gs: string; ms: string; gt: string }[]; from: number; to: number;
   pick: number | null; hover: number | null; onHover: (b: number | null) => void; onPick: (b: number) => void; onZoom: (b: number) => void;
+  log?: SpectralLog; order: string[];
 }) {
+  const byBin = useMemo(() => new Map((log?.rows ?? []).map((r) => [Math.round(r.from_m * 10), r])), [log]);
+  const stack = (mix: Record<string, number>) => [...order, ...Object.keys(mix).filter((k) => !order.includes(k))].filter((k) => mix[k] > 0)
+    .map((k) => <span key={k} className="block w-full" style={{ height: `${mix[k] * 100}%`, background: groupColor(k) }} />);
   const span = to - from; const x = (d: number) => `${Math.max(0, Math.min(100, ((d - from) / span) * 100))}%`;
   const w = `${(0.1 / span) * 100}%`;
   const ticks: number[] = []; const stepM = span <= 1 ? 0.1 : span <= 3 ? 0.5 : 1;
   for (let d = Math.ceil(from / stepM) * stepM; d <= to + 1e-9; d += stepM) ticks.push(Math.round(d * 100) / 100);
-  const row = (key: "gs" | "gt", label: string) => (
-    <div className="flex items-center gap-2">
-      <span className="w-8 flex-none text-[10px] font-medium text-slate-500">{label}</span>
-      <div className="relative h-5 flex-1 rounded bg-slate-100" onMouseLeave={() => onHover(null)}>
-        {bins.map((b) => (
-          <button key={b.bin} type="button" title={`${b.from_m.toFixed(1)} m · ${groupName(b[key])}${key === "gs" && b.ms ? ` · ${mineralName(b.ms)}` : ""}`}
-            onMouseEnter={() => onHover(b.bin)} onClick={() => onPick(b.bin)} onDoubleClick={() => onZoom(b.bin)}
-            className={cn("absolute top-0 h-full border-r border-white/70", (pick === b.bin || hover === b.bin) && "ring-2 ring-cyan ring-inset z-10")}
-            style={{ left: x(b.from_m), width: w, background: key === "gt" && !b.n_tir ? "#e2e8f0" : groupColor(b[key]) }} />
-        ))}
+  const row = (key: "gs" | "gt", label: string) => {
+    const side = key === "gs" ? "swir" : "tir";
+    return (
+      <div className="flex items-center gap-2">
+        <span className="w-8 flex-none text-[10px] font-medium text-slate-500">{label}</span>
+        <div className="relative h-10 flex-1 overflow-hidden rounded bg-slate-100" onMouseLeave={() => onHover(null)}>
+          {bins.map((b) => {
+            const sd = byBin.get(b.bin)?.[side];
+            const mixed = !!sd && sd.n_result > 0;
+            const text = (mixed ? mixOf(log, b.bin, side) : null) ?? `${groupName(b[key])}${key === "gs" && b.ms ? ` · ${mineralName(b.ms)}` : ""}`;
+            return (
+              <button key={b.bin} type="button" title={`${b.from_m.toFixed(1)} m · ${text}`}
+                onMouseEnter={() => onHover(b.bin)} onClick={() => onPick(b.bin)} onDoubleClick={() => onZoom(b.bin)}
+                className={cn("absolute top-0 flex h-full flex-col overflow-hidden border-r border-white/70", (pick === b.bin || hover === b.bin) && "z-10 outline outline-2 -outline-offset-2 outline-cyan")}
+                style={{ left: x(b.from_m), width: w, background: mixed ? undefined : key === "gt" && !b.n_tir ? "#e2e8f0" : groupColor(b[key]) }}>
+                {mixed && stack(sd.mix)}
+              </button>
+            );
+          })}
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
   return (
     <div className="flex flex-col gap-1">
       {row("gs", "SWIR")}{row("gt", "TIR")}
       <div className="relative ml-10 h-4 font-mono text-[9px] text-slate-400">{ticks.map((t) => <span key={t} className="absolute -translate-x-1/2" style={{ left: x(t) }}>{t}</span>)}</div>
-      <p className="text-[10.5px] text-slate-400">Hover a bin for its spectra, click to keep it, double-click to zoom to it. Grey TIR = not measured.</p>
+      <p className="text-[10.5px] text-slate-400">Each bin is the share of every mineral group the scanner&rsquo;s TSG software reads in it, in the colours of the key below. Hover a bin for its spectra, click to keep it, double-click to zoom to it. Pale grey TIR = not measured.</p>
     </div>
   );
 }
@@ -228,7 +215,7 @@ export function WindowStart({ hole, mv, onWindow }: { hole: HoleDetail; mv: Mode
     <div className="flex flex-col gap-5">
       <section>
         <H4>Read the hole at any scale</H4>
-        <p className="text-xs leading-relaxed text-slate-600">The log on the left is the whole hole. Zoom with the wheel or double-click a depth, pick a level above it, or drag the box in the narrow column beside it. Each level shows what there is at that scale: the auto log and the photographs over 10 m, the 10 cm bins and their spectra over a metre, the line scan and every sample at 10 cm.</p>
+        <p className="text-xs leading-relaxed text-slate-600">The log on the left is the whole hole. Zoom with the wheel or double-click a depth, pick a level above it, or drag the box in the narrow column beside it. Each level shows what there is at that scale: the auto log and the photographs over 10 m; at 1 m, everything about the metre (the model&rsquo;s reading, the photograph, the spectra against the core around it) and its 10 cm bins; at 10 cm, the bins and their spectra.</p>
         <div className="mt-2 flex flex-wrap gap-1.5">{levels.map((l) => <button key={l.label} type="button" onClick={() => onWindow(windowAt(l.label === "10 m" ? "10m" : l.label === "1 m" ? "1m" : "10cm", (d0 + d1) / 2, d0, d1) as Window)} className="rounded-full bg-slate-900 px-3 py-1 text-[11px] font-medium text-white hover:bg-slate-700">Open {l.label} at the middle</button>)}</div>
       </section>
       {flags.length > 0 && (
