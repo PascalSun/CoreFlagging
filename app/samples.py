@@ -176,13 +176,19 @@ def samples(refs: list[str], dataset: str, lo: float, hi: float, spectra: bool =
             h = p.read_hires_dat(str(f["hires"]), per_spectra=True); height = h[i0:i1]
         except Exception:        # noqa: BLE001 - a damaged profile is not worth failing the samples for
             height = None
-    tir = _tir_of(d, dataset) if spectra else None
+    tir = _tir_of(d, dataset)
     tirD = tir.sampleheaders["D"].astype(float).to_numpy() if tir is not None else None
-    def tir_at(depth: float):
+    tmin1 = _col(tir, "Min1 sTSAT", "Min1 uTSAT", "Min1 sTSAS", "Min1 uTSAS") if tir is not None else None
+    tgrp1 = _col(tir, "Grp1 sTSAT", "Grp1 uTSAT", "Grp1 sTSAS", "Grp1 uTSAS") if tir is not None else None
+    def tir_index(depth: float):
+        """the TIR sample measured within 5 mm of this depth, or None (the TIR file has its own sample list)"""
         if tirD is None or len(tirD) == 0: return None
         k = int(np.searchsorted(tirD, depth)); k = min(max(k, 0), len(tirD) - 1)
         if k > 0 and abs(tirD[k - 1] - depth) < abs(tirD[k] - depth): k -= 1
-        if abs(tirD[k] - depth) > 0.005: return None
+        return None if abs(tirD[k] - depth) > 0.005 else k
+    def tir_at(depth: float):
+        k = tir_index(depth)
+        if k is None: return None
         v = tir.spectra[k]
         return None if not np.isfinite(v).any() else [round(float(x), 4) for x in v]
     def cls(col, i):
@@ -195,6 +201,8 @@ def samples(refs: list[str], dataset: str, lo: float, hi: float, spectra: bool =
              "x_mm": round(float(sh["X"].iloc[j]), 1), "mineral": cls(min1, i), "group": cls(grp1, i),
              "weight": None if wt1 is None or np.isnan(float(wt1.iloc[i])) else round(float(wt1.iloc[i]), 3),
              "height_mm": None if height is None or np.isnan(height[j]) else round(float(height[j]), 2)}
+        k = tir_index(float(D[i]))
+        r["tir_mineral"] = cls(tmin1, k) if k is not None else ""; r["tir_group"] = cls(tgrp1, k) if k is not None else ""
         if spectra:
             r["swir"] = [round(float(x), 4) for x in sp.spectra[i]]
             r["tir"] = tir_at(float(D[i]))

@@ -164,11 +164,14 @@ def test_samples_pair_each_swir_sample_with_the_nearest_tir_spectrum(tmp_path, m
     monkeypatch.setattr(smp, "package", lambda refs, ds: d)
     swir = SimpleNamespace(sampleheaders=pd.DataFrame({"D": [1.000, 1.008, 1.016], "T": ["t1"] * 3, "L": ["1"] * 3, "X": [0.0, 8.0, 16.0]}),
                            scalars=pd.DataFrame({}), spectra=np.ones((3, 4)), wavelength=np.array([400.0, 1000.0, 2000.0, 2500.0]))
-    tir = SimpleNamespace(sampleheaders=pd.DataFrame({"D": [1.001, 1.030]}), spectra=np.array([[0.1, 0.2], [0.3, 0.4]]), wavelength=np.array([6000.0, 14000.0]))
+    tir = SimpleNamespace(sampleheaders=pd.DataFrame({"D": [1.001, 1.030]}), spectra=np.array([[0.1, 0.2], [0.3, 0.4]]), wavelength=np.array([6000.0, 14000.0]),
+                          scalars=pd.DataFrame({"Min1 sTSAT": ["Quartz", "Albite"], "Grp1 sTSAT": ["SILICA", "PLAGIOCLASE"]}))
     monkeypatch.setattr(smp, "_spectra_of", lambda d_, ds: swir)
     monkeypatch.setattr(smp, "_tir_of", lambda d_, ds: tir)
     out = smp.samples(["x"], "DS", 0.0, 2.0, spectra=True)
     assert out["tir_wl"] == [6000.0, 14000.0]
     assert [r["tir"] for r in out["samples"]] == [[0.1, 0.2], None, None]     # 1.000 ↔ 1.001; 1.008 and 1.016 are > 5 mm from either
+    assert [(r["tir_mineral"], r["tir_group"]) for r in out["samples"]] == [("Quartz", "SILICA"), ("", ""), ("", "")]
     plain = smp.samples(["x"], "DS", 0.0, 2.0)
     assert "tir" not in plain["samples"][0] and "tir_wl" not in plain
+    assert plain["samples"][0]["tir_mineral"] == "Quartz"          # the TIR mineral comes without the spectra too
