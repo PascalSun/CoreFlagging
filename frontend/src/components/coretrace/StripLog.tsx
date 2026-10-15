@@ -10,7 +10,7 @@ import { ColourNote } from "@/components/coretrace/ColourNote";
 import { LEVELS, MIN_SPAN, fmtSpan, levelOf, windowAbout, windowAt } from "@/lib/depth";
 
 type Track = { id: string; label: string; w: number; kind: "mix" | "cat" | "bar" | "line"; info: string };
-const AXIS_W = 44, GAP = 6, HEAD_H = 34, NAV_W = 30;
+const AXIS_W = 44, GAP = 6, HEAD_H = 24, NAV_W = 30;
 
 export const TIP = {
   scale: "Scale: the whole hole in miniature. The box is the window on the right; drag it, or its ends, to move or resize it, or click to put it there.",
@@ -219,9 +219,9 @@ export function StripLog({ metres, model, cursor, onCursor, onHover, hasLith, ra
         </div>)}
       {/* each column's name, and under it an ⓘ that says what the column is (the bubble is drawn by KeyTips) */}
       <div className="flex text-[10px] font-semibold text-slate-600" style={{ height: HEAD_H, width: width + (onRange ? NAV_W : 0) }}>
-        {onRange && <Head label="Scale" info={TIP.scale} w={NAV_W} />}
+        {onRange && <Head label="Scale" info={TIP.scale} w={16} gap={NAV_W - 16} />}
         <span style={{ width: AXIS_W }} />
-        {tracks.map((t) => <Head key={t.id} label={t.label} info={t.info} w={t.w + GAP} />)}
+        {tracks.map((t) => <Head key={t.id} label={t.label} info={t.info} w={t.w} gap={GAP} />)}
       </div>
       <div className="flex min-h-0 flex-1 gap-0">
       {onRange && <div className="flex-none pr-1" style={{ width: NAV_W }}><DepthNav metres={metres} model={model} view={view} hole0={hole0} hole1={hole1} onRange={onRange} typeName={typeName} height={boxH} /></div>}
@@ -272,12 +272,17 @@ export function StripLog({ metres, model, cursor, onCursor, onHover, hasLith, ra
 
 const Sw = ({ c }: { c: string }) => <span className="inline-block h-2.5 w-2.5 flex-none rounded-[2px]" style={{ background: c }} />;
 
-/** A column's name over the log, with an ⓘ under it. */
-function Head({ label, info, w }: { label: string; info: string; w: number }) {
+/** A column's name over the log with its ⓘ to the right, the two centred together over the column (`w`); `gap` is
+ * the space after the column. Wider than a narrow column, the pair spills evenly into the gaps either side. */
+function Head({ label, info, w, gap = 0 }: { label: string; info: string; w: number; gap?: number }) {
   return (
-    <span className="flex flex-col items-center justify-end gap-0.5 pb-1" style={{ width: w }}>
-      <span className="whitespace-nowrap leading-none">{label}</span>
-      <span data-keytip={info} aria-label={info} role="img" className="grid size-3.5 cursor-help place-items-center rounded-full text-slate-400 hover:text-slate-900"><Info size={11} /></span>
+    <span className="flex flex-none items-end pb-1.5" style={{ width: w + gap }}>
+      <span className="flex justify-center overflow-visible" style={{ width: w }}>
+        <span className="flex items-center gap-0.5 whitespace-nowrap leading-none">
+          {label}
+          <span data-keytip={info} aria-label={info} role="img" className="grid size-3.5 flex-none cursor-help place-items-center rounded-full text-slate-400 hover:text-slate-900"><Info size={11} /></span>
+        </span>
+      </span>
     </span>
   );
 }
