@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, lastAssistantMessageIsCompleteWithToolCalls } from "ai";
 import { Streamdown, type Components } from "streamdown";
-import { FileText, Loader2, RotateCcw, Send } from "lucide-react";
+import { ExternalLink, FileText, Loader2, RotateCcw, Send } from "lucide-react";
 import { MD_COMPONENTS } from "@/components/chat/mdTable";
 import { ReportPdf } from "@/components/coretrace/ReportPdf";
 import { authToken, refreshAccessToken, refreshToken } from "@/lib/auth";
@@ -13,6 +13,11 @@ import { cn } from "@/lib/utils";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
+const TOOL_RUNNING: Record<string, string> = {
+  find_holes: "Searching the holes…", hole_summary: "Reading the hole summary…", hole_log: "Reading the auto log…", unusual_10cm: "Reading the 10 cm scores…", metre_detail: "Reading one metre…",
+  similar_core: "Searching similar core…", quality_issues: "Reading the quality list…", open_hole: "Opening it on the map…",
+  hole_documents: "Looking up the hole's documents and reading their first pages…", document_text: "Reading the document…", search_documents: "Searching the reports…", open_document: "Opening the PDF…",
+};
 const TOOL_LABEL: Record<string, string> = {
   find_holes: "Searched the holes", hole_summary: "Read the hole summary", hole_log: "Read the auto log", unusual_10cm: "Read the 10 cm scores", metre_detail: "Read one metre",
   similar_core: "Searched similar core", quality_issues: "Read the quality list", open_hole: "Opened it on the map",
@@ -34,7 +39,7 @@ export type OpenTarget = { hole: string; m?: number; tab?: string };
 type DocRow = { corpus: string; key: string; file: string; title: string; sub: string; url: string };
 
 /** What hole_documents found, as a list the reader can open: the hole's own HyLogger PDFs and the WAMEX reports it was
- * logged in, the primary one open under the list. Drawn by the interface, so it is there whatever the model writes. */
+ * logged in, each a link to its PDF, with a viewer in place on request. Drawn by the interface, so it is there whatever the model writes. */
 function DocumentList({ out }: { out: any }) {
   const rows: DocRow[] = [
     ...((out.wamex?.reports_this_hole_was_logged_in ?? []) as any[]).filter((r) => r.url).map((r) => ({
@@ -42,7 +47,7 @@ function DocumentList({ out }: { out: any }) {
       sub: [r.year, r.company, r.type, r.commodities].filter(Boolean).join(" · ") })),
     ...((out.hole_pdfs ?? []) as any[]).map((p) => ({ corpus: p.corpus, key: p.key, file: p.file, url: p.url, title: p.title, sub: `${p.kind}${p.pages ? ` · ${p.pages} pages` : ""}` })),
   ];
-  const [open, setOpen] = useState<string | null>(out.primary?.url ?? rows[0]?.url ?? null);
+  const [open, setOpen] = useState<string | null>(null);
   const covering = out.wamex?.reports_covering_the_collar_total ?? 0;
   if (!rows.length) return null;
   const shown = rows.find((r) => r.url === open);
@@ -52,8 +57,12 @@ function DocumentList({ out }: { out: any }) {
         {rows.map((r) => (
           <li key={r.url} className={cn("flex items-center gap-2 rounded-xl border px-3 py-2 text-xs", r.url === open ? "border-slate-400 bg-white" : "border-slate-200 bg-white/70")}>
             <FileText size={14} className="shrink-0 text-slate-500" />
-            <div className="min-w-0 flex-1"><div className="truncate font-medium text-slate-900">{r.title}</div>{r.sub && <div className="truncate text-[11px] text-slate-500">{r.sub}</div>}</div>
-            <button type="button" onClick={() => setOpen(r.url === open ? null : r.url)} className="shrink-0 rounded-full border border-slate-200 px-2 py-0.5 text-[11px] text-slate-700 hover:border-slate-400">{r.url === open ? "Close" : "Open"}</button>
+            <div className="min-w-0 flex-1">
+              <a href={`${PLATFORM_URL}${r.url}`} target="_blank" rel="noreferrer" className="block truncate font-medium text-slate-900 underline decoration-slate-300 underline-offset-2 hover:decoration-slate-900">{r.title}</a>
+              {r.sub && <div className="truncate text-[11px] text-slate-500">{r.sub}</div>}
+            </div>
+            <a href={`${PLATFORM_URL}${r.url}`} target="_blank" rel="noreferrer" aria-label="Open the PDF in a new tab" className="grid size-6 shrink-0 place-items-center rounded-full text-slate-500 hover:bg-slate-100 hover:text-slate-900"><ExternalLink size={12} /></a>
+            <button type="button" onClick={() => setOpen(r.url === open ? null : r.url)} className="shrink-0 rounded-full border border-slate-200 px-2 py-0.5 text-[11px] text-slate-700 hover:border-slate-400">{r.url === open ? "Hide" : "View here"}</button>
           </li>
         ))}
       </ul>
@@ -199,7 +208,7 @@ export function CoreChat({ context, onOpen, signedIn, onSignIn }: {
                     return (
                       <span key={i} className="inline-flex w-fit items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-1 text-[11px] text-slate-600">
                         {done ? <span className="size-1.5 rounded-full bg-emerald-500" /> : <Loader2 size={11} className="animate-spin" />}
-                        {TOOL_LABEL[name] ?? name}{what}
+                        {done ? (TOOL_LABEL[name] ?? name) : (TOOL_RUNNING[name] ?? TOOL_LABEL[name] ?? name)}{what}
                       </span>
                     );
                   }

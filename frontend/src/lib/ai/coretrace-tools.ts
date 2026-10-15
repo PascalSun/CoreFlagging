@@ -186,19 +186,19 @@ export function coretraceTools(token: string) {
             wamex: null | { linked: { anumber: string; found_by: string; title?: string; year?: number | null; type?: string; company?: string | null; commodities?: string | null; url: string; abstract?: string | null; pdf?: string | null; files?: { name: string; bytes: number }[] }[];
               covering: { anumber: string; title: string; year: number | null; type: string; company: string | null; commodities: string | null }[]; covering_count: number } };
           const d = await get<D>(`/holes/${encodeURIComponent(h.key)}/documents/`);
-          // the interface draws this tool's output as a document list with the primary PDF open: the report the hole was
-          // logged in when there is one, else the hole's own summary PDF; its first pages come along so the summary needs no second call
-          const linked = (d.wamex?.linked ?? []).filter((r) => r.pdf);
-          const primary = linked[0] ? { corpus: "wamex", key: linked[0].anumber, file: linked[0].pdf as string, title: `${linked[0].anumber} · ${linked[0].title ?? ""}` }
-            : d.hole_pdfs[0] ? { corpus: d.hole_pdfs[0].corpus, key: d.hole_pdfs[0].key, file: d.hole_pdfs[0].file, title: d.hole_pdfs[0].title } : null;
-          let first_pages: { page: number; text: string }[] | null = null;
-          if (primary) {
+          // the interface draws this tool's output as a document list with links; the first pages of every report the hole was
+          // logged in (else its own summary PDF) come along, so each gets a summary without further calls
+          const firstPages = async (corpus: string, key: string, file: string) => {
             try {
-              const q = new URLSearchParams({ corpus: primary.corpus, key: primary.key, file: primary.file, pages: "1-4" });
+              const q = new URLSearchParams({ corpus, key, file, pages: "1-3" });
               const t = await geo<{ pages: { page: number; text: string }[] }>(`/doc/text/?${q}`);
-              first_pages = t.pages.map((pg) => ({ page: pg.page, text: pg.text.slice(0, 3500) }));
-            } catch { first_pages = null; }
-          }
+              return t.pages.map((pg) => ({ page: pg.page, text: pg.text.slice(0, 3000) }));
+            } catch { return null; }
+          };
+          const linked = (d.wamex?.linked ?? []).filter((r) => r.pdf).slice(0, 3);
+          const read = linked.length
+            ? await Promise.all(linked.map(async (r) => ({ corpus: "wamex", key: r.anumber, file: r.pdf as string, title: `${r.anumber} · ${r.title ?? ""}`, first_pages: await firstPages("wamex", r.anumber, r.pdf as string) })))
+            : d.hole_pdfs[0] ? [{ corpus: d.hole_pdfs[0].corpus, key: d.hole_pdfs[0].key, file: d.hole_pdfs[0].file, title: d.hole_pdfs[0].title, first_pages: await firstPages(d.hole_pdfs[0].corpus, d.hole_pdfs[0].key, d.hole_pdfs[0].file) }] : [];
           return { hole: h.key, state: h.state, operator: h.operator, project: h.project,
             hole_pdfs: d.hole_pdfs.map((p) => ({ corpus: p.corpus, key: p.key, file: p.file, kind: p.kind, title: p.title, pages: p.pages, url: docUrl(p.corpus, p.key, p.file) })),
             wamex: d.wamex ? { note: "WAMEX is Western Australia's open-file exploration report system.",
@@ -208,8 +208,8 @@ export function coretraceTools(token: string) {
               reports_covering_the_collar_total: d.wamex.covering_count }
               : { note: `${h.state || "This"} is outside WAMEX (Western Australia only); the hole's own HyLogger PDFs above are what the platform holds.` },
             state_survey_portal: d.portal,
-            primary: primary ? { ...primary, url: docUrl(primary.corpus, primary.key, primary.file), first_pages } : null,
-            shown_to_reader: "The interface already shows this document list and the primary PDF open in the conversation. Summarise the primary document from first_pages (cite page numbers); do not say you opened or will open it, and do not call open_document for it. open_document is for another document on the list when the reader asks; document_text reads further pages." };
+            read: read.map((r) => ({ ...r, url: docUrl(r.corpus, r.key, r.file) })),
+            shown_to_reader: "The interface already shows this document list in the conversation, each with a link to its PDF. Give a summary of every document in `read` from its first_pages (one short paragraph each, headed by its A-number or kind, citing page numbers); do not say you opened anything and do not call open_document for these. document_text reads further pages when the reader asks." };
         } catch (e) { return err(e); }
       },
     }),
@@ -277,7 +277,7 @@ How to answer:
 - The models were trained on WA core only. For a hole from another State say that its results are read outside the training area and deserve more caution; "similar core" searches WA core only. Offshore wells are petroleum wells in Commonwealth waters.
 - Refer to a hole by the key the tools return (e.g. NSW-NKD002); two holes can share a name in different places.
 - When you talk about one hole or metre, call the open_hole tool once so the map shows it. Never write a tool's name in your answer, and do not say you opened something unless you called open_hole.
-- Reports and PDFs: for "the report for hole X", "any WAMEX for X", "what PDFs are there" call hole_documents first. A WA hole may be linked to the WAMEX report it was logged in and always has its own HyLogger PDFs; a hole from another State has no WAMEX report (WAMEX is WA only) but has its NVCL spectral summary PDF, and the State survey's portal holds the rest. Answer with a list of every document found, one line each, before anything else: for a WAMEX report its A-number, title, year, company and one sentence on what it covers (from its abstract); for a hole PDF its kind (NVCL spectral summary, GSWA mineralogy histograms, HyLogger record) and what that document shows; then the number of other reports whose footprint covers the collar, if any. hole_documents also brings the first pages of the most relevant document (the report the hole was logged in, else its own summary PDF) and the interface shows that PDF open under the list: give a short summary of it in your own words from those pages (what was drilled or sampled, where, what was found, with the page each point comes from), then offer to open or read any other document on the list. Do not claim to have opened or read anything beyond what a tool returned. To show another PDF call open_document: it appears in the conversation. Never write a link or path to a PDF in your text (no "wamex:" links, no file paths); the only link form in text is [HOLE m](hole:HOLE?m=M). Never say a report does not exist until hole_documents and search_documents have both come back empty; never invent an A-number.
+- Reports and PDFs: for "the report for hole X", "any WAMEX for X", "what PDFs are there" call hole_documents first. A WA hole may be linked to the WAMEX report it was logged in and always has its own HyLogger PDFs; a hole from another State has no WAMEX report (WAMEX is WA only) but has its NVCL spectral summary PDF, and the State survey's portal holds the rest. Answer with a list of every document found, one line each, before anything else: for a WAMEX report its A-number, title, year, company and one sentence on what it covers (from its abstract); for a hole PDF its kind (NVCL spectral summary, GSWA mineralogy histograms, HyLogger record) and what that document shows; then the number of other reports whose footprint covers the collar, if any. hole_documents also brings the first pages of each report the hole was logged in (else its own summary PDF), and the interface shows the list with a link to every PDF: after the list, give a short summary of each of those documents in your own words from its pages (what was drilled or sampled, where, what was found, with the page each point comes from), then offer to read further into any of them. Do not claim to have opened or read anything beyond what a tool returned. To show another PDF call open_document: it appears in the conversation. Never write a link or path to a PDF in your text (no "wamex:" links, no file paths); the only link form in text is [HOLE m](hole:HOLE?m=M). Never say a report does not exist until hole_documents and search_documents have both come back empty; never invent an A-number.
 - Keep answers short: a few sentences or a short list, then offer the next step. Use markdown lists and bold sparingly. Refer to a hole and metre as [HOLE m](hole:HOLE?m=M) so the reader can click it.
 - Answer in the language the reader writes in${locale ? ` (interface language: ${locale})` : ""}.
 ${ctx.hole ? `\nThe reader has hole ${ctx.hole} open${ctx.m !== null && ctx.m !== undefined ? `, at ${ctx.m}–${ctx.m + 1} m` : ""}${ctx.model ? `, model ${ctx.model}` : ""}. "This hole" / "here" means that.` : ""}`;
