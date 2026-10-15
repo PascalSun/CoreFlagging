@@ -241,7 +241,7 @@ export function coretraceTools(token: string) {
 
     open_hole: tool({
       description: "Show a hole on the map page, at a metre if given, so the reader sees what you are describing. Call it when you discuss a specific hole or metre.",
-      inputSchema: z.object({ hole, m: z.number().int().optional(), tab: z.enum(["metre", "log", "unusual", "similar", "quality", "report"]).optional() }),
+      inputSchema: z.object({ hole, m: z.number().int().optional(), tab: z.enum(["metre", "unusual", "similar", "quality", "report"]).optional() }),
     }),
   };
 }

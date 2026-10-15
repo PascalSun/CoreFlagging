@@ -6,7 +6,7 @@ import { AlertTriangle, ArrowRight, Box, ChevronLeft, ChevronRight, Download, Ex
 import { downloadReportPdf } from "@/components/coretrace/pdf";
 import { PAGE_W, ReportDocument } from "@/components/coretrace/ReportDocument";
 import { ACTIVE, inferred, TARGET_SOURCE_LABEL, abstractParts, commodityName, coreScan, readDate, reportFileKind, sourceLabel, surveyOf, type SimilarScope, type CoreModelInfo, type HoleDetail, type HoleReport, type MetreView, type ModelView, type Tray } from "@/lib/coreScan";
-import { ISSUE_LABEL, STATUS_LABEL, SERIES, coreTypeColor, fmt, groupColor, groupName, issueLabel, mineralName, pct } from "@/components/coretrace/palette";
+import { STATUS_LABEL, SERIES, coreTypeColor, fmt, groupColor, groupName, issueLabel, mineralName, pct } from "@/components/coretrace/palette";
 import { LINE, SpectraChart } from "@/components/coretrace/SpectraChart";
 import { StripKey, StripLog, groupOrder } from "@/components/coretrace/StripLog";
 import { TrayViewer } from "@/components/coretrace/DeepZoom";
@@ -14,13 +14,15 @@ import { TrayPhoto } from "@/components/coretrace/TrayPhoto";
 import { LookAgain } from "@/components/coretrace/LookAgain";
 import { SimilarHoles } from "@/components/coretrace/SimilarHoles";
 import { Nearby } from "@/components/coretrace/Nearby";
+import { QualityChecks } from "@/components/coretrace/QualityChecks";
 import { DepthLens, levelOf, type Window, WindowStart } from "@/components/coretrace/DepthLens";
 import { cn } from "@/lib/utils";
 
 export type Tab = "window" | "metre" | "again" | "log" | "gold" | "similar" | "quality" | "report";
-// "gold" is hidden: its view is kept below, but no tab opens it and a link with ?tab=gold falls back to Window
+// "gold" and "log" (Auto log) are hidden: their views are kept below, but no tab opens them and a link with
+// ?tab=gold or ?tab=log falls back to Window. The auto log still shows as the BD column and in Window at 10 m.
 const TABS: { id: Tab; label: string }[] = [
-  { id: "window", label: "Window" }, { id: "again", label: "Look again" }, { id: "log", label: "Auto log" },
+  { id: "window", label: "Window" }, { id: "again", label: "Look again" },
   { id: "similar", label: "Similar core" }, { id: "quality", label: "Data quality" }, { id: "report", label: "Report" },
 ];
 
@@ -261,8 +263,8 @@ function Report({ hole, models, mvw, run, trays }: { hole: HoleDetail; models: C
     finally { setMaking(false); }
   };
   const exportSegs = async () => save(await coreScan.segmentsCsv(hole.key, run), `${safe(hole.name)}_${run}_auto_log.csv`);
-  const exportIssues = () => save(csv([["hole", "issue", "dataset", "depth_from", "depth_to", "value", "evidence", "suggested_fix"],
-    ...hole.issues.map((i) => [hole.name, issueLabel(i.issue), i.dataset, i.depth_from, i.depth_to, i.value, i.evidence, ISSUE_LABEL[i.issue]?.fix ?? ""])]), `${safe(hole.name)}_quality.csv`);
+  const exportIssues = () => save(csv([["hole", "issue", "dataset", "depth_from", "depth_to", "value", "evidence"],
+    ...hole.issues.map((i) => [hole.name, issueLabel(i.issue), i.dataset, i.depth_from, i.depth_to, i.value, i.evidence])]), `${safe(hole.name)}_quality.csv`);
   return (
     <div className="flex flex-col gap-4">
       <div className="grid grid-cols-2 items-center gap-2 sm:flex sm:flex-wrap">
@@ -544,17 +546,7 @@ export function HolePanel({ holeKey, tab: tabProp, onTab, models, run, metre, on
                 </>)}
                 </div>);
             })()}
-            {tab === "quality" && (
-              <div className="flex flex-col gap-3">
-                <p className="text-xs leading-relaxed text-slate-600">Checks run while the scan was cleaned: unused datasets, thermal-infrared problems, missing core, and missing collar details.</p>
-                {hole.issues.length ? hole.issues.map((i, k) => (
-                  <div key={k} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs">
-                    <div className="flex items-baseline justify-between gap-3"><span className="font-semibold text-slate-900">{issueLabel(i.issue)}</span>
-                      {i.depth_from !== null && <button type="button" className="flex-none font-mono text-slate-600 underline decoration-slate-300 underline-offset-2" onClick={() => jump(Math.floor(i.depth_from as number))}>{fmt(i.depth_from, 1)}–{fmt(i.depth_to, 1)} m</button>}</div>
-                    {(i.value || i.evidence) && <div className="text-slate-600">{[i.value, i.evidence].filter(Boolean).join(" · ")}</div>}
-                    {ISSUE_LABEL[i.issue] && <div className="text-slate-500">Suggested fix: {ISSUE_LABEL[i.issue].fix}</div>}
-                  </div>)) : <Empty>The checks found nothing to report for this hole.</Empty>}
-              </div>)}
+            {tab === "quality" && <QualityChecks issues={hole.issues} datasets={hole.datasets} jump={jump} />}
             {tab === "report" && <Report hole={hole} models={models} mvw={mvw} run={useRun} trays={trays} />}
           </div>
         </div>

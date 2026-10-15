@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import type { CoreModelInfo, HoleDetail, ModelView, Tray } from "@/lib/coreScan";
 import { coreScan, readDate, surveyOf } from "@/lib/coreScan";
-import { GRID, INK, ISSUE_LABEL, MUTED, NONE, SERIES, coreTypeColor, fmt, groupColor, groupName, issueLabel, lithColor, pct } from "@/components/coretrace/palette";
+import { GRID, INK, MUTED, NONE, SERIES, coreTypeColor, fmt, groupColor, groupName, issueLabel, lithColor, pct } from "@/components/coretrace/palette";
 import { marks } from "@/components/coretrace/TrayPhoto";
 import { CORE_TEAM } from "@/components/coretrace/team";
 import { useT } from "@/lib/i18n";
@@ -212,10 +212,10 @@ export function ReportDocument({ hole, mv, run, models, trays, nodeRef }: {
       <Section n={next()} title="Data quality" intro="Checks run while the scan was cleaned: unused datasets, thermal-infrared problems, missing core and missing collar details.">
         {hole.issues.length ? (
           <table data-keep className="w-full border-collapse">
-            <thead><tr><th className={th}>Issue</th><th className={th}>Where</th><th className={th}>Evidence</th><th className={th}>Suggested fix</th></tr></thead>
+            <thead><tr><th className={th}>Issue</th><th className={th}>Where</th><th className={th}>Evidence</th></tr></thead>
             <tbody>{hole.issues.map((i, k) => (
               <tr key={k}><td className={`${td} font-medium`}>{issueLabel(i.issue)}</td><td className={`${td} whitespace-nowrap`}>{i.depth_from !== null ? `${fmt(i.depth_from, 1)}–${fmt(i.depth_to, 1)} m` : "Whole hole"}</td>
-                <td className={`${td} text-slate-600`}>{[i.value, i.evidence].filter(Boolean).join(" · ") || "—"}</td><td className={`${td} text-slate-600`}>{ISSUE_LABEL[i.issue]?.fix ?? "—"}</td></tr>))}</tbody>
+                <td className={`${td} text-slate-600`}>{[i.value, i.evidence].filter(Boolean).join(" · ") || "—"}</td></tr>))}</tbody>
           </table>
         ) : <p className="text-[11.5px] text-slate-700">The checks found nothing to report.</p>}
       </Section>

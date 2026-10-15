@@ -64,23 +64,23 @@ export function lithColor(l: string | null | undefined): string {
   return l ? LITH[l] ?? OTHER : NONE;
 }
 
-export const ISSUE_LABEL: Record<string, { label: string; fix: string }> = {
-  listed_no_data: { label: "Listed, but no scan data at all", fix: "Remove from the list, or load the data." },
-  dataset_skipped: { label: "A scanned dataset was not used", fix: "Check the dataset type (chips are not continuous core)." },
-  tir_miscalibrated: { label: "TIR miscalibrated (reflectance above 1)", fix: "Recalibrate, or mark the TIR unusable." },
-  tir_none: { label: "No usable TIR", fix: "Check the instrument model and the TIR file." },
-  tir_sparse: { label: "Very little usable TIR", fix: "Check the TIR file." },
-  tir_many_bad: { label: "Over 30% of TIR samples dark, negative or above 1", fix: "Check the instrument state at scan time." },
-  low_valid_share: { label: "Over half the samples are not valid core", fix: "Check the Final Mask." },
-  core_gap: { label: "More than 5 m of core missing", fix: "Check for an unscanned interval or a depth error." },
-  no_tsg_coordinates: { label: "Coordinates in the scan file are 0", fix: "Fill the coordinates from the drillhole database." },
-  coordinate_mismatch: { label: "Scan file and hole list disagree by more than 1 km", fix: "Check which coordinate is right." },
-  inclination_missing: { label: "Inclination is 0 or impossible", fix: "Fill the inclination from the drillhole database." },
-  elevation_missing: { label: "Collar elevation is 0", fix: "Fill the elevation from the drillhole database." },
-  drill_date_missing: { label: "No drill date", fix: "Fill the date." },
-  tectonic_unit_missing: { label: "Tectonic unit not filled in", fix: "Use the region inferred from the GSWA tectonic units map." },
-  not_modelled: { label: "Not run through the models", fix: "Nothing to fix in the data for this; the models only read continuous core on the grid they were trained on." },
-  profilometer_bad: { label: "Core surface height 0 or above 200 mm", fix: "Check the profilometer." },
+export const ISSUE_LABEL: Record<string, { label: string }> = {
+  listed_no_data: { label: "Listed, but no scan data at all" },
+  dataset_skipped: { label: "A scanned dataset was not used" },
+  tir_miscalibrated: { label: "TIR miscalibrated (reflectance above 1)" },
+  tir_none: { label: "No usable TIR" },
+  tir_sparse: { label: "Very little usable TIR" },
+  tir_many_bad: { label: "Over 30% of TIR samples dark, negative or above 1" },
+  low_valid_share: { label: "Over half the samples are not valid core" },
+  core_gap: { label: "More than 5 m of core missing" },
+  no_tsg_coordinates: { label: "Coordinates in the scan file are 0" },
+  coordinate_mismatch: { label: "Scan file and hole list disagree by more than 1 km" },
+  inclination_missing: { label: "Inclination is 0 or impossible" },
+  elevation_missing: { label: "Collar elevation is 0" },
+  drill_date_missing: { label: "No drill date" },
+  tectonic_unit_missing: { label: "Tectonic unit not filled in" },
+  not_modelled: { label: "Not run through the models" },
+  profilometer_bad: { label: "Core surface height 0 or above 200 mm" },
 };
 export function issueLabel(code: string): string { return ISSUE_LABEL[code]?.label ?? code.replace(/_/g, " "); }
 
