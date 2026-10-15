@@ -6,6 +6,7 @@ import { DefaultChatTransport, lastAssistantMessageIsCompleteWithToolCalls } fro
 import { Streamdown, type Components } from "streamdown";
 import { Loader2, RotateCcw, Send } from "lucide-react";
 import { MD_COMPONENTS } from "@/components/chat/mdTable";
+import { ReportPdf } from "@/components/coretrace/ReportPdf";
 import { authToken, refreshAccessToken, refreshToken } from "@/lib/auth";
 import { platformFetch } from "@ntlp/geodata-web/fetch";
 import { cn } from "@/lib/utils";
@@ -15,6 +16,7 @@ import { cn } from "@/lib/utils";
 const TOOL_LABEL: Record<string, string> = {
   find_holes: "Searched the holes", hole_summary: "Read the hole summary", hole_log: "Read the auto log", metre_detail: "Read one metre",
   similar_core: "Searched similar core", quality_issues: "Read the quality list", open_hole: "Opened it on the map",
+  hole_documents: "Looked up the hole's documents", document_text: "Read the document", search_documents: "Searched the reports", open_document: "Opened the PDF",
 };
 
 /** "[MND036 120 m](hole:MND036?m=120)" → an in-page link the panel opens itself. */
@@ -101,8 +103,8 @@ export function CoreChat({ context, onOpen, signedIn, onSignIn }: {
   }), []);
 
   const starters = context.hole
-    ? [`What stands out in ${context.hole}?`, `Summarise the auto log of ${context.hole}`, context.m !== null ? `Why is ${context.m} m in ${context.hole} flagged as unusual?` : `Where is gold most likely in ${context.hole}?`, `Which data-quality issues does ${context.hole} have?`]
-    : ["Which processed holes have gold assays?", "Find holes in the Yilgarn with thermal infrared", "What does the unusual score mean?", "Which data-quality problem is most common?"];
+    ? [`What stands out in ${context.hole}?`, `Find and summarise the report for ${context.hole}`, `Summarise the auto log of ${context.hole}`, context.m !== null ? `Why is ${context.m} m in ${context.hole} flagged as unusual?` : `Where is gold most likely in ${context.hole}?`, `Which data-quality issues does ${context.hole} have?`]
+    : ["Which processed holes have gold assays?", "Find and summarise the WAMEX report for MND037", "Find holes in the Yilgarn with thermal infrared", "What does the unusual score mean?", "Which data-quality problem is most common?"];
 
   if (!signedIn) {
     return (
@@ -134,6 +136,9 @@ export function CoreChat({ context, onOpen, signedIn, onSignIn }: {
                 {m.parts.map((p: any, i: number) => {
                   if (p.type === "text" && p.text) {
                     return <div key={i} className="max-w-[92%] rounded-2xl rounded-tl-sm bg-slate-100 px-3.5 py-2 text-sm leading-relaxed text-slate-700 [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 [&_h3]:mt-3 [&_h3]:mb-1 [&_h3]:font-display [&_h3]:font-semibold [&_h3]:text-slate-900 [&_li]:my-0.5 [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:my-1.5 [&_ul]:list-disc [&_ul]:pl-5"><Streamdown controls={{ table: false }} components={components}>{holeLinks(p.text)}</Streamdown></div>;
+                  }
+                  if (p.type === "tool-open_document" && p.state === "output-available" && p.output?.url) {
+                    return <div key={i} className="w-full max-w-[92%] py-1"><ReportPdf url={p.output.url} title={p.output.title} page={p.output.page ?? undefined} subtitle={`${p.output.corpus === "wamex" ? "WAMEX " : ""}${p.output.key} · ${p.output.file}`} /></div>;
                   }
                   if (typeof p.type === "string" && p.type.startsWith("tool-")) {
                     const name = p.type.slice(5); const done = p.state === "output-available" || p.state === "output-error";

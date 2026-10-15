@@ -77,6 +77,19 @@ export type HolePackage = {
 };
 
 /** The exploration report a hole was logged in: the mirror's files (the OCR'd PDF first) and the abstract. */
+/** Every document the platform holds about a hole: its own HyLogger PDFs (every State) and, in WA, the WAMEX
+ * reports it was logged in. `url` fields are same-origin streams the in-page viewer can open. */
+export type HoleDocuments = {
+  hole: string; name: string; state: string;
+  hole_pdfs: { corpus: string; key: string; product: string; kind: string; title: string; pages: number | null; file: string; state: string; url: string }[];
+  wamex: null | {
+    linked: { anumber: string; found_by: string; title?: string; year?: number | null; type?: string; company?: string | null; commodities?: string | null; url: string;
+      abstract?: string | null; files?: { name: string; bytes: number; download_url: string; url: string | null }[]; pdf?: string | null }[];
+    covering: { anumber: string; title: string; year: number | null; type: string; company: string | null; commodities: string | null; url: string }[];
+    covering_count: number;
+  };
+  portal: { name: string; url: string } | null;
+};
 export type HoleReport = {
   anumber: string; abstract: string | null; pdf_url: string | null;
   files: { name: string; bytes: number; download_url: string }[];
@@ -215,6 +228,7 @@ export const coreScan = {
   unreview: (key: string, body: Omit<ReviewBody, "verdict">) => json<void>(`/holes/${enc(key)}/reviews/`, { method: "DELETE", body: JSON.stringify(body), headers: { "Content-Type": "application/json" } }),
   /** 404 when the scan names no report. */
   report: (key: string) => json<HoleReport>(`/holes/${enc(key)}/report/`),
+  documents: (key: string) => json<HoleDocuments>(`/holes/${enc(key)}/documents/`),
   model: (key: string, run: string) => json<ModelView>(`/holes/${enc(key)}/models/${enc(run)}/`).then((v) => v.model ? { ...v, model: { ...v.model, name: modelName(v.model.name) } } : v),
   metre: (key: string, m: number, run: string) => json<MetreView>(`/holes/${enc(key)}/metres/${m}/?model=${enc(run)}`),
   /** Core like a stretch of this hole: the 2 m at a metre, or a window; where to look is the scope. */
