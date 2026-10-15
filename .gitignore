@@ -11,3 +11,5 @@ __pycache__/
 /work/
 *.log
 .claude/worktrees/
+# design notes and backend specs: kept locally, not in the repo
+/docs/
