@@ -104,12 +104,12 @@ function GroupStrip({ groups }: { groups: string[] }) {
   );
 }
 
-/** Core types down the hole in ~120 steps: the whole hole at a glance. */
+/** Rock classes down the hole in ~120 steps: the whole hole at a glance. */
 function MiniStrip({ strip, model }: { strip: number[]; model: ModelView | undefined }) {
   const name = new Map((model?.core_types ?? []).map((c) => [c.k, c.name]));
   if (!strip.length) return null;
   return (
-    <div className="flex h-4 w-full overflow-hidden rounded-[4px]" role="img" aria-label="Core types from the top of the hole (left) to the bottom (right)">
+    <div className="flex h-4 w-full overflow-hidden rounded-[4px]" role="img" aria-label="Rock classes from the top of the hole (left) to the bottom (right)">
       {strip.map((k, i) => <span key={i} className="h-full flex-1" style={{ background: model ? coreTypeColor(name.get(k)) : "#cbd5e1" }} title={name.get(k)} />)}
     </div>
   );
@@ -210,7 +210,7 @@ function MetreTab({ hole, metre, previewing, mv, loading, trays, onMetre, typeNa
       </div>
       {md && (
         <div className="grid grid-cols-2 gap-2 @2xl:grid-cols-4">
-          <Fact k="Core type" v={<span className="flex items-start gap-1.5"><i className="mt-[0.4em] inline-block h-2.5 w-2.5 flex-none rounded-[2px]" style={{ background: coreTypeColor(typeName(md.core)) }} /><span className="line-clamp-2 text-[15px] leading-snug" title={typeName(md.core)}>{typeName(md.core)}</span></span>} />
+          <Fact k="Rock Classification" v={<span className="flex items-start gap-1.5"><i className="mt-[0.4em] inline-block h-2.5 w-2.5 flex-none rounded-[2px]" style={{ background: coreTypeColor(typeName(md.core)) }} /><span className="line-clamp-2 text-[15px] leading-snug" title={typeName(md.core)}>{typeName(md.core)}</span></span>} />
           <Fact k="Unusual" v={pct(md.anom)} sub="State percentile of its most unusual 10 cm" />
           <Fact k="Gold likelihood" v={fmt(md.gold)} sub={`higher than ${pct(md.gold_pct)} of training metres`} />
           <Fact k={md.has_tir ? "TIR from SWIR" : "TIR filled in"} v={groupName(md.tir_group)} sub={md.tir_conf !== null ? `confidence ${pct(md.tir_conf)}` : undefined} />
@@ -402,7 +402,7 @@ export function HolePanel({ holeKey, tab: tabProp, onTab, models, run, metre, on
       <div className="flex flex-col gap-4 p-4">
         <TrayStrip holeKey={hole.key} trays={trays} at={mvw?.anomaly.runs[0]?.peak_m ?? null} onOpen={(m) => openMetre(m)} />
         {displayOnly && <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs leading-relaxed text-slate-700">{hole.message}</p>}
-        {hole.source === "nvcl" && hole.state && hole.state !== "WA" && <p className="rounded-lg bg-sky-50 px-3 py-2 text-[11px] text-sky-900">The models were trained on GSWA&rsquo;s Western Australian core. This hole comes from the {surveyOf(hole.state)} library, outside that training set, so read its core types, unusual scores and gold ranking with more caution. Similar core is searched in WA only.</p>}
+        {hole.source === "nvcl" && hole.state && hole.state !== "WA" && <p className="rounded-lg bg-sky-50 px-3 py-2 text-[11px] text-sky-900">The models were trained on GSWA&rsquo;s Western Australian core. This hole comes from the {surveyOf(hole.state)} library, outside that training set, so read its rock classes, unusual scores and gold ranking with more caution. Similar core is searched in WA only.</p>}
         {(hole.split === "train" || hole.split === "val") && <p className="rounded-lg bg-amber-50 px-3 py-2 text-[11px] text-amber-900">The models saw this hole in training. Results here will look better than on core they have not seen.</p>}
         <div className="grid grid-cols-2 gap-2">
           <Fact k="Depth scanned" v={`${fmt(hole.depth_min, 0)}–${fmt(hole.depth_max, 0)} m`} sub={`${(hole.meta.n_tokens as number | undefined ?? 0).toLocaleString()} ten-centimetre bins`} />
@@ -487,7 +487,7 @@ export function HolePanel({ holeKey, tab: tabProp, onTab, models, run, metre, on
               <div className="flex flex-col gap-3">
                 <p className="text-xs leading-relaxed text-slate-600">The model cuts the hole where its reading of the spectra changes, then each piece is described from the TSG software&rsquo;s minerals. {mvw.segments.length} segments, typically {fmt(mvw.segments.map((s) => s.length_m).sort((a, b) => a - b)[Math.floor(mvw.segments.length / 2)], 1)} m long. Click a row to go there.</p>
                 <table className="w-full border-collapse">
-                  <thead><tr>{["From–to (m)", "Core type", "SWIR minerals", "TIR groups"].map((h) => <th key={h} className={th}>{h}</th>)}</tr></thead>
+                  <thead><tr>{["From–to (m)", "Rock Classification", "SWIR minerals", "TIR groups"].map((h) => <th key={h} className={th}>{h}</th>)}</tr></thead>
                   <tbody>{mvw.segments.map((s) => { const on = metre !== null && metre >= Math.floor(s.from_m) && metre < s.to_m; return (
                     <tr key={s.seg} onClick={() => jump(Math.floor(s.from_m))} className={cn("cursor-pointer hover:bg-slate-50", on && "bg-cyan/10")}>
                       <td className={cn(td, "font-mono whitespace-nowrap")}>{s.from_m.toFixed(1)}–{s.to_m.toFixed(1)}</td>

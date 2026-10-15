@@ -104,8 +104,8 @@ export function correlate(a: CorrSide, b: CorrSide): Correlation | null {
 
 const GOLD = "#c9a24a", LINE = "#94a3b8";
 const STRIP_TIP = {
-  rc: "RC, rock classification: the core type HyFormer reads in each metre, in the colour of its leading mineral (the RC column of the log).",
-  bd: "BD, the auto log's chunks: HyFormer cuts the hole where its reading changes (the BD lines of the log); each chunk is coloured by its core type. Point at a left chunk to light its links; click it to mark it and its match.",
+  rc: "RC, rock classification: the rock class HyFormer reads in each metre, in the colour of its leading mineral (the RC column of the log).",
+  bd: "BD, the auto log's chunks: HyFormer cuts the hole where its reading changes (the BD lines of the log); each chunk is coloured by its rock class. Point at a left chunk to light its links; click it to mark it and its match.",
 };
 
 /** The two holes, each a fine strip (rock class by the metre) and a chunk strip (the auto log), on one scale,

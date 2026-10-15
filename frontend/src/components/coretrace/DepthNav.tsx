@@ -6,7 +6,7 @@ import { SERIES, coreTypeColor, groupColor } from "@/components/coretrace/palett
 import { MIN_SPAN, fmtWindow, windowAbout } from "@/lib/depth";
 
 /** The whole hole in one narrow column beside the zoomed log, so a reader always knows where the window
- * is: the model's core type (or the SWIR mineral group) down the hole, the flagged metres as orange ticks,
+ * is: the model's rock class (or the SWIR mineral group) down the hole, the flagged metres as orange ticks,
  * and the window as a box. Drag the box to move the window, drag its ends to resize it, click anywhere
  * else to put the window there. */
 export function DepthNav({ metres, model, view, hole0, hole1, onRange, typeName, height }: {

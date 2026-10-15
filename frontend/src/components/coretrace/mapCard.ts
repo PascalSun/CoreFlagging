@@ -31,7 +31,7 @@ export function holeCard(h: HoleRow, look: Look, typeName: Map<number, string>, 
     card.append(el("div", "ct-card-wait", `${STATUS_LABEL[h.status]}. Its readings appear once it is processed.`));
     return card;
   }
-  // the hole from top to bottom, in the core types the model reads
+  // the hole from top to bottom, in the rock classes the model reads
   const strip = el("div", "ct-card-strip");
   if (h.strip?.length) for (const k of h.strip) { const i = el("i", ""); i.style.background = coreTypeColor(typeName.get(k)); strip.append(i); }
   else { const i = el("i", ""); i.style.background = NONE; strip.append(i); }

@@ -1,5 +1,5 @@
 // How a hole is classed on the CoreFlagging map. Colour is always the target commodity; the map key can also
-// filter by core type, by where the target comes from (a hatched fill when inferred) and by whether the models
+// filter by rock class, by where the target comes from (a hatched fill when inferred) and by whether the models
 // read the hole (the shape). Colours come from the shared palette, so a mineral family has the same colour on
 // the map as in the logs.
 
@@ -41,7 +41,7 @@ export function sourceOf(h: HoleRow): string | null {
   return inferred(h.target_source) ? INFERRED_LABEL : RECORDED_LABEL;
 }
 
-// ---- core type: the family of the core type the models read most often down the hole. Null when the models
+// ---- rock class: the family of the rock class the models read most often down the hole. Null when the models
 // did not read it.
 const FAMILY: [string, string][] = [
   ["chlorite", "Chlorite"], ["white mica", "White mica"], ["kaolin", "Kaolin"], ["amphibole", "Amphibole"], ["carbonate", "Carbonate"],

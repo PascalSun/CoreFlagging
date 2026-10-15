@@ -15,7 +15,7 @@ const glass = "rounded-2xl border border-white/60 bg-white/85 shadow-glass backd
 const RINGS = [2, 5, 10] as const;
 
 /** A hole and its neighbours as lines in space, in metres from this hole's collar (east, north, up). The hole is
- * coloured by the core type the model read every 2 m; the neighbours are grey, or coloured when "colour all" is on;
+ * coloured by the rock class the model read every 2 m; the neighbours are grey, or coloured when "colour all" is on;
  * the flagged metres and the log disagreements are drawn thick. A click on a point opens that depth on the map. */
 export function Scene() {
   const sp = useSearchParams(); const router = useRouter();
@@ -38,7 +38,7 @@ export function Scene() {
       const line = (t: Trace, main: boolean) => {
         const { dx, dy, dz } = rel(t); const P = t.points;
         if (main || colourAll) {
-          // one segment per run of the same core type, so each keeps its colour
+          // one segment per run of the same rock class, so each keeps its colour
           let i = 0;
           while (i < P.length - 1) {
             let j = i + 1; while (j < P.length - 1 && P[j].k === P[i].k) j++;

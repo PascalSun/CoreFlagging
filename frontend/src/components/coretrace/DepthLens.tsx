@@ -76,7 +76,7 @@ export function DepthLens({ hole, mv, win, onWindow, trays, metre, onMetre, type
             <H4>The model&rsquo;s auto log in this window</H4>
             {segs.length ? (
               <table className="w-full border-collapse">
-                <thead><tr>{["From–to (m)", "Core type", "SWIR minerals"].map((h) => <th key={h} className={th}>{h}</th>)}</tr></thead>
+                <thead><tr>{["From–to (m)", "Rock Classification", "SWIR minerals"].map((h) => <th key={h} className={th}>{h}</th>)}</tr></thead>
                 <tbody>{segs.map((s) => (
                   <tr key={s.seg} onClick={() => onWindow([round1(Math.max(from, s.from_m)), round1(Math.min(to, s.to_m))])} className="cursor-pointer hover:bg-slate-50">
                     <td className={cn(td, "font-mono whitespace-nowrap")}>{s.from_m.toFixed(1)}–{s.to_m.toFixed(1)}</td>

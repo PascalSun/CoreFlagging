@@ -165,7 +165,7 @@ export type SimilarHit = {
   rock: string; au: number | null; lat: number | null; lon: number | null; region: string; split: string;
 };
 export type SimilarScope = "state" | "nearby" | "region" | "hole";
-/** A whole hole's signature: the share of each core type, and the type read most in each of 20 slices down the hole. */
+/** A whole hole's signature: the share of each rock class, and the type read most in each of 20 slices down the hole. */
 export type HoleSig = { shares: Record<string, number>; seq: number[]; n: number; from_m: number; to_m: number };
 export type SimilarHole = { key: string; name: string; region: string; operator: string; project: string; target: string; lon: number | null; lat: number | null; km: number | null;
   score: number; composition: number; sequence: number; sig: HoleSig };

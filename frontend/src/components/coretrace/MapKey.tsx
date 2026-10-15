@@ -23,8 +23,8 @@ export function facet(h: HoleRow, typeName: Map<number, string>): Faceted {
   return { h, core: coreFamily(h, typeName), target: c.label, source: sourceOf(h), shape: shapeOf(h)?.label ?? READ_LABEL, year: h.drilled ?? null, again: h.n_again > 0, glyph: c.glyph, color: c.color };
 }
 
-/** Whether a hole passes the key, leaving one facet out (for that facet's own counts). `again` keeps only the holes worth a second look. A hole with no core type
- * passes the core facet only while no core type is hidden; a hole with no year passes any range. */
+/** Whether a hole passes the key, leaving one facet out (for that facet's own counts). `again` keeps only the holes worth a second look. A hole with no rock class
+ * passes the core facet only while no rock class is hidden; a hole with no year passes any range. */
 export function passes(f: Faceted, hidden: Hidden, years: [number, number] | null, again: boolean, skip?: Facet | "year" | "again"): boolean {
   if (skip !== "again" && again && !f.again) return false;
   if (skip !== "target" && hidden.target.has(f.target)) return false;
@@ -124,8 +124,8 @@ const More = ({ open, n, onClick }: { open: boolean; n: number; onClick: () => v
     {open ? "Show fewer" : `Show ${n} more`}<ChevronDown size={12} className={cn("transition-transform", open && "rotate-180")} />
   </button>) : null;
 
-/** The sections of the key: core type, target commodity, where the target comes from, model reading, year drilled
- * (core type is hidden for now). Each count is of the holes the other sections let through. */
+/** The sections of the key: rock class, target commodity, where the target comes from, model reading, year drilled
+ * (rock class is hidden for now). Each count is of the holes the other sections let through. */
 export function MapKeyBody({ rows, hidden, onHidden, years, onYears, again }: {
   rows: Faceted[]; hidden: Hidden; onHidden: (f: Facet, s: Set<string>) => void;
   years: [number, number] | null; onYears: (y: [number, number] | null) => void;

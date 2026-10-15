@@ -17,7 +17,7 @@ export const TIP = {
   swir: "SWIR: the short-wave infrared mineral groups the scanner's TSG software reads (TSA). Each bar is the share of every group in the interval, weighted by the software's fit: 1 m bars over the whole hole, 10 cm bars once zoomed to 50 m or less. Grey is TSG's Invalid (no usable spectrum).",
   tir: "TIR: the thermal infrared mineral groups the scanner's TSG software reads (jCLST), drawn the same way as SWIR. Empty where the hole has no usable thermal infrared.",
   bd: "BD, boundary detection: HyFormer cuts the hole where its reading of the spectra changes. Each black line is a predicted boundary; the chunks between them are the auto log.",
-  rc: "RC, rock classification: the core type HyFormer reads in each metre (a cluster of its reading), in the colour of the type's leading mineral.",
+  rc: "RC, rock classification: the rock class HyFormer reads in each metre (a cluster of its reading), in the colour of the type's leading mineral.",
   unusual: "Unusual: how far each metre's spectra stand from the core within 15 m of it (bar length). Orange-red bars are flagged: among the hole's top 3% and above the State's 98th percentile.",
 };
 

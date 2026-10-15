@@ -30,7 +30,7 @@ export function Regions() {
           </div>
         </div>
         <p className="mb-4 max-w-3xl text-xs leading-relaxed text-slate-600">
-          For each region, the average share of each core type over its holes, as the model reads them metre by metre. The same type has the same colour in every row, so a region&rsquo;s signature can be read against the others. Shares are of scanned core, which is where companies chose to drill, not of the crust.
+          For each region, the average share of each rock class over its holes, as the model reads them metre by metre. The same type has the same colour in every row, so a region&rsquo;s signature can be read against the others. Shares are of scanned core, which is where companies chose to drill, not of the crust.
         </p>
         <div className="flex flex-wrap gap-x-3 gap-y-1 pb-3 text-[11px] text-slate-600">
           {order.map((k) => <span key={k} className="flex items-center gap-1"><i className="inline-block size-2.5 rounded-[2px]" style={{ background: coreTypeColor(names.get(k)) }} />{names.get(k)}</span>)}
@@ -38,7 +38,7 @@ export function Regions() {
         <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
           <table className="w-full border-collapse text-xs">
             <thead><tr className="border-b border-slate-200 text-[11px] text-slate-500">
-              <th className="px-3 py-2 text-left font-medium">Region</th><th className="w-16 px-3 py-2 text-right font-medium">Holes</th><th className="w-24 px-3 py-2 text-right font-medium">Metres read</th><th className="px-3 py-2 text-left font-medium">Core types, by share</th>
+              <th className="px-3 py-2 text-left font-medium">Region</th><th className="w-16 px-3 py-2 text-right font-medium">Holes</th><th className="w-24 px-3 py-2 text-right font-medium">Metres read</th><th className="px-3 py-2 text-left font-medium">Rock classes, by share</th>
             </tr></thead>
             <tbody>{rows.map((r) => {
               const by = new Map(r.types.map((t) => [t.k, t]));

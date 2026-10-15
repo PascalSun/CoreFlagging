@@ -96,7 +96,7 @@ export function coretraceTools(token: string) {
     }),
 
     hole_log: tool({
-      description: "A model's reading of a whole hole: the auto log (segments with depths, core type and description), the flagged unusual intervals, and the metres ranked highest for gold (with assays where the scan has them).",
+      description: "A model's reading of a whole hole: the auto log (segments with depths, rock class and description), the flagged unusual intervals, and the metres ranked highest for gold (with assays where the scan has them).",
       inputSchema: z.object({ hole, model }),
       toModelOutput: modelView(),
       execute: async ({ hole: name, model: run }) => {
@@ -130,7 +130,7 @@ export function coretraceTools(token: string) {
     }),
 
     metre_detail: tool({
-      description: "One metre of one hole: logged rock and assay, the TSG software's minerals in it and in the 15 m around it, the spectral features that set it apart, and the model's readings (core type, unusual percentile, gold likelihood, TIR group filled in from SWIR).",
+      description: "One metre of one hole: logged rock and assay, the TSG software's minerals in it and in the 15 m around it, the spectral features that set it apart, and the model's readings (rock class, unusual percentile, gold likelihood, TIR group filled in from SWIR).",
       inputSchema: z.object({ hole, m: z.number().int().describe("Depth in metres; the metre from m to m+1."), model }),
       toModelOutput: modelView(),
       execute: async ({ hole: name, m, model: run }) => {
@@ -254,7 +254,7 @@ export function coretracePrompt(ctx: { hole?: string | null; m?: number | null; 
 What the data is:
 - SWIR = visible to shortwave infrared, TIR = thermal infrared. Minerals named per bin come from the TSG software, not from the models.
 - Models: HyFormer (run v2) is the one model readers see and the one to use; CoreFlagging is the platform, HyFormer the model. HyFormer+DINO and HyFormer+JEPA are training variants that read core almost the same way, and "Conventional methods" (baseline) has no foundation model; mention them only when the reader asks to compare.
-- Per metre the model gives: a core type, an unusual score (State percentile of how much the metre differs from the 15 m around it), a gold likelihood (a probe fitted on assayed holes; it reads spectra only), and a TIR mineral group filled in from SWIR.
+- Per metre the model gives: a rock class, an unusual score (State percentile of how much the metre differs from the 15 m around it), a gold likelihood (a probe fitted on assayed holes; it reads spectra only), and a TIR mineral group filled in from SWIR.
 - The auto log cuts the hole where the model's reading changes; descriptions are written by rule and no geologist has reviewed them.
 
 How to answer:

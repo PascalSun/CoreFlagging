@@ -317,7 +317,7 @@ export function CoreTeam() {
 const STEPS: [string, string][] = [
   ["Spectra every 10 cm", "The HyLogger measures short-wave infrared (clays, micas, carbonates, talc) and thermal infrared (quartz, feldspar) all along the core."],
   ["A model learns the core", "Trained with no labels, it learns what core looks like to the scanner. It never sees the logs, the assays or the deposits."],
-  ["A reading for every 10 cm", "Each stretch of core gets a reading, grouped into 12 core types named by their minerals."],
+  ["A reading for every 10 cm", "Each stretch of core gets a reading, grouped into 12 rock classes named by their minerals."],
   ["Set beside the log", "Where the reading and the log agree, the log is confirmed. Where they differ, the interval is worth another look."],
 ];
 

@@ -53,7 +53,7 @@ function HoleFigure({ hole, mv }: { hole: HoleDetail; mv: ModelView }) {
     { label: "SWIR minerals", h: 13, draw: (y, h) => ms.m.map((m, i) => <rect key={m} x={x(m)} y={y} width={bw} height={h} fill={groupColor(ms.gs[i])} />) },
     { label: "TIR minerals", h: 13, draw: (y, h) => ms.m.map((m, i) => <rect key={m} x={x(m)} y={y} width={bw} height={h} fill={groupColor(ms.gt[i])} />) },
     ...(hole.has_lith ? [{ label: "Logged rock", h: 13, draw: (y: number, h: number) => ms.m.map((m, i) => <rect key={m} x={x(m)} y={y} width={bw} height={h} fill={lithColor(ms.lith[i])} />) }] : []),
-    { label: "Core type", h: 13, draw: (y, h) => <>
+    { label: "Rock Classification", h: 13, draw: (y, h) => <>
       {ms.m.map((m) => { const j = idx.get(m); return j === undefined ? null : <rect key={m} x={x(m)} y={y} width={bw} height={h} fill={coreTypeColor(type.get(mv.core[j]))} />; })}
       {mv.segments.map((s) => s.from_m > m0 + 0.5 ? <rect key={s.seg} x={x(s.from_m) - 0.4} y={y - 3} width={0.8} height={h + 6} fill={INK} /> : null)}
     </> },
@@ -96,7 +96,7 @@ function Legend({ hole, mv }: { hole: HoleDetail; mv: ModelView }) {
       <span className="flex items-center gap-1"><i className="inline-block h-2.5 w-px bg-slate-900" />auto-log boundary</span>
       <span className="flex items-center gap-1"><Sw c={SERIES.orange} />flagged unusual</span>
       {hole.au_m > 0 && <span className="flex items-center gap-1"><Sw c={INK} />assay ≥ 0.1 ppm</span>}
-      <span className="text-slate-400">· core types: {mv.summary.main_types.map(([n, s]) => `${n} ${pct(s)}`).join(", ")}</span>
+      <span className="text-slate-400">· rock classes: {mv.summary.main_types.map(([n, s]) => `${n} ${pct(s)}`).join(", ")}</span>
     </div>
   );
 }
@@ -239,7 +239,7 @@ export function ReportDocument({ hole, mv, run, models, trays, nodeRef }: {
       {SHOW_AUTO_LOG && mv && (
         <Section n={next()} title="Auto log" intro={`${mv.segments.length} segments cut by ${model?.name ?? run} where its reading of the spectra changes. Descriptions are written by rule from the TSG software's minerals; a geologist has not reviewed them.`}>
           <table className="w-full border-collapse">
-            <thead><tr><th className={`${th} w-[78px]`}>Depth (m)</th><th className={`${th} w-[150px]`}>Core type</th><th className={th}>Minerals</th></tr></thead>
+            <thead><tr><th className={`${th} w-[78px]`}>Depth (m)</th><th className={`${th} w-[150px]`}>Rock Classification</th><th className={th}>Minerals</th></tr></thead>
             <tbody>{mv.segments.map((s) => (
               <tr key={s.seg}>
                 <td className={`${td} whitespace-nowrap tabular-nums`}>{s.from_m.toFixed(1)}–{s.to_m.toFixed(1)}</td>

@@ -106,7 +106,7 @@ export function LookAgain({ hole, mv, run, metre, onJump, onSimilar }: { hole: H
                   <span className="ml-auto flex items-center gap-2">{more(holeFrom, holeTo)}<Verdict holeKey={hole.key} body={{ run, kind: "unit", from_m: holeFrom, to_m: holeTo }} reviews={reviews} canVote={canVote} /></span>
                 </li>))}</ul>
             )}
-          {st && !st.hole_vs_region.note && <p className="text-[11px] leading-relaxed text-slate-500">The region&rsquo;s profile is the average share of each core type over its {st.hole_vs_region.n_holes} scanned holes ({st.hole_vs_region.region}); a type is listed when it is at least a tenth of this hole and three times that average. <a href="/regions" className="font-medium text-slate-700 underline-offset-2 hover:underline">Every region&rsquo;s profile</a>.</p>}
+          {st && !st.hole_vs_region.note && <p className="text-[11px] leading-relaxed text-slate-500">The region&rsquo;s profile is the average share of each rock class over its {st.hole_vs_region.n_holes} scanned holes ({st.hole_vs_region.region}); a type is listed when it is at least a tenth of this hole and three times that average. <a href="/regions" className="font-medium text-slate-700 underline-offset-2 hover:underline">Every region&rsquo;s profile</a>.</p>}
         </section>
       )}
 

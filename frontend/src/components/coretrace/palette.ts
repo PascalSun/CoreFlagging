@@ -35,7 +35,7 @@ export function groupName(g: string | null | undefined): string {
   return GROUP_NAME[g] ?? g.charAt(0) + g.slice(1).toLowerCase();
 }
 
-/** A model core type is named after its minerals ("Quartz + chlorite, more dark mica");
+/** A model rock class is named after its minerals ("Quartz + chlorite, more dark mica");
  * it takes the colour of the first SWIR mineral in that name, grey when SWIR sees none. */
 const NAME_KEYS: [string, string][] = [
   ["chlorite", "CHLORITE"], ["white mica", "WHITE-MICA"], ["kaolin", "KAOLIN"], ["amphibole", "AMPHIBOLE"], ["carbonate", "CARBONATE"],
