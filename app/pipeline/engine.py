@@ -470,6 +470,14 @@ class Models:
         self.default = want if want in self.dirs else next(iter(self.dirs))
         self._e: dict[str, Engine] = {}; self._lock = threading.Lock()
 
+    def forget(self, hole: str) -> None:
+        """Drop a hole from every loaded engine's in-memory cache. An engine keeps each hole's full result (spectra,
+        representation) after compute(); a long-running worker or backfill that never forgets grows by ~10-30 MB a hole."""
+        for e in list(self._e.values()):
+            e.cache.pop(hole, None); e.timing.pop(hole, None)
+            with e._llock:
+                e.locks.pop(hole, None)
+
     def get(self, run: str | None = None) -> Engine:
         run = run or self.default
         if run not in self.dirs:

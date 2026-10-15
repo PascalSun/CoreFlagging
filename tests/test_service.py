@@ -195,7 +195,8 @@ def test_token_scores_backfill_runs_the_models_on_the_platforms_tokens_and_clean
     eng = SimpleNamespace(compute=lambda key: R)
     anom, raw = extras.token_arrays(eng, "H1")
     assert anom.dtype == np.dtype("<f4") and raw.dtype == np.dtype("<f4") and len(anom) == len(raw) == n and anom[-1] == 1.0
-    runner = SimpleNamespace(ws=ws, models=SimpleNamespace(dirs={"v2": None, "v9": None}, get=lambda run: eng))
+    forgotten = []
+    runner = SimpleNamespace(ws=ws, models=SimpleNamespace(dirs={"v2": None, "v9": None}, get=lambda run: eng), forget=lambda key: (ws.remove(key), forgotten.append(key)))
     sent = {}
 
     class FakePlatform:
@@ -219,3 +220,13 @@ def test_token_scores_backfill_runs_the_models_on_the_platforms_tokens_and_clean
     assert token_scores.one("H2", runner, FakePlatform({"v2": {"token_scores": False}, "v9": {"token_scores": True}, "old": {"token_scores": False}}), False) == "sent"
     assert sent["H2"] == ["anom__v2", "raw__v2"]
     assert not list(ws.proc.iterdir())                       # the platform is the record: nothing kept
+    assert forgotten == ["H1", "H2"]                         # ... and the engines forget the hole too
+
+
+def test_models_forget_drops_a_hole_from_every_engines_cache():
+    import threading
+    from app.pipeline.engine import Models
+    e = SimpleNamespace(cache={"H1": {"F": 1}, "H2": {}}, timing={"H1": 2.0}, locks={"H1": threading.Lock()}, _llock=threading.Lock())
+    m = Models.__new__(Models); m._e = {"v2": e}
+    m.forget("H1"); m.forget("nothing")
+    assert e.cache == {"H2": {}} and e.timing == {} and e.locks == {}
