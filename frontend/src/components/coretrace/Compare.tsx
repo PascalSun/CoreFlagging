@@ -106,7 +106,7 @@ export function ComparePanel({ a: aKey, b: bKey, winA = null, winB = null, onClo
         </div>
         <button type="button" onClick={onClose} aria-label="Close the comparison" className="grid h-8 w-8 flex-none place-items-center rounded-lg text-slate-500 hover:bg-slate-100"><X size={16} /></button>
       </div>
-      <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 overflow-y-auto p-4 lg:grid-cols-[minmax(0,1fr)_minmax(260px,380px)_minmax(0,1fr)] lg:overflow-hidden">
+      <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 overflow-y-auto p-4 lg:grid-cols-[minmax(0,1fr)_minmax(300px,440px)_minmax(0,1fr)] lg:overflow-hidden">
         <Column hole={a.hole} mv={a.mv} spectral={a.spectral} cursor={ca} onCursor={pickA} onOpen={onOpenHole} missing={missing(a, "A")} win={wa} onWin={setWa} />
         <div className="flex min-h-[420px] flex-col">
           {corr ? (
@@ -121,7 +121,7 @@ export function ComparePanel({ a: aKey, b: bKey, winA = null, winB = null, onClo
                 </div>
               </div>
               <p className="pb-2 text-center text-[11px] text-slate-500">matched by {corr.basis === "representation" ? "HyFormer\u2019s representation (2 m fingerprints), as Similar core" : corr.basis === "rock class" ? "rock class (RC) for now, until the representation match is available" : "the mineral groups the scanner reads (SWIR and TIR) for now; no model reading on both holes"}</p>
-              <div className="min-h-0 flex-1"><CorrelationView a={{ hole: a.hole!, mv: a.mv, spectral: a.spectral }} b={{ hole: b.hole!, mv: b.mv, spectral: b.spectral }} corr={corr} cursorA={ca} winA={wa} winB={wb} onWinA={setWa} onWinB={setWb} onPick={both} show={show} /></div>
+              <div className="min-h-0 flex-1"><CorrelationView a={{ hole: a.hole!, mv: a.mv, spectral: a.spectral }} b={{ hole: b.hole!, mv: b.mv, spectral: b.spectral }} corr={corr} cursorA={ca} winA={wa} winB={wb} onPick={both} show={show} /></div>
             </>
           ) : <div className="m-auto text-center text-xs text-slate-500">{a.loading || b.loading ? "Matching the two holes…" : "These two holes have nothing to match by: neither a spectral log nor a model reading on both."}</div>}
         </div>

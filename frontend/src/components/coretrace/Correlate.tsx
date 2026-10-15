@@ -12,7 +12,6 @@ import { useEffect, useId, useMemo, useRef, useState } from "react";
 import type { HoleDetail, ModelView, SpectralLog } from "@/lib/coreScan";
 import { SERIES, coreTypeColor, groupColor } from "@/components/coretrace/palette";
 import { TIP, groupOrder } from "@/components/coretrace/StripLog";
-import { windowAbout } from "@/lib/depth";
 
 export type CorrSide = { hole: HoleDetail; mv?: ModelView; spectral?: SpectralLog };
 export type Link = { a: number; b: number; sim: number };
@@ -110,18 +109,17 @@ export type CorrShow = "swir" | "tir" | "anom" | "bd";
 export const CORR_SHOW: { id: CorrShow; label: string }[] = [{ id: "swir", label: "SWIR" }, { id: "tir", label: "TIR" }, { id: "anom", label: "Unusual" }, { id: "bd", label: "BD" }];
 const PICK = " Here: point at a metre of the left hole to light its link; click it to mark it and its match.";
 const SHOW_TIP: Record<CorrShow, string> = { swir: TIP.swir, tir: TIP.tir, anom: TIP.unusual, bd: TIP.bd };
-const SCALE_TIP = "Scale: the whole hole in miniature, the box the window on the strips beside it. Click to move the window there; set it with the log's own Scale column and levels.";
 
 type Side = { s: CorrSide; win: [number, number] | null; h0: number; h1: number; r: [number, number]; y: (d: number) => number; k: number };
 
 /** The two holes on one depth axis (or, once either log has a window, each on its own), mirrored about the links
- * between them: from the outside in, the Scale column (only with a window), the chosen column (SWIR, TIR, Unusual
- * or BD) and RC, whose metres the links join. The metre under the pointer (or the selected one) and its link in
+ * between them: from the outside in, the chosen column (SWIR, TIR, Unusual or BD, its depths marked on it) and RC,
+ * whose metres the links join. The metre under the pointer (or the selected one) and its link in
  * gold; click a metre to mark it and its match. */
-export function CorrelationView({ a, b, corr, cursorA, onPick, winA = null, winB = null, onWinA, onWinB, show }: {
+export function CorrelationView({ a, b, corr, cursorA, onPick, winA = null, winB = null, show }: {
   a: CorrSide; b: CorrSide; corr: Correlation; cursorA: number | null; onPick: (aM: number, bM: number) => void;
-  /** each log's window: the strips draw just that, and a Scale column beside them shows where it is */
-  winA?: [number, number] | null; winB?: [number, number] | null; onWinA?: (w: [number, number]) => void; onWinB?: (w: [number, number]) => void;
+  /** each log's window: the strips draw just that, on that side's own depths */
+  winA?: [number, number] | null; winB?: [number, number] | null;
   show: CorrShow;
 }) {
   const ref = useRef<HTMLDivElement>(null); const cid = useId().replace(/:/g, "");
@@ -145,10 +143,10 @@ export function CorrelationView({ a, b, corr, cursorA, onPick, winA = null, winB
     return { s, win, h0, h1, r, k, y: (d: number) => PAD + (d - r[0]) * k };
   };
   const A = side(a, winA, a0, a1), B = side(b, winB, b0, b1);
-  const AXIS = 30, SC = 12, SHOWW = 30, RCW = 14, GAP = 6, SCGAP = 14;   // gaps wide enough for the heads not to run together
-  // left hole, outside in: axis, Scale, the chosen column, RC; the right hole the mirror of it
-  const xScA = AXIS, xShA = AXIS + (winA ? SC + SCGAP : 0), xRcA = xShA + SHOWW + GAP;
-  const xAxB = box.w - (shared ? 4 : AXIS), xScB = xAxB - SC, xShB = (winB ? xScB - SCGAP : xAxB) - SHOWW, xRcB = xShB - GAP - RCW;
+  const EDGE = 2, SHOWW = 64, RCW = 14, GAP = 6;
+  // left hole, outside in: the chosen column (its depths marked on it), RC; the right hole the mirror of it
+  const xShA = EDGE, xRcA = xShA + SHOWW + GAP;
+  const xShB = box.w - EDGE - SHOWW, xRcB = xShB - GAP - RCW;
   const x1 = xRcA + RCW + 2, x2 = xRcB - 2;
   const inR = (S: Side, d: number) => d >= S.r[0] && d < S.r[1];
 
@@ -189,28 +187,18 @@ export function CorrelationView({ a, b, corr, cursorA, onPick, winA = null, winB
     });
     return out;
   };
-  // the whole hole in miniature, the window boxed; a click moves the window there
-  const scale = (S: Side, x: number, set?: (w: [number, number]) => void) => {
-    if (!S.win) return null;
-    const kk = H / Math.max(1, S.h1 - S.h0), yy = (d: number) => PAD + (d - S.h0) * kk;
-    const mv = S.s.mv; const midx = new Map((mv?.m ?? []).map((m, i) => [m, i])); const names = new Map((mv?.core_types ?? []).map((c) => [c.k, c.name]));
-    const w = S.win, span = w[1] - w[0];
-    return (
-      <g className={set ? "cursor-pointer" : undefined} onClick={set ? (e) => { const rc = (e.currentTarget as SVGGElement).ownerSVGElement!.getBoundingClientRect(); set(windowAbout(S.h0 + (e.clientY - rc.top - PAD) / kk, span, S.h0, S.h1)); } : undefined}>
-        <rect x={x} y={PAD} width={SC} height={H} fill="#f1f5f9" />
-        {S.s.hole.metres.m.map((m, i) => { const j = midx.get(m); return <rect key={m} x={x} y={yy(m)} width={SC} height={Math.max(kk, 0.5)} opacity={0.45} fill={j !== undefined && mv ? coreTypeColor(names.get(mv.core[j])) : groupColor(S.s.hole.metres.gs[i])} />; })}
-        <rect x={x - 1.5} y={yy(w[0])} width={SC + 3} height={Math.max(span * kk, 3)} fill="none" stroke="#0f172a" strokeWidth={1.6} rx={2}><title>{`The window: ${w[0]}–${w[1]} m`}</title></rect>
-      </g>
-    );
-  };
-
   const fmtM = (d: number) => (Number.isInteger(d) ? String(d) : d.toFixed(1));
   const label = (x: number, y: number, t: string, anchor: "start" | "end" | "middle") => <text x={x} y={y} textAnchor={anchor} className="fill-slate-500 font-mono text-[9px]">{t}</text>;
   const head = (x: number, t: string, tip: string) => <text x={x} y={12} textAnchor="middle" data-keytip={tip} className="cursor-help fill-slate-600 text-[9.5px] font-semibold">{t}</text>;
+  // the depths, marked on the chosen column itself: a fine line across it and the depth at its outer edge, haloed in white
   const axis = (S: Side, x: number, right: boolean) => {
     const step = [0.5, 1, 2, 5, 10, 20, 50, 100, 200, 500].find((t) => t * S.k >= 40) ?? 1000; const ts: number[] = [];
-    for (let d = Math.ceil(S.r[0] / step) * step; d <= S.r[1] + 1e-6; d += step) ts.push(d);
-    return ts.map((d) => <g key={d}><line x1={right ? x + 1 : x - 4} x2={right ? x + 4 : x - 1} y1={S.y(d)} y2={S.y(d)} stroke="#cbd5e1" />{label(right ? x + 6 : x - 6, S.y(d) + 3, step < 1 ? d.toFixed(1) : String(Math.round(d)), right ? "start" : "end")}</g>);
+    const lo = Math.max(S.r[0], S.h0), hi = Math.min(S.r[1], S.h1);   // only where the hole has core, not past its foot on a shared axis
+    for (let d = Math.ceil(lo / step) * step; d < hi - 1e-6; d += step) ts.push(d);
+    return <g className="pointer-events-none">{ts.map((d) => <g key={d}>
+      <line x1={x} x2={x + SHOWW} y1={S.y(d)} y2={S.y(d)} stroke="#0f172a" strokeOpacity={0.45} strokeWidth={0.8} />
+      <text x={right ? x + SHOWW - 2 : x + 2} y={S.y(d) + 9} textAnchor={right ? "end" : "start"} stroke="#fff" strokeWidth={2.5} paintOrder="stroke" className="fill-slate-800 font-mono text-[9px] font-medium">{step < 1 ? d.toFixed(1) : String(Math.round(d))}</text>
+    </g>)}</g>;
   };
   // a link's end outside the other window is drawn at that window's edge, dashed
   const clampY = (S: Side, d: number) => Math.min(PAD + H, Math.max(PAD, S.y(d)));
@@ -224,17 +212,16 @@ export function CorrelationView({ a, b, corr, cursorA, onPick, winA = null, winB
         </defs>
         {corr.links.filter((l) => !inLit(l) && inR(A, l.a) && inR(B, l.b)).map((l) => <line key={`${l.a}`} x1={x1} y1={A.y(l.a + 0.5)} x2={x2} y2={B.y(l.b + 0.5)} stroke={LINE} strokeOpacity={0.25 + 0.5 * l.sim} strokeWidth={0.8} />)}
         {corr.links.filter(inLit).map((l) => <line key={`g${l.a}`} x1={x1} y1={A.y(l.a + 0.5)} x2={x2} y2={clampY(B, l.b + 0.5)} stroke={GOLD} strokeWidth={2.6} strokeLinecap="round" strokeDasharray={inR(B, l.b) ? undefined : "4 3"} />)}
-        {axis(A, AXIS, false)}{!shared && axis(B, xAxB, true)}
         <g clipPath={`url(#${cid}a)`}>{column(A, show, xShA, SHOWW)}{column(A, "rc", xRcA, RCW)}</g>
         <g clipPath={`url(#${cid}b)`}>{column(B, "rc", xRcB, RCW)}{column(B, show, xShB, SHOWW)}</g>
-        {scale(A, xScA, onWinA)}{scale(B, xScB, onWinB)}
+        {axis(A, xShA, false)}{axis(B, xShB, true)}
         {/* the left hole, metre by metre: hover lights a metre and its link, a click marks it and its match */}
         <rect x={xShA} y={PAD} width={xRcA + RCW - xShA} height={H} fill="transparent" className="cursor-pointer"
           onMouseMove={(e) => setHover(metreAt(e.clientY, e.currentTarget))} onMouseLeave={() => setHover(null)}
           onClick={(e) => { const m = metreAt(e.clientY, e.currentTarget); const l = m === null ? undefined : corr.links.find((x) => x.a === m); if (l) onPick(l.a, l.b); }} />
         {lit !== null && <g clipPath={`url(#${cid}a)`}><rect x={xShA - 1} y={A.y(lit)} width={xRcA + RCW - xShA + 2} height={Math.max(A.k, 2)} fill="none" stroke={GOLD} strokeWidth={2} className="pointer-events-none" /></g>}
-        {winA && head(xScA + SC / 2, "Scale", SCALE_TIP)}{head(xShA + SHOWW / 2, showLabel, SHOW_TIP[show])}{head(xRcA + RCW / 2, "RC", TIP.rc + PICK)}
-        {head(xRcB + RCW / 2, "RC", TIP.rc)}{head(xShB + SHOWW / 2, showLabel, SHOW_TIP[show])}{winB && head(xScB + SC / 2, "Scale", SCALE_TIP)}
+        {head(xShA + SHOWW / 2, showLabel, SHOW_TIP[show])}{head(xRcA + RCW / 2, "RC", TIP.rc + PICK)}
+        {head(xRcB + RCW / 2, "RC", TIP.rc)}{head(xShB + SHOWW / 2, showLabel, SHOW_TIP[show])}
         {label(xShA + (xRcA + RCW - xShA) / 2, PAD + H + 11, `${fmtM(Math.min(A.r[1], a1))} m`, "middle")}
         {label(xRcB + (xShB + SHOWW - xRcB) / 2, PAD + H + 11, `${fmtM(Math.min(B.r[1], b1))} m`, "middle")}
       </svg>
