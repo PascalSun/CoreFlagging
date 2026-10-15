@@ -33,7 +33,7 @@ def one(key: str, runner, pf: Platform, force: bool = False) -> str:
         (ws.proc / f"{key}.json").write_text(json.dumps({"meta": h["meta"], "report": h["report"]}))
         arrays = {}
         for run in runs:
-            arrays[f"anom__{run}"], arrays[f"raw__{run}"] = extras.token_arrays(runner.models.get(run), key)
+            arrays[f"anom__{run}"], arrays[f"raw__{run}"], arrays[f"core__{run}"] = extras.token_arrays(runner.models.get(run), key)
         np.savez_compressed(ws.proc / f"{key}.arrays.npz", **arrays)
         return "sent" if pf.token_scores(key, ws.proc / f"{key}.arrays.npz") else "not on the platform"
     finally:

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Info } from "lucide-react";
-import type { Metres, ModelView, SpectralLog } from "@/lib/coreScan";
+import type { Metres, ModelView, SpectralLog, TokenScores } from "@/lib/coreScan";
 import { GRID, INK, MUTED, SERIES, coreTypeColor, fmt, groupColor, groupName, pct } from "@/components/coretrace/palette";
 import { cn } from "@/lib/utils";
 import { DepthNav } from "@/components/coretrace/DepthNav";
@@ -17,8 +17,8 @@ export const TIP = {
   swir: "SWIR: the short-wave infrared mineral groups the scanner's TSG software reads (TSA). Each bar is the share of every group in the interval, weighted by the software's fit: 1 m bars over the whole hole, 10 cm bars once zoomed to 50 m or less. Grey is TSG's Invalid (no usable spectrum).",
   tir: "TIR: the thermal infrared mineral groups the scanner's TSG software reads (jCLST), drawn the same way as SWIR. Empty where the hole has no usable thermal infrared.",
   bd: "BD, boundary detection: HyFormer cuts the hole where its reading of the spectra changes. Each black line is a predicted boundary; the chunks between them are the auto log.",
-  rc: "RC, rock classification: the rock class HyFormer reads in each metre (a cluster of its reading), in the colour of the type's leading mineral.",
-  unusual: "Unusual: how far each metre's spectra stand from the core within 15 m of it (bar length). Orange-red bars are flagged: among the hole's top 3% and above the State's 98th percentile.",
+  rc: "RC, rock classification: the rock class HyFormer reads (a cluster of its reading), in the colour of the type's leading mineral. One block per metre over the whole hole (the commonest type of its 10 cm pieces); every 10 cm once zoomed to 50 m or less.",
+  unusual: "Unusual: how far the spectra stand from the core within 15 m (bar length): per metre over the whole hole, per 10 cm once zoomed to 50 m or less. Orange-red bars are flagged: among the hole's top 3% and above the State's 98th percentile; at 10 cm, the piece that carries the flag.",
 };
 
 /** The groups of a spectral log in the order the official HyLogger plots stack them: most of the hole first,
@@ -37,10 +37,12 @@ export function groupOrder(log: SpectralLog | undefined): string[] {
  * what the core is: the TSG software's mineral groups as stacked shares (SWIR, TIR), HyFormer's
  * boundaries (BD) and its rock class (RC); the bar track says how unusual it is. Each track has its
  * own scale — they sit side by side, never on a shared axis. Hover reads a metre, click selects it. */
-export function StripLog({ metres, model, cursor, onCursor, onHover, hasLith, range, onRange, spectral, spectralFine }: {
+export function StripLog({ metres, model, cursor, onCursor, onHover, hasLith, range, onRange, spectral, spectralFine, tokens }: {
   metres: Metres; model: ModelView | undefined; cursor: number | null; onCursor: (m: number) => void; onHover?: (m: number | null) => void; hasLith: boolean; hasAu?: boolean;
   /** the group make-up of the whole hole at 1 m, and of the window at 0.1 m; without them SWIR and TIR show the leading group per metre */
   spectral?: SpectralLog; spectralFine?: SpectralLog;
+  /** the model's reading per 10 cm token of the window; with it RC and Unusual draw at 10 cm instead of per metre */
+  tokens?: TokenScores;
   /** draw to this depth range instead of the hole's own: two logs side by side share one axis, or the reader has zoomed in */
   range?: [number, number];
   /** when set, the log can be zoomed: the wheel over it and the level buttons change the range (null = whole hole) */
@@ -149,10 +151,22 @@ export function StripLog({ metres, model, cursor, onCursor, onHover, hasLith, ra
       }
       return true;
     };
+    // the model's reading per 10 cm, when the window's tokens are here and cover what is in view
+    const tok = tokens && tokens.bin.length && tokens.bin[0] <= Math.round(m0 * 10) + 1 && tokens.bin[tokens.bin.length - 1] >= Math.round((m1 + 1) * 10) - 2 ? tokens : undefined;
+    const tokH = Math.max(0.1 * ppm, 1 / dpr);
+    const tokFlag = (i: number) => !!tok && tok.flag_at !== null && tok.flag_raw !== null && tok.anom[i] >= tok.flag_at && tok.anom_raw[i] >= tok.flag_raw;
     let x = AXIS_W;
     for (const t of tracks) {
       if (t.kind === "bar" || t.kind === "line") { g.fillStyle = "#f8fafc"; g.fillRect(x, 0, t.w, height); }
       if (t.kind === "mix" && stack(t.id === "gs" ? "swir" : "tir", x, t.w)) { x += t.w + GAP; continue; }
+      if (tok && model && (t.id === "rc" && tok.core || t.id === "anom")) {
+        for (let i = 0; i < tok.bin.length; i++) {
+          const y = (tok.bin[i] / 10 - m0) * ppm; if (y + tokH < 0 || y > height) continue;
+          if (t.id === "rc") { g.fillStyle = coreTypeColor(typeName.get(tok.core![i])); g.fillRect(x, y, t.w, tokH); }
+          else { const j = midx.get(Math.floor(tok.bin[i] / 10)); g.fillStyle = tokFlag(i) && j !== undefined && flagged(j) ? SERIES.orange : "#9ca3af"; g.fillRect(x, y, Math.max(1, Math.min(1, tok.anom_raw[i] / rawTop) * t.w), tokH); }
+        }
+        x += t.w + GAP; continue;
+      }
       for (let i = 0; i < metres.m.length; i++) {
         const m = metres.m[i], y = (m - m0) * ppm, j = midx.get(m);
         // no spectral log (yet): the leading group of each metre
@@ -170,7 +184,7 @@ export function StripLog({ metres, model, cursor, onCursor, onHover, hasLith, ra
       x += t.w + GAP;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [metres, model, tracks, width, height, ppm, m0, m1, rawTop, spectral, spectralFine, order]);
+  }, [metres, model, tracks, width, height, ppm, m0, m1, rawTop, spectral, spectralFine, tokens, order]);
 
   // keep the selected metre in view: it may be set from a link, a table row or another tab
   useEffect(() => {

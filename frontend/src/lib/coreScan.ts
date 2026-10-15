@@ -121,10 +121,12 @@ export type SpectralLog = { key: string; step: number; from_m: number; to_m: num
 export type HoleMatch = { model: string; window_m: number; step_m: number; score: number; rho: number;
   a: { key: string; name: string; from_m: number; to_m: number; n: number }; b: { key: string; name: string; from_m: number; to_m: number; n: number };
   links: { a_m: number; b_m: number; sim: number }[] };
-/** A model's unusual score for every 10 cm token of a hole: the per-metre `anom` of ModelView is the maximum of these
- * over the metre. `bin` is the depth in 10 cm (bin 123 = 12.3–12.4 m), `anom` the State percentile, `anom_raw` the
+/** A model's reading of every 10 cm token of a hole: the per-metre `anom` of ModelView is the maximum of these
+ * over the metre, the per-metre `core` their mode. `bin` is the depth in 10 cm (bin 123 = 12.3–12.4 m), `anom` the State percentile, `anom_raw` the
  * contrast against ±15 m; a metre is flagged when its highest token reaches both `flag_at` and `flag_raw`. */
-export type TokenScores = { run: string; step_m: 0.1; n: number; flag_at: number | null; flag_raw: number | null; bin: number[]; anom: number[]; anom_raw: number[] };
+export type TokenScores = { run: string; step_m: 0.1; n: number; flag_at: number | null; flag_raw: number | null; bin: number[]; anom: number[]; anom_raw: number[];
+  /** the model's core type per token (its per-metre value is the mode); absent for a hole read before the service sent it */
+  core?: number[]; core_types: { k: number; name: string; share: number }[] };
 export type Metres = { m: number[]; gs: string[]; ms: string[]; gt: string[]; lith: string[]; lith_raw: string[]; au: (number | null)[] };
 
 export type HoleDetail = HoleRow & {
@@ -165,11 +167,12 @@ export type SimilarHit = {
   rock: string; au: number | null; lat: number | null; lon: number | null; region: string; split: string;
 };
 export type SimilarScope = "state" | "nearby" | "region" | "hole";
-/** A whole hole's signature: the share of each rock class, and the type read most in each of 20 slices down the hole. */
-export type HoleSig = { shares: Record<string, number>; seq: number[]; n: number; from_m: number; to_m: number };
+/** A whole hole against another, metre by metre on the model's representation: `score` is the mean best cosine of each metre in
+ * the other hole (both ways); `rho` says whether the other hole repeats this one's order down the hole (1 same order, -1 reversed). */
 export type SimilarHole = { key: string; name: string; region: string; operator: string; project: string; target: string; lon: number | null; lat: number | null; km: number | null;
-  score: number; composition: number; sequence: number; sig: HoleSig };
-export type SimilarHolesView = { model: string; scope: SimilarScope; km: number | null; region: string | null; n_candidates: number; mine: HoleSig; core_types: { k: number; name: string }[]; results: SimilarHole[] };
+  score: number; rho: number | null; n: number };
+export type SimilarHolesView = { model: string; scope: SimilarScope; km: number | null; region: string | null; n_candidates: number; compared: number;
+  mine: { n: number; from_m: number; to_m: number }; results: SimilarHole[] };
 export type SimilarView = { model: string; library: { intervals: number; holes: number }; results: SimilarHit[];
   query: { from_m: number; to_m: number; metres?: number; scope?: SimilarScope; km?: number | null; region?: string | null; gs: string; gt: string; rock: string } };
 
@@ -247,7 +250,7 @@ export const coreScan = {
   /** Core like a stretch of this hole: the 2 m at a metre, or a window; where to look is the scope. */
   similar: (key: string, at: { m: number } | { from: number; to: number }, run: string, scope: SimilarScope = "state", km = 10) =>
     json<SimilarView>(`/holes/${enc(key)}/similar/?${"m" in at ? `m=${at.m}` : `from=${at.from}&to=${at.to}`}&model=${enc(run)}&scope=${scope}&km=${km}`),
-  /** Holes like this one as a whole (composition and downhole sequence); 404 when the hole has no signature yet. */
+  /** Holes like this one as a whole, metre by metre on the model's representation; 404 when the hole has no metre vectors yet. */
   similarHoles: (key: string, run: string, scope: Exclude<SimilarScope, "hole"> = "state", km = 25) => json<SimilarHolesView>(`/holes/${enc(key)}/similar-holes/?model=${enc(run)}&scope=${scope}&km=${km}`),
   trays: (key: string) => json<{ trays: Tray[] }>(`/holes/${enc(key)}/trays/`),
   /** The original of a tray photograph as a deep-zoom pyramid; 404 for an upload (no original kept). */

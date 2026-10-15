@@ -7,7 +7,8 @@ answers as the evaluation page:
   3 unusual intervals  local contrast of the representation against +-15 m of the same hole, as a State percentile
   4 gold prediction    linear probe on per-metre mean representations, fitted on train + val holes
   5 data quality       issue list from the cleaning pipeline (no model)
-  6 similar intervals  cosine similarity of 2 m fingerprints against every 2 m interval of the State's 1,696 holes
+  6 similar intervals  cosine similarity of 2 m fingerprints (principal components of the representation, averaged,
+                       standardised) against every 2 m interval of the State's library holes
 """
 from __future__ import annotations
 
@@ -117,6 +118,32 @@ def _mode(a):
     return pd.Series(a).value_counts().index[0] if a else ""
 
 
+def metre_vectors(R, H, metres=None):
+    """One fingerprint per metre, as the research code defined it: the 2 m of core starting at the metre (LEN = 20
+    tokens in depth order), the model's representation projected to its principal components (R["F"]), averaged,
+    standardised against the State library (H["i_mu"], H["i_sd"]) and put on the unit sphere. Cosine between two such
+    vectors is the similarity used everywhere (Similar core, similar holes, the hole-to-hole match).
+    Returns (metres, V) with V float32 (n_metres, d), in the order of `metres` (default R["metres"])."""
+    um = R["metres"] if metres is None else np.asarray(metres)
+    o = R["order"]; dep = R["depth"][o]; F = R["F"]
+    V = np.zeros((len(um), F.shape[1]), "f4")
+    for k, mm in enumerate(um):
+        i0 = int(np.searchsorted(dep, float(mm))); i0 = min(max(i0, 0), max(len(o) - LEN, 0))
+        x = F[o[i0:i0 + LEN]].mean(0); x = (x - H["i_mu"]) / H["i_sd"]; V[k] = x / (np.linalg.norm(x) + 1e-9)
+    return um, V
+
+
+def window_vector(R, H, lo, hi):
+    """The fingerprint of a depth window [lo, hi): the tokens in it, averaged, standardised and normalised as a
+    metre's fingerprint is. A window of less than 2 m is widened to the 2 m from its start, as the metre search is."""
+    o = R["order"]; dep = R["depth"][o]
+    sel = np.flatnonzero((dep >= lo) & (dep < hi))
+    if len(sel) < LEN:
+        i0 = int(np.searchsorted(dep, float(lo))); i0 = min(max(i0, 0), max(len(o) - LEN, 0)); sel = np.arange(i0, i0 + LEN)
+    x = R["F"][o[sel]].mean(0); x = (x - H["i_mu"]) / H["i_sd"]
+    return x / (np.linalg.norm(x) + 1e-9)
+
+
 def _f(x, nd=3):
     return None if x is None or not np.isfinite(x) else round(float(x), nd)
 
@@ -135,8 +162,12 @@ class Engine:
         with open(B / "heads.pkl", "rb") as f:
             self.H = pickle.load(f)
         self.core = {c["k"]: c for c in self.H["core"]}
-        lib = np.load(B / "library.npz", allow_pickle=False)
-        self.L = {k: lib[k] for k in lib.files}; self.L["Z"] = self.L["Z"].astype("f4")
+        # the interval library the bundle ships with, or CORETRACE_LIBRARY (a rebuilt one, `python -m app.cli build-library`)
+        libf = Path(os.environ["CORETRACE_LIBRARY"]) if os.environ.get("CORETRACE_LIBRARY") else B / "library.npz"
+        if not libf.exists():
+            warnings.warn(f"library {libf} is not there; using {B / 'library.npz'}"); libf = B / "library.npz"
+        lib = np.load(libf, allow_pickle=False)
+        self.L = {k: lib[k] for k in lib.files}; self.L["Z"] = self.L["Z"].astype("f4"); self.library_file = libf
         self.card = json.loads((B / "card.json").read_text())
         self.run = self.card.get("run") or ck.get("run") or B.name
         self.model_info = {"run": self.run, "step": ck.get("step"), "name": self.card.get("name", self.run), "zh": self.card.get("zh", ""), "desc": self.card.get("desc", "")}
@@ -216,7 +247,7 @@ class Engine:
     def _version(self, hole):
         """Results are recomputed when the model or the processed hole changes."""
         f = self.store.proc / f"{hole}.npz"
-        return f"{self.model_info['run']}-{self.model_info['step']}-2-{int(f.stat().st_mtime) if f.exists() else 0}"
+        return f"{self.model_info['run']}-{self.model_info['step']}-fp2m-{int(f.stat().st_mtime) if f.exists() else 0}"
 
     def _compute(self, hole):
         z = np.load(self.store.proc / f"{hole}.npz", allow_pickle=False); R = {k: z[k] for k in z.files}
@@ -415,7 +446,7 @@ class Engine:
 
     def similar(self, hole, d0, k=10):
         R = self.compute(hole); o = R["order"]; dep = R["depth"][o]; i0 = int(np.searchsorted(dep, d0)); i0 = min(max(i0, 0), max(len(o) - LEN, 0))
-        q = o[i0:i0 + LEN]; x = R["F"][q].mean(0); x = (x - self.H["i_mu"]) / self.H["i_sd"]; x = x / (np.linalg.norm(x) + 1e-9)
+        q = o[i0:i0 + LEN]; x = window_vector(R, self.H, d0, d0 + 2)
         L = self.L; s = L["Z"] @ x.astype("f4"); meta = self.store.meta(hole)["meta"]; s[L["hole"] == hole] = -np.inf
         if meta.get("lat") is not None:                     # other areas only: no hole within 5 km of this one
             p = np.pi / 180; la, lo = meta["lat"], meta["lon"]

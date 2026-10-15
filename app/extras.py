@@ -3,7 +3,8 @@
 The research app computed these on demand from a hole held in memory (engine.metre_view, engine.similar).
 Here they are computed once, when the hole is processed, for every metre:
   tir       the TIR spectrum the model rebuilds from SWIR alone, mean over the metre
-  fp        the fingerprint of the 2 m interval that starts at the metre, ready to compare with the State library
+  fp        the fingerprint of the 2 m interval that starts at the metre (principal components of the representation,
+            averaged, standardised, unit length), ready to compare with the State library and any other hole's metres
   why       which spectral features set the metre apart from the core around it (no model involved)
 """
 from __future__ import annotations
@@ -14,7 +15,7 @@ import numpy as np
 
 from . import labels
 from .pipeline import names as N
-from .pipeline.engine import FEAT_ZH, FEATS, LEN, Engine, _f
+from .pipeline.engine import FEAT_ZH, FEATS, Engine, _f, metre_vectors
 
 FEAT_EN = {"alb": "overall brightness", "vis_slope": "visible reddening (iron oxides)", "d900": "900 nm iron-oxide absorption depth", "d1400": "1400 nm hydroxyl absorption depth",
            "d1900": "1900 nm water absorption depth", "d2160": "2160 nm kaolinite shoulder", "d2200": "2200 nm Al-OH absorption depth (white mica, clays)",
@@ -27,20 +28,19 @@ FEAT_EN = {"alb": "overall brightness", "vis_slope": "visible reddening (iron ox
 def metre_arrays(eng: Engine, key: str) -> tuple[np.ndarray, np.ndarray]:
     """(tir, fp): one row per metre of the hole, in the order of hole_view()['m']."""
     R = eng.compute(key); um = R["metres"]; m = np.floor(R["depth"]).astype(int)
-    o = R["order"]; dep = R["depth"][o]; F = R["F"]; H = eng.H
-    tir = np.zeros((len(um), R["tir_pred"].shape[1]), "f4"); fp = np.zeros((len(um), F.shape[1]), "f4")
+    tir = np.zeros((len(um), R["tir_pred"].shape[1]), "f4")
     for k, mm in enumerate(um):
         tir[k] = R["tir_pred"][m == mm].mean(0)
-        i0 = int(np.searchsorted(dep, float(mm))); i0 = min(max(i0, 0), max(len(o) - LEN, 0))      # as engine.similar
-        x = F[o[i0:i0 + LEN]].mean(0); x = (x - H["i_mu"]) / H["i_sd"]; fp[k] = x / (np.linalg.norm(x) + 1e-9)
+    _, fp = metre_vectors(R, eng.H, um)
     return tir, fp
 
 
-def token_arrays(eng: Engine, key: str) -> tuple[np.ndarray, np.ndarray]:
-    """(anom, raw): the unusual score of every 10 cm token, in the tokens' order (the order of the processed .npz, which is
-    the order the platform keeps them in). The per-metre `anom` of hole_view() is the maximum of these over the metre."""
+def token_arrays(eng: Engine, key: str) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """(anom, raw, core): the unusual score and the core type of every 10 cm token, in the tokens' order (the order of the
+    processed .npz, which is the order the platform keeps them in). Per metre, hole_view() takes the maximum of anom and the
+    mode of core."""
     R = eng.compute(key)
-    return R["lc_pct"].astype("<f4"), R["lc"].astype("<f4")
+    return R["lc_pct"].astype("<f4"), R["lc"].astype("<f4"), np.asarray(R["core"]).astype("<i2")
 
 
 def metre_why(eng: Engine, key: str) -> list[list[dict]]:

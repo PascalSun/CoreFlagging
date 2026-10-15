@@ -191,10 +191,10 @@ def test_token_scores_backfill_runs_the_models_on_the_platforms_tokens_and_clean
     from app import extras, token_scores
     from app.workspace import Workspace
     ws = Workspace(tmp_path); n = 25
-    R = {"lc_pct": np.linspace(0, 1, n), "lc": np.linspace(0, 4, n)}
+    R = {"lc_pct": np.linspace(0, 1, n), "lc": np.linspace(0, 4, n), "core": np.arange(n) % 4}
     eng = SimpleNamespace(compute=lambda key: R)
-    anom, raw = extras.token_arrays(eng, "H1")
-    assert anom.dtype == np.dtype("<f4") and raw.dtype == np.dtype("<f4") and len(anom) == len(raw) == n and anom[-1] == 1.0
+    anom, raw, core = extras.token_arrays(eng, "H1")
+    assert anom.dtype == np.dtype("<f4") and raw.dtype == np.dtype("<f4") and core.dtype == np.dtype("<i2") and len(anom) == len(raw) == len(core) == n and anom[-1] == 1.0
     forgotten = []
     runner = SimpleNamespace(ws=ws, models=SimpleNamespace(dirs={"v2": None, "v9": None}, get=lambda run: eng), forget=lambda key: (ws.remove(key), forgotten.append(key)))
     sent = {}
@@ -215,10 +215,10 @@ def test_token_scores_backfill_runs_the_models_on_the_platforms_tokens_and_clean
     assert token_scores.one("H0", runner, FakePlatform({}), False) == "no models"
     assert token_scores.one("H1", runner, FakePlatform({"v2": {"token_scores": True}}), False) == "has them"
     assert token_scores.one("H1", runner, FakePlatform({"v2": {"token_scores": True}}), True) == "sent"
-    assert sent["H1"] == ["anom__v2", "raw__v2"]
+    assert sent["H1"] == ["anom__v2", "core__v2", "raw__v2"]
     # only the runs this service has models for, and only those still missing scores
     assert token_scores.one("H2", runner, FakePlatform({"v2": {"token_scores": False}, "v9": {"token_scores": True}, "old": {"token_scores": False}}), False) == "sent"
-    assert sent["H2"] == ["anom__v2", "raw__v2"]
+    assert sent["H2"] == ["anom__v2", "core__v2", "raw__v2"]
     assert not list(ws.proc.iterdir())                       # the platform is the record: nothing kept
     assert forgotten == ["H1", "H2"]                         # ... and the engines forget the hole too
 
@@ -230,3 +230,32 @@ def test_models_forget_drops_a_hole_from_every_engines_cache():
     m = Models.__new__(Models); m._e = {"v2": e}
     m.forget("H1"); m.forget("nothing")
     assert e.cache == {"H2": {}} and e.timing == {} and e.locks == {}
+
+
+def test_metre_vectors_are_the_2m_fingerprints_standardised_against_the_library():
+    from app.pipeline.engine import metre_vectors, window_vector
+    depth = np.arange(0, 4.0, 0.1, dtype="f4")                                  # 40 tokens: metres 0-3
+    F = np.zeros((40, 3), "f4"); F[:, 0] = np.arange(40); F[:, 1] = 1.0           # a ramp and a constant
+    R = {"depth": depth, "F": F, "order": np.arange(40), "metres": np.array([0, 1, 2, 3])}
+    H = {"i_mu": np.array([10.0, 1.0, 0.0], "f4"), "i_sd": np.array([5.0, 1.0, 1.0], "f4")}
+    um, V = metre_vectors(R, H)
+    assert um.tolist() == [0, 1, 2, 3] and V.shape == (4, 3)
+    np.testing.assert_allclose(np.linalg.norm(V, axis=1), 1.0, atol=1e-5)
+    # metre 1: tokens 10..29 (the 2 m from 1.0 m), mean of the ramp 19.5 -> (19.5-10)/5 = 1.9; the constant standardises to 0
+    np.testing.assert_allclose(V[1] * np.hypot(1.9, 0), [1.9, 0, 0], atol=1e-4)
+    # the last metre cannot start a full 2 m window: it slides back so the window still holds 20 tokens (as the search does)
+    np.testing.assert_allclose(V[3], V[2], atol=1e-5)
+    # a window asked for by depth: [1, 3) is exactly metre 1's window; a window shorter than 2 m widens to 2 m from its start
+    np.testing.assert_allclose(window_vector(R, H, 1, 3), V[1], atol=1e-5)
+    np.testing.assert_allclose(window_vector(R, H, 1, 1.5), V[1], atol=1e-5)
+
+
+def test_metre_arrays_fingerprint_is_the_metre_vector(monkeypatch):
+    from app import extras
+    depth = np.arange(0, 4.0, 0.1, dtype="f4"); F = np.zeros((40, 2), "f4"); F[:, 0] = np.arange(40)
+    R = {"depth": depth, "F": F, "order": np.arange(40), "metres": np.array([0, 1, 2, 3]), "tir_pred": np.ones((40, 2), "f4")}
+    H = {"i_mu": np.array([0.0, 0.0], "f4"), "i_sd": np.array([1.0, 1.0], "f4")}
+    eng = SimpleNamespace(compute=lambda key: R, H=H)
+    tir, fp = extras.metre_arrays(eng, "h")
+    assert tir.shape == (4, 2) and fp.shape == (4, 2)
+    np.testing.assert_allclose(fp[0], [1, 0], atol=1e-5)                       # the ramp only: unit vector along it

@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, lastAssistantMessageIsCompleteWithToolCalls } from "ai";
 import { Streamdown, type Components } from "streamdown";
-import { Loader2, RotateCcw, Send } from "lucide-react";
+import { ExternalLink, FileText, Loader2, RotateCcw, Send } from "lucide-react";
 import { MD_COMPONENTS } from "@/components/chat/mdTable";
 import { ReportPdf } from "@/components/coretrace/ReportPdf";
 import { authToken, refreshAccessToken, refreshToken } from "@/lib/auth";
@@ -13,6 +13,11 @@ import { cn } from "@/lib/utils";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
+const TOOL_RUNNING: Record<string, string> = {
+  find_holes: "Searching the holes…", hole_summary: "Reading the hole summary…", hole_log: "Reading the auto log…", unusual_10cm: "Reading the 10 cm scores…", metre_detail: "Reading one metre…",
+  similar_core: "Searching similar core…", quality_issues: "Reading the quality list…", open_hole: "Opening it on the map…",
+  hole_documents: "Looking up the hole's documents and reading their first pages…", document_text: "Reading the document…", search_documents: "Searching the reports…", open_document: "Opening the PDF…",
+};
 const TOOL_LABEL: Record<string, string> = {
   find_holes: "Searched the holes", hole_summary: "Read the hole summary", hole_log: "Read the auto log", unusual_10cm: "Read the 10 cm scores", metre_detail: "Read one metre",
   similar_core: "Searched similar core", quality_issues: "Read the quality list", open_hole: "Opened it on the map",
@@ -30,6 +35,64 @@ const docHref = (corpus: string, key: string, file: string) => `${PLATFORM_URL}$
   : `/geo/api/doc/file/?corpus=${encodeURIComponent(corpus)}&key=${encodeURIComponent(key)}&filename=${encodeURIComponent(file)}`}`;
 
 export type OpenTarget = { hole: string; m?: number; tab?: string };
+
+type DocRow = { corpus: string; key: string; file: string; title: string; sub: string; url: string };
+
+/** What hole_documents found, as a list the reader can open: the hole's own HyLogger PDFs and the WAMEX reports it was
+ * logged in, each a link to its PDF, with a viewer in place on request. Drawn by the interface, so it is there whatever the model writes. */
+function DocumentList({ out }: { out: any }) {
+  const rows: DocRow[] = [
+    ...((out.wamex?.reports_this_hole_was_logged_in ?? []) as any[]).filter((r) => r.url).map((r) => ({
+      corpus: "wamex", key: r.anumber, file: r.pdf, url: r.url, title: `${r.anumber} · ${r.title ?? "WAMEX report"}`,
+      sub: [r.year, r.company, r.type, r.commodities].filter(Boolean).join(" · ") })),
+    ...((out.hole_pdfs ?? []) as any[]).map((p) => ({ corpus: p.corpus, key: p.key, file: p.file, url: p.url, title: p.title, sub: `${p.kind}${p.pages ? ` · ${p.pages} pages` : ""}` })),
+  ];
+  const [open, setOpen] = useState<string | null>(null);
+  const [more, setMore] = useState(false);
+  const covering: any[] = out.wamex?.reports_covering_the_collar ?? [];
+  // the platform's count includes the reports the hole was logged in, which the list above already shows
+  const coveringTotal: number = Math.max(covering.length, (out.wamex?.reports_covering_the_collar_total ?? covering.length) - (out.wamex?.reports_this_hole_was_logged_in?.length ?? 0));
+  if (!rows.length) return null;
+  const shown = rows.find((r) => r.url === open);
+  return (
+    <div className="flex flex-col gap-1.5">
+      <ul className="flex flex-col gap-1">
+        {rows.map((r) => (
+          <li key={r.url} className={cn("flex items-center gap-2 rounded-xl border px-3 py-2 text-xs", r.url === open ? "border-slate-400 bg-white" : "border-slate-200 bg-white/70")}>
+            <FileText size={14} className="shrink-0 text-slate-500" />
+            <div className="min-w-0 flex-1">
+              <a href={`${PLATFORM_URL}${r.url}`} target="_blank" rel="noreferrer" className="block truncate font-medium text-slate-900 underline decoration-slate-300 underline-offset-2 hover:decoration-slate-900">{r.title}</a>
+              {r.sub && <div className="truncate text-[11px] text-slate-500">{r.sub}</div>}
+            </div>
+            <a href={`${PLATFORM_URL}${r.url}`} target="_blank" rel="noreferrer" aria-label="Open the PDF in a new tab" className="grid size-6 shrink-0 place-items-center rounded-full text-slate-500 hover:bg-slate-100 hover:text-slate-900"><ExternalLink size={12} /></a>
+            <button type="button" onClick={() => setOpen(r.url === open ? null : r.url)} className="shrink-0 rounded-full border border-slate-200 px-2 py-0.5 text-[11px] text-slate-700 hover:border-slate-400">{r.url === open ? "Hide" : "View here"}</button>
+          </li>
+        ))}
+      </ul>
+      {coveringTotal > 0 && (
+        <div className="rounded-xl border border-slate-200 bg-white/70 text-xs">
+          <button type="button" onClick={() => setMore((v) => !v)} className="flex w-full items-center justify-between px-3 py-2 text-left text-[12px] text-slate-700 hover:text-slate-900">
+            <span>{coveringTotal} more WAMEX {coveringTotal === 1 ? "report covers" : "reports cover"} the collar{covering.length < coveringTotal ? ` (newest ${covering.length} listed)` : ""}</span>
+            <span className="text-[11px] text-slate-500">{more ? "Hide" : "Show all"}</span>
+          </button>
+          {more && (
+            <ol className="flex flex-col gap-1.5 border-t border-slate-100 px-3 py-2">
+              {covering.map((r) => (
+                <li key={r.anumber} className="text-[11px] leading-snug text-slate-600">
+                  <a href={r.wamex_page} target="_blank" rel="noreferrer" className="font-medium text-slate-900 underline decoration-slate-300 underline-offset-2 hover:decoration-slate-900">{r.anumber}</a>
+                  {" "}{[r.year, r.company, r.type, r.commodities].filter(Boolean).join(" · ")}
+                  <div className="text-slate-700">{r.title}</div>
+                  {r.abstract && <div className="text-slate-500">{String(r.abstract).replace(/\s+/g, " ").slice(0, 220)}{String(r.abstract).length > 220 ? "…" : ""}</div>}
+                </li>
+              ))}
+            </ol>
+          )}
+        </div>
+      )}
+      {shown && <ReportPdf url={shown.url} title={shown.title} subtitle={`${shown.corpus === "wamex" ? "WAMEX " : ""}${shown.key} · ${shown.file}`} />}
+    </div>
+  );
+}
 
 /** The CoreFlagging assistant: ask about holes, metres and the models in plain words. It reads
  * the same data as the map and moves the map to what it is describing. */
@@ -116,8 +179,8 @@ export function CoreChat({ context, onOpen, signedIn, onSignIn }: {
   }), []);
 
   const starters = context.hole
-    ? [`What stands out in ${context.hole}?`, `Find and summarise the report for ${context.hole}`, `Summarise the auto log of ${context.hole}`, context.m !== null ? `Why is ${context.m} m in ${context.hole} flagged as unusual?` : `Where is gold most likely in ${context.hole}?`, `Which data-quality issues does ${context.hole} have?`]
-    : ["Which processed holes have gold assays?", "Find and summarise the WAMEX report for MND037", "Find holes in the Yilgarn with thermal infrared", "What does the unusual score mean?", "Which data-quality problem is most common?"];
+    ? [`Find the WAMEX reports for ${context.hole} and summarise them`, `What stands out in ${context.hole}?`, `Summarise the auto log of ${context.hole}`, context.m !== null ? `Why is ${context.m} m in ${context.hole} flagged as unusual?` : `Where is gold most likely in ${context.hole}?`, `Which data-quality issues does ${context.hole} have?`]
+    : ["Find the WAMEX reports for DRDD309 and summarise them", "What do the WAMEX reports say about MND037?", "Which reports cover KPDDH009, and what did the drilling find?", "Which processed holes have gold assays?", "What does the unusual score mean?"];
 
   if (!signedIn) {
     return (
@@ -155,6 +218,9 @@ export function CoreChat({ context, onOpen, signedIn, onSignIn }: {
                   if (p.type === "text" && p.text) {
                     return <div key={i} className="max-w-[92%] rounded-2xl rounded-tl-sm bg-slate-100 px-3.5 py-2 text-sm leading-relaxed text-slate-700 [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 [&_h3]:mt-3 [&_h3]:mb-1 [&_h3]:font-display [&_h3]:font-semibold [&_h3]:text-slate-900 [&_li]:my-0.5 [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:my-1.5 [&_ul]:list-disc [&_ul]:pl-5"><Streamdown controls={{ table: false }} components={components}>{holeLinks(p.text)}</Streamdown></div>;
                   }
+                  if (p.type === "tool-hole_documents" && p.state === "output-available" && p.output?.hole_pdfs) {
+                    return <div key={i} className="w-full max-w-[92%] py-1"><DocumentList out={p.output} /></div>;
+                  }
                   if (p.type === "tool-open_document" && p.state === "output-available" && p.output?.url) {
                     return <div key={i} className="w-full max-w-[92%] py-1"><ReportPdf url={p.output.url} title={p.output.title} page={p.output.page ?? undefined} subtitle={`${p.output.corpus === "wamex" ? "WAMEX " : ""}${p.output.key} · ${p.output.file}`} /></div>;
                   }
@@ -164,7 +230,7 @@ export function CoreChat({ context, onOpen, signedIn, onSignIn }: {
                     return (
                       <span key={i} className="inline-flex w-fit items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-1 text-[11px] text-slate-600">
                         {done ? <span className="size-1.5 rounded-full bg-emerald-500" /> : <Loader2 size={11} className="animate-spin" />}
-                        {TOOL_LABEL[name] ?? name}{what}
+                        {done ? (TOOL_LABEL[name] ?? name) : (TOOL_RUNNING[name] ?? TOOL_LABEL[name] ?? name)}{what}
                       </span>
                     );
                   }

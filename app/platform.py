@@ -91,6 +91,16 @@ class Platform:
         r.raise_for_status()
         return True
 
+    def fingerprints(self, key: str, arrays: Path) -> bool:
+        """Hand the platform a hole's metre vectors on their own (the backfill): fp__<run>, one row per metre in the order of
+        the hole's metres. False when the hole, or a result for these runs, is not on the platform."""
+        with open(arrays, "rb") as f:
+            r = self.http.post(f"holes/{quote(key, safe='')}/fingerprints/", files={"arrays": ("arrays.npz", f, "application/octet-stream")})
+        if r.status_code == 404:
+            return False
+        r.raise_for_status()
+        return True
+
     def done(self, job: dict) -> None:
         self.http.post(f"jobs/{job['job']}/done/", json={"token": job["token"]}).raise_for_status()
 
