@@ -6,7 +6,7 @@ import { AlertTriangle, ArrowRight, Box, ChevronLeft, ChevronRight, Download, Ex
 import { downloadReportPdf } from "@/components/coretrace/pdf";
 import { PAGE_W, ReportDocument } from "@/components/coretrace/ReportDocument";
 import { ACTIVE, inferred, TARGET_SOURCE_LABEL, abstractParts, commodityName, coreScan, readDate, reportFileKind, sourceLabel, surveyOf, type SimilarScope, type CoreModelInfo, type HoleDetail, type HoleReport, type MetreView, type ModelView, type Tray } from "@/lib/coreScan";
-import { STATUS_LABEL, SERIES, coreTypeColor, fmt, groupColor, groupName, issueLabel, mineralName, pct } from "@/components/coretrace/palette";
+import { STATUS_LABEL, SERIES, fmt, groupColor, groupName, issueLabel, mineralName, pct, coreTypeBg } from "@/components/coretrace/palette";
 import { LINE, SpectraChart } from "@/components/coretrace/SpectraChart";
 import { StripKey, StripLog, groupOrder } from "@/components/coretrace/StripLog";
 import { TrayViewer } from "@/components/coretrace/DeepZoom";
@@ -110,7 +110,7 @@ function MiniStrip({ strip, model }: { strip: number[]; model: ModelView | undef
   if (!strip.length) return null;
   return (
     <div className="flex h-4 w-full overflow-hidden rounded-[4px]" role="img" aria-label="Rock classes from the top of the hole (left) to the bottom (right)">
-      {strip.map((k, i) => <span key={i} className="h-full flex-1" style={{ background: model ? coreTypeColor(name.get(k)) : "#cbd5e1" }} title={name.get(k)} />)}
+      {strip.map((k, i) => <span key={i} className="h-full flex-1" style={{ background: model ? coreTypeBg(name.get(k)) : "#cbd5e1" }} title={name.get(k)} />)}
     </div>
   );
 }
@@ -210,7 +210,7 @@ function MetreTab({ hole, metre, previewing, mv, loading, trays, onMetre, typeNa
       </div>
       {md && (
         <div className="grid grid-cols-2 gap-2 @2xl:grid-cols-4">
-          <Fact k="Rock Classification" v={<span className="flex items-start gap-1.5"><i className="mt-[0.4em] inline-block h-2.5 w-2.5 flex-none rounded-[2px]" style={{ background: coreTypeColor(typeName(md.core)) }} /><span className="line-clamp-2 text-[15px] leading-snug" title={typeName(md.core)}>{typeName(md.core)}</span></span>} />
+          <Fact k="Rock Classification" v={<span className="flex items-start gap-1.5"><i className="mt-[0.4em] inline-block h-2.5 w-2.5 flex-none rounded-[2px]" style={{ background: coreTypeBg(typeName(md.core)) }} /><span className="line-clamp-2 text-[15px] leading-snug" title={typeName(md.core)}>{typeName(md.core)}</span></span>} />
           <Fact k="Unusual" v={pct(md.anom)} sub="State percentile of its most unusual 10 cm" />
           <Fact k="Gold likelihood" v={fmt(md.gold)} sub={`higher than ${pct(md.gold_pct)} of training metres`} />
           <Fact k={md.has_tir ? "TIR from SWIR" : "TIR filled in"} v={groupName(md.tir_group)} sub={md.tir_conf !== null ? `confidence ${pct(md.tir_conf)}` : undefined} />
@@ -419,7 +419,7 @@ export function HolePanel({ holeKey, tab: tabProp, onTab, models, run, metre, on
           <H3>Down the hole</H3>
           {displayOnly ? <GroupStrip groups={hole.metres.gs} /> : <MiniStrip strip={res?.summary.strip ?? hole.strip} model={mvw} />}
           <div className="flex justify-between pt-0.5 font-mono text-[10px] text-slate-400"><span>{fmt(hole.depth_min, 0)} m</span><span>{fmt(hole.depth_max, 0)} m</span></div>
-          {tops.length > 0 && <ul className="flex flex-col gap-1 pt-2 text-xs text-slate-700">{tops.map(([n, s]) => <li key={n} className="flex items-center gap-2"><i className="inline-block h-2.5 w-2.5 flex-none rounded-[2px]" style={{ background: coreTypeColor(n) }} /><span className="flex-1 truncate">{n}</span><span className="font-mono text-slate-500">{pct(s)}</span></li>)}</ul>}
+          {tops.length > 0 && <ul className="flex flex-col gap-1 pt-2 text-xs text-slate-700">{tops.map(([n, s]) => <li key={n} className="flex items-center gap-2"><i className="inline-block h-2.5 w-2.5 flex-none rounded-[2px]" style={{ background: coreTypeBg(n) }} /><span className="flex-1 truncate">{n}</span><span className="font-mono text-slate-500">{pct(s)}</span></li>)}</ul>}
         </div>
         {res && (
           <div>
@@ -491,7 +491,7 @@ export function HolePanel({ holeKey, tab: tabProp, onTab, models, run, metre, on
                   <tbody>{mvw.segments.map((s) => { const on = metre !== null && metre >= Math.floor(s.from_m) && metre < s.to_m; return (
                     <tr key={s.seg} onClick={() => jump(Math.floor(s.from_m))} className={cn("cursor-pointer hover:bg-slate-50", on && "bg-cyan/10")}>
                       <td className={cn(td, "font-mono whitespace-nowrap")}>{s.from_m.toFixed(1)}–{s.to_m.toFixed(1)}</td>
-                      <td className={td}><span className="flex items-center gap-1.5"><i className="inline-block h-2.5 w-2.5 flex-none rounded-[2px]" style={{ background: coreTypeColor(s.core_type_name) }} />{s.core_type_name}</span></td>
+                      <td className={td}><span className="flex items-center gap-1.5"><i className="inline-block h-2.5 w-2.5 flex-none rounded-[2px]" style={{ background: coreTypeBg(s.core_type_name) }} />{s.core_type_name}</span></td>
                       <td className={td}>{s.swir_minerals.slice(0, 3).map(([c, , p]) => `${mineralName(c)} ${pct(p)}`).join(", ") || "—"}</td>
                       <td className={td}>{s.tir_groups.slice(0, 2).map(([c, , p]) => `${groupName(c)} ${pct(p)}`).join(", ") || "—"}</td></tr>); })}</tbody>
                 </table>

@@ -6,7 +6,7 @@ import { Info, X } from "lucide-react";
 import { commodityName, coreScan, inferred, sourceLabel, TARGET_SOURCE_LABEL, type HoleDetail, type ModelView, type SpectralLog } from "@/lib/coreScan";
 import { StripLog, StripKey } from "@/components/coretrace/StripLog";
 import { CORR_SHOW, CORR_TIP, CorrelationView, correlate, type Correlation, type CorrShow } from "@/components/coretrace/Correlate";
-import { coreTypeColor, fmt, pct } from "@/components/coretrace/palette";
+import { fmt, pct, coreTypeBg } from "@/components/coretrace/palette";
 import { cn } from "@/lib/utils";
 
 function useHole(key: string | null) {
@@ -41,7 +41,7 @@ function Column({ hole, mv, spectral, cursor, onCursor, onOpen, missing, win, on
           {hole.target && <span title={TARGET_SOURCE_LABEL[hole.target_source] || ""}>{inferred(hole.target_source) ? "Likely drilled for " : "Drilled for "}<b className="font-semibold text-slate-800">{commodityName(hole.target)}</b> · </span>}
           {fmt(hole.depth_min, 0)}–{fmt(hole.depth_max, 0)} m · {hole.instrument || "instrument not recorded"}
         </p>
-        {tops.length > 0 && <p className="flex flex-wrap items-center gap-x-2 text-[11px] text-slate-600">Mostly {tops.map(([n, s]) => <span key={n} className="flex items-center gap-1"><i className="inline-block h-2 w-2 rounded-[2px]" style={{ background: coreTypeColor(n) }} />{n} {pct(s)}</span>)}</p>}
+        {tops.length > 0 && <p className="flex flex-wrap items-center gap-x-2 text-[11px] text-slate-600">Mostly {tops.map(([n, s]) => <span key={n} className="flex items-center gap-1"><i className="inline-block h-2 w-2 rounded-[2px]" style={{ background: coreTypeBg(n) }} />{n} {pct(s)}</span>)}</p>}
         {hole.has_lith && again.length > 0 && <p className="text-[11px] text-slate-600">{again.length} {again.length === 1 ? "interval" : "intervals"} where the model disagrees with the log: {again.slice(0, 3).map((d) => (
           <button key={d.from_m} type="button" onClick={() => onCursor(d.from_m)} className="mr-1 font-mono hover:underline">{d.from_m}–{d.to_m} m</button>))}</p>}
       </div>

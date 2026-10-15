@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { AlertTriangle, ArrowDown, ArrowUp, Download, Info, Loader2, MessageCircle, Search, X } from "lucide-react";
 import { commodityName, coreScan, type HoleRow, inferred, TARGET_SOURCE_LABEL } from "@/lib/coreScan";
 import { csvSheet } from "@/lib/lookAgain";
-import { NONE, coreTypeColor, fmt } from "@/components/coretrace/palette";
+import { NONE, fmt, coreTypeBg } from "@/components/coretrace/palette";
 import { Mark, type Shape } from "@/components/coretrace/shapes";
 import { STATUS_LABEL } from "@/components/coretrace/palette";
 import { cn } from "@/lib/utils";
@@ -28,7 +28,7 @@ function RockKey() {
       <span role="tooltip" className="pointer-events-none absolute top-full left-1/2 z-30 mt-1.5 hidden w-60 -translate-x-1/2 rounded-xl border border-slate-200 bg-white p-3 text-left text-[11px] font-normal text-slate-600 shadow-glass group-focus-within:block group-hover:block">
         <span className="mb-2 block leading-snug">Down the hole, top to bottom, each rock type coloured by its leading mineral:</span>
         <span className="grid grid-cols-1 gap-1">
-          {KEY.map(([label, name]) => <span key={label} className="flex items-center gap-1.5"><i className="inline-block size-2.5 flex-none rounded-[2px]" style={{ background: coreTypeColor(name) }} />{label}</span>)}
+          {KEY.map(([label, name]) => <span key={label} className="flex items-center gap-1.5"><i className="inline-block size-2.5 flex-none rounded-[2px]" style={{ background: coreTypeBg(name) }} />{label}</span>)}
           <span className="flex items-center gap-1.5"><i className="inline-block size-2.5 flex-none rounded-[2px] ring-1 ring-slate-200" style={{ background: NONE }} />No model reading</span>
         </span>
       </span>
@@ -98,7 +98,7 @@ export function HoleTable({ holes, q, onQ, look, typeName, onOpen, onAsk, loadin
                   </span>
                   <span className="truncate text-[11px] text-slate-500">{h.status !== "ready" ? STATUS_LABEL[h.status] : [h.operator, h.project].filter(Boolean).join(" · ") || "—"}{h.target ? ` · ${commodityName(h.target)}` : ""}{h.n_again > 0 ? ` · look again: ${fmt(h.again_m, 0)} m` : ""}{h.au_pos_m > 0 ? ` · gold ${h.au_pos_m} m ≥ 0.1 ppm` : ""}</span>
                   <span className="flex h-1.5 w-full overflow-hidden rounded-full" aria-hidden>
-                    {h.strip?.length ? h.strip.map((k, i) => <i key={i} className="h-full flex-1" style={{ background: coreTypeColor(typeName.get(k)) }} />) : <i className="h-full flex-1" style={{ background: NONE }} />}
+                    {h.strip?.length ? h.strip.map((k, i) => <i key={i} className="h-full flex-1" style={{ background: coreTypeBg(typeName.get(k)) }} />) : <i className="h-full flex-1" style={{ background: NONE }} />}
                   </span>
                 </button>
               </li>
@@ -133,7 +133,7 @@ export function HoleTable({ holes, q, onQ, look, typeName, onOpen, onAsk, loadin
                   <td className="px-3 py-2 text-slate-600" title={h.commodities.length > 1 ? h.commodities.map(commodityName).join(", ") : undefined}>{h.target ? <>{inferred(h.target_source) && <span className="text-slate-400" title={TARGET_SOURCE_LABEL[h.target_source]}>≈ </span>}{commodityName(h.target)}{h.commodities.length > 1 && <span className="text-slate-400"> +{h.commodities.length - 1}</span>}</> : <span className="text-slate-300">—</span>}</td>
                   <td className="px-3 py-2">
                     <span className="flex h-1.5 w-40 overflow-hidden rounded-full" aria-hidden>
-                      {h.strip?.length ? h.strip.map((k, i) => <i key={i} className="h-full flex-1" style={{ background: coreTypeColor(typeName.get(k)) }} />) : <i className="h-full flex-1" style={{ background: NONE }} />}
+                      {h.strip?.length ? h.strip.map((k, i) => <i key={i} className="h-full flex-1" style={{ background: coreTypeBg(typeName.get(k)) }} />) : <i className="h-full flex-1" style={{ background: NONE }} />}
                     </span>
                   </td>
                   <td className="px-3 py-2 text-right font-mono text-slate-600">{h.depth_max !== null ? `${fmt(h.depth_max, 0)} m` : "—"}</td>

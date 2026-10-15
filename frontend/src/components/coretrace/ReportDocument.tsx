@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import type { CoreModelInfo, HoleDetail, ModelView, Tray } from "@/lib/coreScan";
 import { coreScan, readDate, surveyOf } from "@/lib/coreScan";
-import { GRID, INK, MUTED, NONE, SERIES, coreTypeColor, fmt, groupColor, groupName, issueLabel, lithColor, pct } from "@/components/coretrace/palette";
+import { HatchDefs, hatchFill } from "@/components/coretrace/HatchDefs";
+import { GRID, INK, MUTED, NONE, SERIES, coreTypeBg, fmt, groupColor, groupName, issueLabel, lithColor, pct } from "@/components/coretrace/palette";
 import { CORE_TEAM } from "@/components/coretrace/team";
 import { useT } from "@/lib/i18n";
 
@@ -54,7 +55,7 @@ function HoleFigure({ hole, mv }: { hole: HoleDetail; mv: ModelView }) {
     { label: "TIR minerals", h: 13, draw: (y, h) => ms.m.map((m, i) => <rect key={m} x={x(m)} y={y} width={bw} height={h} fill={groupColor(ms.gt[i])} />) },
     ...(hole.has_lith ? [{ label: "Logged rock", h: 13, draw: (y: number, h: number) => ms.m.map((m, i) => <rect key={m} x={x(m)} y={y} width={bw} height={h} fill={lithColor(ms.lith[i])} />) }] : []),
     { label: "Rock Classification", h: 13, draw: (y, h) => <>
-      {ms.m.map((m) => { const j = idx.get(m); return j === undefined ? null : <rect key={m} x={x(m)} y={y} width={bw} height={h} fill={coreTypeColor(type.get(mv.core[j]))} />; })}
+      {ms.m.map((m) => { const j = idx.get(m); return j === undefined ? null : <rect key={m} x={x(m)} y={y} width={bw} height={h} fill={hatchFill("rh", type.get(mv.core[j]))} />; })}
       {mv.segments.map((s) => s.from_m > m0 + 0.5 ? <rect key={s.seg} x={x(s.from_m) - 0.4} y={y - 3} width={0.8} height={h + 6} fill={INK} /> : null)}
     </> },
     { label: "Unusual", h: 24, draw: (y, h) => ms.m.map((m) => { const j = idx.get(m); if (j === undefined) return null; const v = Math.min(1, mv.anom_raw[j] / rawTop) * h;
@@ -69,6 +70,7 @@ function HoleFigure({ hole, mv }: { hole: HoleDetail; mv: ModelView }) {
   const ticks: number[] = []; for (let d = Math.ceil(m0 / step) * step; d <= m1; d += step) ticks.push(d);
   return (
     <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} role="img" aria-label="The hole from top (left) to bottom (right)">
+      <defs><HatchDefs prefix="rh" names={mv.core_types.map((c) => c.name)} /></defs>
       {rows.map((r) => (
         <g key={r.label}>
           <text x={0} y={r.y + r.h / 2} dominantBaseline="middle" fontSize="10" fill={MUTED}>{r.label}</text>
@@ -245,7 +247,7 @@ export function ReportDocument({ hole, mv, run, models, trays, nodeRef }: {
             <tbody>{mv.segments.map((s) => (
               <tr key={s.seg}>
                 <td className={`${td} whitespace-nowrap tabular-nums`}>{s.from_m.toFixed(1)}–{s.to_m.toFixed(1)}</td>
-                <td className={td}><span className="flex items-start gap-1.5"><i className="mt-[3px] inline-block size-2.5 flex-none rounded-[2px]" style={{ background: coreTypeColor(s.core_type_name) }} />{s.core_type_name}</span></td>
+                <td className={td}><span className="flex items-start gap-1.5"><i className="mt-[3px] inline-block size-2.5 flex-none rounded-[2px]" style={{ background: coreTypeBg(s.core_type_name) }} />{s.core_type_name}</span></td>
                 <td className={`${td} text-slate-600`}>{s.desc_en.replace(/^[\d.]+–[\d.]+ m \([\d.]+ m\); /, "")}</td>
               </tr>))}</tbody>
           </table>

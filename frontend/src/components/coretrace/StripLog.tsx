@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Info } from "lucide-react";
 import type { Metres, ModelView, SpectralLog, TokenScores } from "@/lib/coreScan";
-import { GRID, INK, MUTED, SERIES, coreTypeColor, fmt, groupColor, groupName, pct } from "@/components/coretrace/palette";
+import { GRID, INK, MUTED, SERIES, coreTypePaint, fmt, groupColor, groupName, pct } from "@/components/coretrace/palette";
 import { cn } from "@/lib/utils";
 import { DepthNav } from "@/components/coretrace/DepthNav";
 import { ColourNote } from "@/components/coretrace/ColourNote";
@@ -17,7 +17,7 @@ export const TIP = {
   swir: "SWIR: the short-wave infrared mineral groups the scanner's TSG software reads (TSA). Each bar is the share of every group in the interval, weighted by the software's fit: 1 m bars over the whole hole, 10 cm bars once zoomed to 50 m or less. Grey is TSG's Invalid (no usable spectrum).",
   tir: "TIR: the thermal infrared mineral groups the scanner's TSG software reads (jCLST), drawn the same way as SWIR. Empty where the hole has no usable thermal infrared.",
   bd: "BD, boundary detection: HyFormer cuts the hole where its reading of the spectra changes. Each black line is a predicted boundary; the chunks between them are the auto log.",
-  rc: "RC, rock classification: the rock class HyFormer reads (a cluster of its reading), in the colour of the type's leading mineral. One block per metre over the whole hole (the commonest type of its 10 cm pieces); every 10 cm once zoomed to 50 m or less.",
+  rc: "RC, rock classification: the rock class HyFormer reads (a cluster of its reading), in the colour of the type's leading mineral; types that share a colour are told apart by a hatch over it (lines, dots or a grid). One block per metre over the whole hole (the commonest type of its 10 cm pieces); every 10 cm once zoomed to 50 m or less.",
   unusual: "Unusual: how far the spectra stand from the core within 15 m (bar length): per metre over the whole hole, per 10 cm once zoomed to 50 m or less. Orange-red bars are flagged: among the hole's top 3% and above the State's 98th percentile; at 10 cm, the piece that carries the flag.",
 };
 
@@ -167,7 +167,7 @@ export function StripLog({ metres, model, cursor, onCursor, onHover, hasLith, ra
       if (tok && model && (t.id === "rc" && tok.core || t.id === "anom")) {
         for (let i = 0; i < tok.bin.length; i++) {
           const y = (tok.bin[i] / 10 - m0) * ppm; if (y + tokH < 0 || y > height) continue;
-          if (t.id === "rc") { g.fillStyle = coreTypeColor(typeName.get(tok.core![i])); g.fillRect(x, y, t.w, tokH); }
+          if (t.id === "rc") { g.fillStyle = coreTypePaint(g, typeName.get(tok.core![i])); g.fillRect(x, y, t.w, tokH); }
           else { const j = midx.get(Math.floor(tok.bin[i] / 10)); g.fillStyle = tokFlag(i) && j !== undefined && flagged(j) ? SERIES.orange : "#9ca3af"; g.fillRect(x, y, Math.max(1, Math.min(1, tok.anom_raw[i] / rawTop) * t.w), tokH); }
         }
         x += t.w + GAP; continue;
@@ -178,7 +178,7 @@ export function StripLog({ metres, model, cursor, onCursor, onHover, hasLith, ra
         if (t.id === "gs") { g.fillStyle = groupColor(metres.gs[i]); g.fillRect(x, y, t.w, rowH); }
         else if (t.id === "gt") { g.fillStyle = groupColor(metres.gt[i]); g.fillRect(x, y, t.w, rowH); }
         else if (model && j !== undefined) {
-          if (t.id === "rc") { g.fillStyle = coreTypeColor(typeName.get(model.core[j])); g.fillRect(x, y, t.w, rowH); }
+          if (t.id === "rc") { g.fillStyle = coreTypePaint(g, typeName.get(model.core[j])); g.fillRect(x, y, t.w, rowH); }
           else if (t.id === "anom") { g.fillStyle = flagged(j) ? SERIES.orange : "#9ca3af"; g.fillRect(x, y, Math.max(1, Math.min(1, model.anom_raw[j] / rawTop) * t.w), rowH); }
         }
       }
@@ -334,7 +334,7 @@ export function StripKey({ metres, model, spectral }: { metres: Metres; model: M
       {model && <>
         <span className="h-3 w-px bg-slate-200" aria-hidden />
         <span className="flex items-center gap-1" data-keytip={TIP.bd}><span className="inline-block h-[1.5px] w-3 bg-slate-900" />boundary (BD)</span>
-        <span className="flex items-center gap-1" data-keytip={TIP.rc}>RC in its leading mineral&rsquo;s colour</span>
+        <span className="flex items-center gap-1" data-keytip={TIP.rc}>RC in its leading mineral&rsquo;s colour, hatched where types share one</span>
         <span className="flex items-center gap-1" data-keytip={TIP.unusual}><Sw c={SERIES.orange} />unusual, flagged</span>
         <span className="flex items-center gap-1"><Sw c="#9ca3af" />unusual, not flagged</span>
       </>}

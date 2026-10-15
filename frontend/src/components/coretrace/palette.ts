@@ -50,6 +50,60 @@ export function coreTypeColor(name: string | undefined): string {
   return OTHER;
 }
 
+/** Classes that share a colour (five read chlorite first, two white mica, two no SWIR response) are told apart by a
+ * hatch over that colour, from the rest of the name: a plain name is solid; "more dark mica", "more K-feldspar" and
+ * other "more X" hatch "/"; "more smectite" "\\"; "more white mica" across; "more amphibole" dotted; a second class of
+ * the same name ("(II)") a grid; a class led by a mineral that is not quartz or plagioclase ("Other Mg-OH minerals +
+ * chlorite") upright. Unique within each colour across HyFormer's classes. */
+export type Hatch = "solid" | "diag" | "back" | "horiz" | "vert" | "dots" | "grid";
+export function coreTypeHatch(name: string | undefined): Hatch {
+  if (!name) return "solid";
+  const n = name.toLowerCase();
+  if (/\(ii+\)/.test(n)) return "grid";
+  const more = /more ([^,(]+)/.exec(n)?.[1] ?? "";
+  if (more.includes("amphibole")) return "dots";
+  if (more.includes("smectite")) return "back";
+  if (more.includes("white mica")) return "horiz";
+  if (more) return "diag";
+  if (!/^(quartz|plagioclase|carbonate)/.test(n)) return "vert";
+  return "solid";
+}
+const HATCH_INK = "rgba(15,23,42,0.42)";
+/** A CSS `background` for a class: its colour with its hatch over it. */
+export function coreTypeBg(name: string | undefined): string {
+  const c = coreTypeColor(name), h = coreTypeHatch(name), L = `${HATCH_INK} 0 1px, transparent 1px 4px`;
+  switch (h) {
+    case "diag": return `repeating-linear-gradient(135deg, ${L}), ${c}`;
+    case "back": return `repeating-linear-gradient(45deg, ${L}), ${c}`;
+    case "horiz": return `repeating-linear-gradient(0deg, ${L}), ${c}`;
+    case "vert": return `repeating-linear-gradient(90deg, ${L}), ${c}`;
+    case "grid": return `repeating-linear-gradient(0deg, ${L}), repeating-linear-gradient(90deg, ${L}), ${c}`;
+    case "dots": return `radial-gradient(${HATCH_INK} 0.9px, transparent 1.2px) 0 0 / 4px 4px, ${c}`;
+    default: return c;
+  }
+}
+/** The same for a canvas: a pattern (or the plain colour), made once per class and context. */
+const PAT = new WeakMap<CanvasRenderingContext2D, Map<string, CanvasPattern | string>>();
+export function coreTypePaint(g: CanvasRenderingContext2D, name: string | undefined): CanvasPattern | string {
+  const c = coreTypeColor(name), h = coreTypeHatch(name);
+  if (h === "solid" || typeof document === "undefined") return c;
+  let m = PAT.get(g); if (!m) { m = new Map(); PAT.set(g, m); }
+  const key = `${c}|${h}`; const hit = m.get(key); if (hit) return hit;
+  // a 4 px tile drawn at 4x, the pattern scaled back down so the lines stay crisp on a dense screen
+  const S = 4, R = 4, t = document.createElement("canvas"); t.width = t.height = S * R;
+  const q = t.getContext("2d"); if (!q) return c;
+  q.scale(R, R); q.fillStyle = c; q.fillRect(0, 0, S, S); q.strokeStyle = HATCH_INK; q.fillStyle = HATCH_INK; q.lineWidth = 0.9;
+  const line = (x0: number, y0: number, x1: number, y1: number) => { q.beginPath(); q.moveTo(x0, y0); q.lineTo(x1, y1); q.stroke(); };
+  if (h === "diag") { line(-1, S + 1, S + 1, -1); line(-1, 1, 1, -1); line(S - 1, S + 1, S + 1, S - 1); }
+  if (h === "back") { line(-1, -1, S + 1, S + 1); line(S - 1, -1, S + 1, 1); line(-1, S - 1, 1, S + 1); }
+  if (h === "horiz" || h === "grid") line(0, 0.5, S, 0.5);
+  if (h === "vert" || h === "grid") line(0.5, 0, 0.5, S);
+  if (h === "dots") { q.beginPath(); q.arc(S / 2, S / 2, 0.8, 0, Math.PI * 2); q.fill(); }
+  const p = g.createPattern(t, "repeat"); if (!p) return c;
+  p.setTransform(new DOMMatrix().scale(1 / R));
+  m.set(key, p); return p;
+}
+
 /** Logged rock classes in GSWA's own colours. Each is the modal fill GSWA gives units of that rock type in the
  * 1:500 000 Interpreted bedrock geology of Western Australia (DASC, the layer's symbology over its 1,537 unit
  * codes): granitoids pink, mafic intrusives mint, mafic volcanics green, felsic volcanics yellow, ultramafics

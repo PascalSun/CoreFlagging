@@ -1,7 +1,7 @@
 // The card shown when the pointer rests on a hole: built as plain DOM, since Mapbox owns the popup.
 
 import type { HoleRow } from "@/lib/coreScan";
-import { NONE, STATUS_LABEL, coreTypeColor } from "@/components/coretrace/palette";
+import { NONE, STATUS_LABEL, coreTypeBg } from "@/components/coretrace/palette";
 import type { Shape } from "@/components/coretrace/shapes";
 
 type Look = { color: string; label: string; ring?: string; wait?: boolean; shape?: Shape; shapeLabel?: string };
@@ -33,7 +33,7 @@ export function holeCard(h: HoleRow, look: Look, typeName: Map<number, string>, 
   }
   // the hole from top to bottom, in the rock classes the model reads
   const strip = el("div", "ct-card-strip");
-  if (h.strip?.length) for (const k of h.strip) { const i = el("i", ""); i.style.background = coreTypeColor(typeName.get(k)); strip.append(i); }
+  if (h.strip?.length) for (const k of h.strip) { const i = el("i", ""); i.style.background = coreTypeBg(typeName.get(k)); strip.append(i); }
   else { const i = el("i", ""); i.style.background = NONE; strip.append(i); }
   const ends = el("div", "ct-card-ends");
   ends.append(el("span", "", h.depth_min !== null ? `${Math.round(h.depth_min)} m` : ""), el("span", "", h.depth_max !== null ? `${Math.round(h.depth_max)} m` : ""));

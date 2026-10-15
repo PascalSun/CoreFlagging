@@ -10,7 +10,8 @@
 
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import type { HoleDetail, ModelView, SpectralLog } from "@/lib/coreScan";
-import { SERIES, coreTypeColor, groupColor } from "@/components/coretrace/palette";
+import { SERIES, groupColor } from "@/components/coretrace/palette";
+import { HatchDefs, hatchFill } from "@/components/coretrace/HatchDefs";
 import { TIP, groupOrder } from "@/components/coretrace/StripLog";
 
 export type CorrSide = { hole: HoleDetail; mv?: ModelView; spectral?: SpectralLog };
@@ -179,7 +180,7 @@ export function CorrelationView({ a, b, corr, cursorA, onPick, winA = null, winB
       if (!vis(m)) return; const j = midx.get(m); const hh = Math.max(k, 0.6);
       if (kind === "swir") out.push(<rect key={m} x={x} y={y(m)} width={w} height={hh} fill={groupColor(s.hole.metres.gs[i])} />);
       else if (kind === "tir") out.push(<rect key={m} x={x} y={y(m)} width={w} height={hh} fill={groupColor(s.hole.metres.gt[i])} />);
-      else if (kind === "rc") out.push(<rect key={m} x={x} y={y(m)} width={w} height={hh} fill={j !== undefined && mv ? coreTypeColor(names.get(mv.core[j])) : groupColor(s.hole.metres.gs[i])} />);
+      else if (kind === "rc") out.push(<rect key={m} x={x} y={y(m)} width={w} height={hh} fill={j !== undefined && mv ? hatchFill(cid, names.get(mv.core[j])) : groupColor(s.hole.metres.gs[i])} />);
       else if (kind === "anom" && mv && j !== undefined) {
         const flag = mv.anom_raw[j] >= mv.anomaly.flag_raw && mv.anom[j] >= mv.anomaly.flag_at;
         out.push(<rect key={m} x={x} y={y(m)} width={Math.max(1, Math.min(1, mv.anom_raw[j] / rawTop) * w)} height={hh} fill={flag ? SERIES.orange : "#9ca3af"} />);
@@ -204,6 +205,7 @@ export function CorrelationView({ a, b, corr, cursorA, onPick, winA = null, winB
     <div ref={ref} className="relative h-full w-full">
       <svg width={box.w} height={box.h} className="block">
         <defs>
+          <HatchDefs prefix={cid} names={[...(a.mv?.core_types ?? []), ...(b.mv?.core_types ?? [])].map((c) => c.name)} />
           <clipPath id={`${cid}a`}><rect x={0} y={PAD} width={x1} height={H} /></clipPath>
           <clipPath id={`${cid}b`}><rect x={x2} y={PAD} width={box.w - x2} height={H} /></clipPath>
         </defs>

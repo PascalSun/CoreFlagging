@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft } from "lucide-react";
 import { coreScan } from "@/lib/coreScan";
-import { coreTypeColor, fmt, pct } from "@/components/coretrace/palette";
+import { fmt, pct, coreTypeBg } from "@/components/coretrace/palette";
 import { cn } from "@/lib/utils";
 
 /** Every tectonic region with enough scanned holes, and what its core is made of: the mean share of each core
@@ -33,7 +33,7 @@ export function Regions() {
           For each region, the average share of each rock class over its holes, as the model reads them metre by metre. The same type has the same colour in every row, so a region&rsquo;s signature can be read against the others. Shares are of scanned core, which is where companies chose to drill, not of the crust.
         </p>
         <div className="flex flex-wrap gap-x-3 gap-y-1 pb-3 text-[11px] text-slate-600">
-          {order.map((k) => <span key={k} className="flex items-center gap-1"><i className="inline-block size-2.5 rounded-[2px]" style={{ background: coreTypeColor(names.get(k)) }} />{names.get(k)}</span>)}
+          {order.map((k) => <span key={k} className="flex items-center gap-1"><i className="inline-block size-2.5 rounded-[2px]" style={{ background: coreTypeBg(names.get(k)) }} />{names.get(k)}</span>)}
         </div>
         <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
           <table className="w-full border-collapse text-xs">
@@ -50,7 +50,7 @@ export function Regions() {
                   <td className="px-3 py-2">
                     <div className="flex h-5 w-full overflow-hidden rounded">
                       {order.map((k) => { const t = by.get(k); if (!t || t.share < 0.005) return null; return (
-                        <div key={k} title={`${names.get(k)}: ${pct(t.share)} of the region's core, in ${t.holes} of ${r.n_holes} holes`} className="h-full border-r border-white/60 last:border-0" style={{ width: `${t.share * 100}%`, background: coreTypeColor(names.get(k)) }} />); })}
+                        <div key={k} title={`${names.get(k)}: ${pct(t.share)} of the region's core, in ${t.holes} of ${r.n_holes} holes`} className="h-full border-r border-white/60 last:border-0" style={{ width: `${t.share * 100}%`, background: coreTypeBg(names.get(k)) }} />); })}
                     </div>
                     <div className="mt-0.5 truncate text-[10.5px] text-slate-500">{r.types.slice(0, 3).map((t) => `${names.get(t.k)} ${pct(t.share)}`).join(" · ")}</div>
                   </td>

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import type { Metres, ModelView } from "@/lib/coreScan";
-import { SERIES, coreTypeColor, groupColor } from "@/components/coretrace/palette";
+import { SERIES, coreTypePaint, groupColor } from "@/components/coretrace/palette";
 import { MIN_SPAN, fmtWindow, windowAbout } from "@/lib/depth";
 
 /** The whole hole in one narrow column beside the zoomed log, so a reader always knows where the window
@@ -31,7 +31,7 @@ export function DepthNav({ metres, model, view, hole0, hole1, onRange, typeName,
     const rowH = Math.max(ppm, 1);
     for (let i = 0; i < metres.m.length; i++) {
       const m = metres.m[i], j = midx.get(m);
-      g.fillStyle = model && j !== undefined ? coreTypeColor(typeName.get(model.core[j])) : groupColor(metres.gs[i]);
+      g.fillStyle = model && j !== undefined ? coreTypePaint(g, typeName.get(model.core[j])) : groupColor(metres.gs[i]);
       g.fillRect(0, yOf(m), W, rowH);
     }
     if (model) {

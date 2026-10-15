@@ -6,7 +6,7 @@ import { ChevronLeft, ChevronRight, Maximize2 } from "lucide-react";
 import { coreScan, type HoleDetail, type ModelView, type SpectralLog, type Tray } from "@/lib/coreScan";
 import { LINE, SpectraChart } from "@/components/coretrace/SpectraChart";
 import { TrayPhoto } from "@/components/coretrace/TrayPhoto";
-import { coreTypeColor, fmt, groupColor, groupName, mineralName, pct } from "@/components/coretrace/palette";
+import { fmt, groupColor, groupName, mineralName, pct, coreTypeBg } from "@/components/coretrace/palette";
 import { cn } from "@/lib/utils";
 
 import { LEVELS, MIN_SPAN, fmtSpan, fmtWindow, levelOf, windowAt, type Window } from "@/lib/depth";
@@ -93,7 +93,7 @@ export function DepthLens({ hole, mv, win, onWindow, trays, metre, onMetre, type
               <div className="grid grid-cols-2 gap-2 @2xl:grid-cols-3">{metres.map((m) => { const j = midx.get(m); if (j === undefined) return null; return (
                 <button key={m} type="button" onClick={() => onMetre(m)} className={cn("rounded-lg border bg-white px-3 py-2 text-left hover:border-slate-400", metre === m ? "border-cyan" : "border-slate-200")}>
                   <div className="text-[11px] text-slate-500">{m}–{m + 1} m</div>
-                  <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-900"><i className="inline-block h-2.5 w-2.5 flex-none rounded-[2px]" style={{ background: coreTypeColor(typeName(mv.core[j])) }} /><span className="truncate">{typeName(mv.core[j])}</span></div>
+                  <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-900"><i className="inline-block h-2.5 w-2.5 flex-none rounded-[2px]" style={{ background: coreTypeBg(typeName(mv.core[j])) }} /><span className="truncate">{typeName(mv.core[j])}</span></div>
                   <div className="text-[11px] text-slate-500">unusual {pct(mv.anom[j])} · gold {fmt(mv.gold[j])}</div>
                 </button>); })}</div>
               <p className="pt-1 text-[10.5px] text-slate-400">The model reads the core by the metre; below that, what you see is the scanner&rsquo;s own reading and the photograph.</p>
@@ -182,7 +182,7 @@ function TenMetres({ hole, mv, spectral, from, to, typeName, onWindow }: {
             <td className={cn(td10, "font-mono whitespace-nowrap")}>{r.k}–{r.k + 10}{r.n < 10 ? <span className="ml-1 font-sans text-[10px] text-slate-400">({r.n} m of core)</span> : null}</td>
             <td className={td10}>{sw(r.sw, groupColor)}</td>
             <td className={td10}>{sw(r.tr, groupColor)}</td>
-            <td className={cn(td10, PRED)}>{sw(r.rc, (c) => coreTypeColor(typeName(Number(c))))}</td>
+            <td className={cn(td10, PRED)}>{sw(r.rc, (c) => coreTypeBg(typeName(Number(c))))}</td>
           </tr>))}</tbody>
       </table>
       <p className="pt-1 text-[10.5px] text-slate-400">SWIR and TIR: the share of each mineral group the scanner&rsquo;s TSG software reads, over the 10 m. Rock Classification: the class HyFormer reads in most of its metres, and in what share of them.</p>
