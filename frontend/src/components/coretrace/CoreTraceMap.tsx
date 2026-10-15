@@ -28,6 +28,12 @@ import { cn } from "@/lib/utils";
 
 const glass = "rounded-2xl border border-white/60 bg-white/80 shadow-glass backdrop-blur-xl";
 
+/** "230-240" from the address as a depth window, or null. */
+function parseWin(w: string | null): [number, number] | null {
+  if (!w) return null; const [a, b] = w.split("-").map(Number);
+  return Number.isFinite(a) && Number.isFinite(b) && b > a ? [a, b] : null;
+}
+
 /** The CoreFlagging map: every scanned hole in the State, and the way into any one of them.
  * What is open lives in the address (?hole=&m=&model=&full=1), so a view can be shared. */
 export function CoreTraceMap() {
@@ -296,17 +302,17 @@ export function CoreTraceMap() {
       {holeKey && !mobile && (
         <aside className="absolute z-30 overflow-hidden rounded-2xl border border-white/60 bg-white/90 shadow-glass backdrop-blur-xl" style={{ top: 68, bottom: 12, width: panelW, right: chatW + ctlW + 12 }}>
           <HolePanel key={holeKey} holeKey={holeKey} tab={tab} onTab={(t) => set({ tab: t === "window" ? null : t })} models={models} run={run} metre={metre} onMetre={(m) => set({ m: m === null ? null : String(m) })}
-            wide={wide} onWide={(w) => set({ full: w ? "1" : null })} onClose={() => set({ hole: null, m: null, full: null, tab: null, w: null, cmp: null })} win={win} onWindow={(r) => set(r ? { w: `${r[0]}-${r[1]}`, full: "1", tab: "window" } : { w: null, tab: null })}
+            wide={wide} onWide={(w) => set({ full: w ? "1" : null })} onClose={() => set({ hole: null, m: null, full: null, tab: null, w: null, cmp: null, wa: null, wb: null })} win={win} onWindow={(r) => set(r ? { w: `${r[0]}-${r[1]}`, full: "1", tab: "window" } : { w: null, tab: null })}
             onOpenHole={(k, m) => set({ hole: k, m: m === undefined ? null : String(m), full: "1" })}
-            onDeleted={() => set({ hole: null, m: null, full: null })} onRing={setRingKm} onCompare={(k) => set({ cmp: k })} />
+            onDeleted={() => set({ hole: null, m: null, full: null })} onRing={setRingKm} onCompare={(k, w) => set({ cmp: k, wa: w ? `${w.a[0]}-${w.a[1]}` : null, wb: w ? `${w.b[0]}-${w.b[1]}` : null })} />
         </aside>
       )}
       {holeKey && mobile && (
         <HoleSheet full={wide || sheetFull} onFull={(f) => { setSheetFull(f); if (!f && wide) set({ full: null }); }} onClose={() => set({ hole: null, m: null, full: null, tab: null, cmp: null })}>
           <HolePanel key={holeKey} holeKey={holeKey} tab={tab} onTab={(t) => set({ tab: t === "window" ? null : t })} models={models} run={run} metre={metre} onMetre={(m) => set({ m: m === null ? null : String(m) })}
-            wide={wide} onWide={(w) => set({ full: w ? "1" : null })} onClose={() => set({ hole: null, m: null, full: null, tab: null, w: null, cmp: null })} win={win} onWindow={(r) => set(r ? { w: `${r[0]}-${r[1]}`, full: "1", tab: "window" } : { w: null, tab: null })}
+            wide={wide} onWide={(w) => set({ full: w ? "1" : null })} onClose={() => set({ hole: null, m: null, full: null, tab: null, w: null, cmp: null, wa: null, wb: null })} win={win} onWindow={(r) => set(r ? { w: `${r[0]}-${r[1]}`, full: "1", tab: "window" } : { w: null, tab: null })}
             onOpenHole={(k, m) => set({ hole: k, m: m === undefined ? null : String(m), full: "1" })}
-            onDeleted={() => set({ hole: null, m: null, full: null })} onRing={setRingKm} onCompare={(k) => set({ cmp: k })} />
+            onDeleted={() => set({ hole: null, m: null, full: null })} onRing={setRingKm} onCompare={(k, w) => set({ cmp: k, wa: w ? `${w.a[0]}-${w.a[1]}` : null, wb: w ? `${w.b[0]}-${w.b[1]}` : null })} />
         </HoleSheet>
       )}
 
@@ -314,7 +320,8 @@ export function CoreTraceMap() {
       {comparing && (
         <aside className={mobile ? "fixed inset-0 z-50 overflow-hidden bg-white" : "absolute z-[35] overflow-hidden rounded-2xl border border-white/60 bg-white/90 shadow-glass backdrop-blur-xl"}
           style={mobile ? undefined : { top: 68, bottom: 12, left: 12, right: chatW + 12 }}>
-          <ComparePanel key={`${holeKey}|${cmp}`} a={holeKey!} b={cmp!} onClose={() => set({ cmp: null })} onOpenHole={(k) => set({ hole: k, cmp: null, m: null, w: null, tab: null })} />
+          <ComparePanel key={`${holeKey}|${cmp}`} a={holeKey!} b={cmp!} winA={parseWin(sp.get("wa"))} winB={parseWin(sp.get("wb"))} onClose={() => set({ cmp: null, wa: null, wb: null })}
+            onOpenHole={(k) => set({ hole: k, cmp: null, wa: null, wb: null, m: null, w: null, tab: null })} />
         </aside>
       )}
 

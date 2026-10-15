@@ -287,8 +287,8 @@ export function HolePanel({ holeKey, tab: tabProp, onTab, models, run, metre, on
   wide: boolean; onWide: (w: boolean) => void; onClose: () => void; onOpenHole: (key: string, m?: number) => void; onDeleted: () => void;
   /** draw (or clear) a ring of this many km around the hole on the map */
   onRing?: (km: number | null) => void;
-  /** set this hole beside another (by key) in the comparison panel */
-  onCompare?: (key: string) => void;
+  /** set this hole beside another (by key) in the comparison panel; `wins` opens both logs on the matched stretches */
+  onCompare?: (key: string, wins?: { a: [number, number]; b: [number, number] }) => void;
   /** the depth window the reader has zoomed to, and how to change it */
   win?: Window | null; onWindow?: (w: Window | null) => void;
 }) {
@@ -319,6 +319,8 @@ export function HolePanel({ holeKey, tab: tabProp, onTab, models, run, metre, on
   const [simScope, setSimScope] = useState<SimilarScope>("state");
   const [simWhole, setSimWhole] = useState(false);     // a stretch of the hole, or the whole hole
   const simAt = win && win[1] - win[0] <= 50 ? { from: win[0], to: win[1] } : metre !== null ? { m: metre } : null;
+  // the stretch the similar-core search asked about, as a window: the zoomed window, or the 2 m at the metre
+  const simWin = (q: NonNullable<typeof simAt>): [number, number] => ("from" in q && q.from !== undefined && q.to !== undefined ? [q.from, q.to] : [(q as { m: number }).m, (q as { m: number }).m + 2]);
   const sq = useQuery({ queryKey: ["core-similar", holeKey, simAt, useRun, simScope], queryFn: () => coreScan.similar(holeKey, simAt as { m: number }, useRun, simScope), enabled: ready && wide && tab === "similar" && simAt !== null && !!useRun, staleTime: 5 * 60_000, retry: false });
   const mvw = mq.data; const trays = tq.data?.trays ?? [];
   // the SWIR / TIR group make-up, worked out when the hole was read: the whole hole at 1 m, and the window at 0.1 m
@@ -409,7 +411,7 @@ export function HolePanel({ holeKey, tab: tabProp, onTab, models, run, metre, on
           <Fact k="Data quality" v={hole.n_issues ? `${hole.n_issues} ${hole.n_issues === 1 ? "issue" : "issues"}` : "nothing found"} sub={hole.issues[0] ? issueLabel(hole.issues[0].issue) : undefined} />
         </div>
         {hasReport && <div><H3>Original report</H3><OriginalReport report={rq.data} loading={rq.isPending} /></div>}
-        {hole.lat !== null && <div><H3>Nearby holes</H3><Nearby hole={hole} onOpen={(k) => onOpenHole(k)} onRing={onRing} onCompare={onCompare} /></div>}
+        {hole.lat !== null && <div><H3>Nearby holes</H3><Nearby hole={hole} onOpen={(k) => onOpenHole(k)} onRing={onRing} onCompare={(k) => onCompare?.(k)} /></div>}
         {modelPicker}
         <div>
           <H3>Down the hole</H3>
@@ -517,7 +519,7 @@ export function HolePanel({ holeKey, tab: tabProp, onTab, models, run, metre, on
                   <span className="text-[11px] text-slate-500">Compare</span>
                   {([false, true] as const).map((w) => <button key={String(w)} type="button" role="tab" aria-selected={simWhole === w} onClick={() => setSimWhole(w)} className={cn("rounded-full px-2.5 py-0.5 text-[11px] font-medium ring-1", simWhole === w ? "bg-slate-900 text-white ring-slate-900" : "bg-white text-slate-700 ring-slate-200 hover:ring-slate-400")}>{w ? "The whole hole" : "A stretch of core"}</button>)}
                 </div>);
-              if (simWhole) return <div className="flex flex-col gap-3">{asking}{useRun ? <SimilarHoles hole={hole} run={useRun} onOpenHole={(k) => onOpenHole(k)} onCompare={onCompare} /> : <Empty>Loading…</Empty>}</div>;
+              if (simWhole) return <div className="flex flex-col gap-3">{asking}{useRun ? <SimilarHoles hole={hole} run={useRun} onOpenHole={(k) => onOpenHole(k)} onCompare={(k) => onCompare?.(k)} /> : <Empty>Loading…</Empty>}</div>;
               return (
                 <div className="flex flex-col gap-3">
                   {asking}
@@ -534,7 +536,7 @@ export function HolePanel({ holeKey, tab: tabProp, onTab, models, run, metre, on
                     <thead><tr>{["Hole", "Interval (m)", "Similarity", "SWIR / TIR", "Region"].map((h) => <th key={h} className={th}>{h}</th>)}</tr></thead>
                     <tbody>{sq.data.results.map((r) => (
                       <tr key={`${r.hole}-${r.from_m}`} onClick={() => simScope === "hole" ? onWindow?.([r.from_m, r.to_m]) : r.key && onOpenHole(r.key, Math.floor(r.from_m))} className={cn((r.key || simScope === "hole") && "cursor-pointer hover:bg-slate-50")}>
-                        <td className={cn(td, "font-medium text-slate-900")}>{r.hole}{r.key && simScope !== "hole" ? <><ArrowRight size={12} className="ml-1 inline" /><button type="button" onClick={(e) => { e.stopPropagation(); if (r.key) onCompare?.(r.key); }} className="ml-2 text-[11px] font-normal text-slate-500 underline-offset-2 hover:underline">compare</button></> : null}</td>
+                        <td className={cn(td, "font-medium text-slate-900")}>{r.hole}{r.key && simScope !== "hole" ? <><ArrowRight size={12} className="ml-1 inline" /><button type="button" onClick={(e) => { e.stopPropagation(); if (r.key && simAt) onCompare?.(r.key, { a: simWin(simAt), b: [r.from_m, r.to_m] }); }} className="ml-2 text-[11px] font-normal text-slate-500 underline-offset-2 hover:underline">compare</button></> : null}</td>
                         <td className={cn(td, "font-mono")}>{r.from_m.toFixed(0)}–{r.to_m.toFixed(0)}</td><td className={cn(td, "font-mono")}>{r.sim.toFixed(2)}</td>
                         <td className={td}><span className="flex items-center gap-1.5"><i className="inline-block h-2.5 w-2.5 rounded-[2px]" style={{ background: groupColor(r.gs) }} />{groupName(r.gs)} / {groupName(r.gt)}</span></td>
                         <td className={td}>{r.region || "—"}{r.rock ? ` · ${r.rock}` : ""}</td></tr>))}</tbody>

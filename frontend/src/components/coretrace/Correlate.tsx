@@ -103,12 +103,18 @@ export function correlate(a: CorrSide, b: CorrSide): Correlation | null {
 }
 
 const GOLD = "#c9a24a", LINE = "#94a3b8";
+const STRIP_TIP = {
+  rc: "RC, rock classification: the core type HyFormer reads in each metre, in the colour of its leading mineral (the RC column of the log).",
+  bd: "BD, the auto log's chunks: HyFormer cuts the hole where its reading changes (the BD lines of the log); each chunk is coloured by its core type. Point at a left chunk to light its links; click it to mark it and its match.",
+};
 
 /** The two holes, each a fine strip (rock class by the metre) and a chunk strip (the auto log), on one scale,
  * the right one shifted so its matches sit level with the left; the links between them, the chunk under the
  * pointer (or the one holding the selected metre) in gold. Click a chunk to go to it and its match. */
-export function CorrelationView({ a, b, corr, cursorA, onPick }: {
+export function CorrelationView({ a, b, corr, cursorA, onPick, winA = null, winB = null }: {
   a: CorrSide; b: CorrSide; corr: Correlation; cursorA: number | null; onPick: (aM: number, bM: number) => void;
+  /** each log's window, boxed on its strips */
+  winA?: [number, number] | null; winB?: [number, number] | null;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const [box, setBox] = useState({ w: 320, h: 600 });
@@ -121,13 +127,13 @@ export function CorrelationView({ a, b, corr, cursorA, onPick }: {
 
   const a0 = a.hole.metres.m[0] ?? 0, a1 = (a.hole.metres.m[a.hole.metres.m.length - 1] ?? 0) + 1;
   const b0 = b.hole.metres.m[0] ?? 0, b1 = (b.hole.metres.m[b.hole.metres.m.length - 1] ?? 0) + 1;
-  // the right hole slides so the median link is level
-  const shift = useMemo(() => { const d = corr.links.map((l) => (l.a - a0) - (l.b - b0)).sort((x, y) => x - y); return d[Math.floor(d.length / 2)] ?? 0; }, [corr, a0, b0]);
-  const top = Math.min(0, shift), bot = Math.max(a1 - a0, b1 - b0 + shift);
-  const PAD = 22, k = Math.max(0.05, (box.h - 2 * PAD) / Math.max(1, bot - top));
-  const yA = (d: number) => PAD + (d - a0 - top) * k, yB = (d: number) => PAD + (d - b0 + shift - top) * k;
-  const FINE = 12, CHUNK = 22, GAP = 3, colW = FINE + GAP + CHUNK;
-  const xA = 4, xB = box.w - 4 - colW, x1 = xA + colW + 2, x2 = xB - 2;
+  // one depth axis for both: a metre sits at the same height in either hole, so their depths can be read across
+  const top = Math.min(a0, b0), bot = Math.max(a1, b1);
+  const PAD = 30, k = Math.max(0.05, (box.h - PAD - 16) / Math.max(1, bot - top));
+  const yA = (d: number) => PAD + (d - top) * k, yB = yA;
+  const FINE = 12, CHUNK = 22, GAP = 3, colW = FINE + GAP + CHUNK, AXIS = 30;
+  const xA = AXIS, xB = box.w - 4 - colW, x1 = xA + colW + 2, x2 = xB - 2;
+  const tick = [10, 20, 50, 100, 200, 500].find((t) => t * k >= 40) ?? 1000;
 
   const segsA = useMemo(() => a.mv?.segments ?? [], [a.mv]);
   // the chunk in gold: under the pointer, else the one holding the selected metre, else the best-matched one
@@ -154,16 +160,22 @@ export function CorrelationView({ a, b, corr, cursorA, onPick }: {
       <title>{`${g.from_m.toFixed(1)}–${g.to_m.toFixed(1)} m · ${g.core_type_name}`}</title>
     </rect>));
 
-  const label = (x: number, y: number, t: string, anchor: "start" | "end") => <text x={x} y={y} textAnchor={anchor} className="fill-slate-500 font-mono text-[9px]">{t}</text>;
+  const label = (x: number, y: number, t: string, anchor: "start" | "end" | "middle") => <text x={x} y={y} textAnchor={anchor} className="fill-slate-500 font-mono text-[9px]">{t}</text>;
+  const head = (x: number, t: string, tip: string) => <text x={x} y={12} textAnchor="middle" data-keytip={tip} className="cursor-help fill-slate-600 text-[9.5px] font-semibold">{t}</text>;
+  const frame = (x: number, w: [number, number] | null) => w && <rect x={x - 2} y={yA(w[0]) - 1} width={colW + 4} height={Math.max((w[1] - w[0]) * k, 2) + 2} fill="none" stroke="#0f172a" strokeWidth={1.2} strokeDasharray="3 2" rx={2}><title>{`The window on the log: ${w[0]}–${w[1]} m`}</title></rect>;
+  const ticks: number[] = []; for (let d = Math.ceil(top / tick) * tick; d <= bot; d += tick) ticks.push(d);
   return (
     <div ref={ref} className="relative h-full w-full">
       <svg width={box.w} height={box.h} className="block">
         {corr.links.filter((l) => !inLit(l)).map((l) => <line key={`${l.a}`} x1={x1} y1={yA(l.a + 0.5)} x2={x2} y2={yB(l.b + 0.5)} stroke={LINE} strokeOpacity={0.25 + 0.5 * l.sim} strokeWidth={0.8} />)}
         {corr.links.filter(inLit).map((l) => <line key={`g${l.a}`} x1={x1} y1={yA(l.a + 0.5)} x2={x2} y2={yB(l.b + 0.5)} stroke={GOLD} strokeWidth={2.6} strokeLinecap="round" />)}
-        <g>{fine(a, xA, yA)}{chunks(a, xA + FINE + GAP, yA, "a")}</g>
-        <g>{fine(b, xB, yB)}{chunks(b, xB + FINE + GAP, yB, "b")}</g>
-        {label(xA, yA(a0) - 6, `${Math.round(a0)} m`, "start")}{label(xA, yA(a1) + 12, `${Math.round(a1)} m`, "start")}
-        {label(xB + colW, yB(b0) - 6, `${Math.round(b0)} m`, "end")}{label(xB + colW, yB(b1) + 12, `${Math.round(b1)} m`, "end")}
+        {/* the shared depth axis, at the left */}
+        {ticks.map((d) => <g key={d}><line x1={AXIS - 4} x2={AXIS - 1} y1={yA(d)} y2={yA(d)} stroke="#cbd5e1" />{label(AXIS - 6, yA(d) + 3, String(d), "end")}</g>)}
+        <g>{fine(a, xA, yA)}{chunks(a, xA + FINE + GAP, yA, "a")}{frame(xA, winA)}</g>
+        <g>{fine(b, xB, yB)}{chunks(b, xB + FINE + GAP, yB, "b")}{frame(xB, winB)}</g>
+        {head(xA + FINE / 2, "RC", STRIP_TIP.rc)}{head(xA + FINE + GAP + CHUNK / 2, "BD", STRIP_TIP.bd)}
+        {head(xB + FINE / 2, "RC", STRIP_TIP.rc)}{head(xB + FINE + GAP + CHUNK / 2, "BD", STRIP_TIP.bd)}
+        {label(xA + colW / 2, yA(a1) + 11, `${Math.round(a1)} m`, "middle")}{label(xB + colW / 2, yB(b1) + 11, `${Math.round(b1)} m`, "middle")}
       </svg>
     </div>
   );
