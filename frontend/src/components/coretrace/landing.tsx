@@ -82,7 +82,7 @@ export function CoreHero() {
       <div className="absolute inset-x-0 bottom-0">
         <div className="container-site flex flex-col gap-5 pb-6 md:flex-row md:items-end md:justify-between md:gap-8 md:pb-12">
           <div className="max-w-4xl">
-            <p className="font-display text-lg font-semibold tracking-tight text-white md:text-xl">CoreTRACE</p>
+            <p className="font-display text-lg font-semibold tracking-tight text-white md:text-xl">CoreFlagging</p>
             <h1 className="mt-1.5 font-display text-[34px] font-semibold leading-[1.1] tracking-tight md:mt-2.5 md:text-6xl md:leading-tight">
               <span className="bg-linear-to-r from-white from-40% to-cyan bg-clip-text text-transparent">A second opinion on every metre of core.</span>
             </h1>
