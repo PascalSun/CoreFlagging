@@ -48,7 +48,9 @@ function DocumentList({ out }: { out: any }) {
     ...((out.hole_pdfs ?? []) as any[]).map((p) => ({ corpus: p.corpus, key: p.key, file: p.file, url: p.url, title: p.title, sub: `${p.kind}${p.pages ? ` · ${p.pages} pages` : ""}` })),
   ];
   const [open, setOpen] = useState<string | null>(null);
-  const covering = out.wamex?.reports_covering_the_collar_total ?? 0;
+  const [more, setMore] = useState(false);
+  const covering: any[] = out.wamex?.reports_covering_the_collar ?? [];
+  const coveringTotal: number = out.wamex?.reports_covering_the_collar_total ?? covering.length;
   if (!rows.length) return null;
   const shown = rows.find((r) => r.url === open);
   return (
@@ -66,7 +68,26 @@ function DocumentList({ out }: { out: any }) {
           </li>
         ))}
       </ul>
-      {covering > 0 && <p className="px-1 text-[11px] text-slate-500">{covering} more WAMEX {covering === 1 ? "report covers" : "reports cover"} the collar; ask for them by subject or year.</p>}
+      {coveringTotal > 0 && (
+        <div className="rounded-xl border border-slate-200 bg-white/70 text-xs">
+          <button type="button" onClick={() => setMore((v) => !v)} className="flex w-full items-center justify-between px-3 py-2 text-left text-[12px] text-slate-700 hover:text-slate-900">
+            <span>{coveringTotal} more WAMEX {coveringTotal === 1 ? "report covers" : "reports cover"} the collar{covering.length < coveringTotal ? ` (newest ${covering.length} listed)` : ""}</span>
+            <span className="text-[11px] text-slate-500">{more ? "Hide" : "Show all"}</span>
+          </button>
+          {more && (
+            <ol className="flex flex-col gap-1.5 border-t border-slate-100 px-3 py-2">
+              {covering.map((r) => (
+                <li key={r.anumber} className="text-[11px] leading-snug text-slate-600">
+                  <a href={r.wamex_page} target="_blank" rel="noreferrer" className="font-medium text-slate-900 underline decoration-slate-300 underline-offset-2 hover:decoration-slate-900">{r.anumber}</a>
+                  {" "}{[r.year, r.company, r.type, r.commodities].filter(Boolean).join(" · ")}
+                  <div className="text-slate-700">{r.title}</div>
+                  {r.abstract && <div className="text-slate-500">{String(r.abstract).replace(/\s+/g, " ").slice(0, 220)}{String(r.abstract).length > 220 ? "…" : ""}</div>}
+                </li>
+              ))}
+            </ol>
+          )}
+        </div>
+      )}
       {shown && <ReportPdf url={shown.url} title={shown.title} subtitle={`${shown.corpus === "wamex" ? "WAMEX " : ""}${shown.key} · ${shown.file}`} />}
     </div>
   );
