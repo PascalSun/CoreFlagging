@@ -296,7 +296,7 @@ export function ReportDocument({ hole, mv, run, models, trays, nodeRef }: {
           </div>
           <div>
             <h3 className="mb-1.5 text-[11.5px] font-semibold">Cleaning rules</h3>
-            <ul className="flex flex-col gap-1 text-[10.5px] leading-snug text-slate-600">{(hole.report.rules ?? []).map((r) => <li key={r.step}><span className="font-medium text-slate-800">{r.step}.</span> {r.rule}</li>)}</ul>
+            <ul className="flex flex-col gap-1 text-[10.5px] leading-snug text-slate-600">{(hole.report.rules ?? []).filter((r) => r.step !== "Software minerals").map((r) => <li key={r.step}><span className="font-medium text-slate-800">{r.step}.</span> {r.rule}</li>)}</ul>
           </div>
         </div>
         <p className="mt-5 border-t border-slate-200 pt-3 text-[10px] leading-relaxed text-slate-500">
