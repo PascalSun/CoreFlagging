@@ -185,7 +185,7 @@ export function CoreChat({ context, onOpen, signedIn, onSignIn }: {
   if (!signedIn) {
     return (
       <div className="flex flex-1 flex-col items-start justify-center gap-3 p-5">
-        <p className="text-sm leading-relaxed text-slate-600">The assistant answers from the same data as the map: holes, metres, the auto log, unusual intervals, gold ranking and quality issues. Sign in to use it.</p>
+        <p className="text-sm leading-relaxed text-slate-600">The assistant answers from the same data as the map: holes, metres, the auto log, unusual intervals and quality issues. Sign in to use it.</p>
         <button type="button" onClick={onSignIn} className="rounded-full bg-ink px-5 py-2 text-sm font-semibold text-white hover:bg-ink-soft">Sign in</button>
       </div>
     );

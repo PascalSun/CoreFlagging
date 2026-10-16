@@ -6,7 +6,7 @@ import { AlertTriangle, ArrowRight, Box, Check, ChevronLeft, ChevronRight, Downl
 import { downloadReportPdf } from "@/components/coretrace/pdf";
 import { PAGE_W, ReportDocument } from "@/components/coretrace/ReportDocument";
 import { ACTIVE, inferred, TARGET_SOURCE_LABEL, abstractParts, commodityName, coreScan, readDate, sourceLabel, surveyOf, type SimilarScope, type CoreModelInfo, type HoleDetail, type HoleDocuments, type MetreView, type ModelView, type Tray } from "@/lib/coreScan";
-import { STATUS_LABEL, SERIES, fmt, groupColor, groupName, issueLabel, mineralName, pct, coreTypeBg } from "@/components/coretrace/palette";
+import { STATUS_LABEL, fmt, groupColor, groupName, issueLabel, mineralName, pct, coreTypeBg } from "@/components/coretrace/palette";
 import { LINE, SpectraChart } from "@/components/coretrace/SpectraChart";
 import { StripKeyBar, StripLog, groupOrder } from "@/components/coretrace/StripLog";
 import { TrayViewer } from "@/components/coretrace/DeepZoom";
@@ -19,9 +19,9 @@ import { DepthLens, levelOf, type Window, WindowStart } from "@/components/coret
 import { cn } from "@/lib/utils";
 import { PLATFORM_URL } from "@ntlp/geodata-web/fetch";
 
-export type Tab = "window" | "metre" | "again" | "log" | "gold" | "similar" | "quality" | "report";
-// "gold" and "log" (Auto log) are hidden: their views are kept below, but no tab opens them and a link with
-// ?tab=gold or ?tab=log falls back to Window. The auto log still shows as the BD column and in Window at 10 m.
+export type Tab = "window" | "metre" | "again" | "log" | "similar" | "quality" | "report";
+// "log" (Auto log) is hidden: its view is kept below, but no tab opens it and a link with ?tab=log (or the old
+// ?tab=gold) falls back to Window. The auto log still shows as the BD column and in Window at 10 m.
 const TABS: { id: Tab; label: string }[] = [
   { id: "window", label: "Window" }, { id: "again", label: "Unusual" },
   { id: "similar", label: "Similar core" }, { id: "quality", label: "Data quality" }, { id: "report", label: "Report" },
@@ -491,7 +491,6 @@ export function HolePanel({ holeKey, tab: tabProp, onTab, models, run, metre, on
       </div>
     );
   } else {
-    const goldTop = mvw?.gold_summary.top ?? [];
     body = (
       // a wide screen keeps the log and the reading side by side, each scrolling on its own; a phone scrolls the whole
       // page as one, with the log a fixed height at the top and the tabs held at the top of the screen as you read
@@ -547,18 +546,6 @@ export function HolePanel({ holeKey, tab: tabProp, onTab, models, run, metre, on
                 </table></div>
               </div>) : <Empty>Loading…</Empty>)}
             {tab === "again" && (mvw ? <LookAgain mv={mvw} metre={metre} onJump={(m, to) => { jump(m); if (to !== undefined && onWindow) onWindow([m, to]); }} /> : <Empty>Loading…</Empty>)}
-            {tab === "gold" && (mvw ? (
-              <div className="flex flex-col gap-3">
-                <p className="text-xs leading-relaxed text-slate-600">The likelihood comes from a probe fitted on assayed training holes; it reads the spectra only. {hole.au_m ? `This hole has ${hole.au_m} assayed metres (${hole.au_pos_m} at or above 0.1 ppm)${mvw.gold_summary.auc !== null ? `; the model ranks them with AUC ${fmt(mvw.gold_summary.auc)}` : ""}${mvw.gold_summary.top10_share !== undefined ? `, and ${pct(mvw.gold_summary.top10_share)} of its top tenth carry gold against ${pct(mvw.gold_summary.base_share)} overall` : ""}.` : "This scan carries no assays, so the ranking cannot be checked here."}</p>
-                <table className="w-full border-collapse">
-                  <thead><tr>{["Metre", "Gold likelihood", ...(hole.au_m ? ["Assay (ppm)"] : [])].map((h) => <th key={h} className={th}>{h}</th>)}</tr></thead>
-                  <tbody>{goldTop.map((g) => (
-                    <tr key={g.m} onClick={() => { setTab("window"); openMetre(g.m); }} className="cursor-pointer hover:bg-slate-50">
-                      <td className={cn(td, "font-mono")}>{g.m}–{g.m + 1}</td>
-                      <td className={td}><span className="flex items-center gap-2"><span className="h-2 rounded-r-[4px]" style={{ width: `${g.p * 60}%`, background: SERIES.blue }} /><span className="font-mono">{g.p.toFixed(2)}</span></span></td>
-                      {hole.au_m ? <td className={cn(td, "font-mono")}>{g.au !== null ? g.au.toFixed(2) : "—"}</td> : null}</tr>))}</tbody>
-                </table>
-              </div>) : <Empty>Loading…</Empty>)}
             {tab === "similar" && (() => {
               const scopes: { id: SimilarScope; label: string; hint: string }[] = [
                 { id: "hole", label: "This hole", hint: "Where else in this hole is core like this" }, { id: "nearby", label: "Within 10 km", hint: "The neighbouring holes" },
