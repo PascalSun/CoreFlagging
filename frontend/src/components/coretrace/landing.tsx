@@ -316,8 +316,8 @@ export function CoreTeam() {
 const STEPS: [string, string][] = [
   ["Spectra every 10 cm", "The HyLogger measures short-wave infrared (clays, micas, carbonates, talc) and thermal infrared (quartz, feldspar) all along the core."],
   ["Cleaned the same way for every hole", "Chip and cuttings scans dropped, bad readings masked, every instrument on one wavelength grid, the good readings averaged per 10 cm."],
-  ["One model, trained by filling in blanks", "Pre-trained on millions of unlabelled intervals to rebuild hidden depths, sensors and wavelengths. Logs and assays are kept for scoring; the rock classes alone are fine-tuned on training holes."],
-  ["One representation, every function", "The same reading drives the rock classes, the virtual TIR, the domain boundaries, the unusual metres and the similar core."],
+  ["HyFormer, one model trained by filling in blanks", "HyFormer learns from millions of unlabelled 10 cm intervals the way language models learn from text: part of the scan is hidden \u2014 a stretch of depth, a whole sensor, a band of wavelengths \u2014 and the model learns to rebuild it. Logs and assays are never used for training, only for scoring; the rock classes alone are fine-tuned on the training holes' logs."],
+  ["One representation, multiple functions", "The same HyFormer reading of each interval supports every task: rock classification, filling in the thermal infrared for scans made without that sensor, finding the domain boundaries, flagging the metres that stand out, and looking up similar core as neighbours in the representation space."],
 ];
 
 /** How it works: four steps in order, in the notes' quiet card style. */
@@ -342,11 +342,11 @@ export function CoreHow() {
   );
 }
 
-const FOUND: [string, string][] = [
-  ["0.75 vs 0.64", "Which metres hold gold: AUC over 105 assayed holes, against the best conventional method."],
-  ["+0.06 F1", "Domain boundaries closer to the geologists' logged contacts (p = 0.002)."],
-  ["10 of 10", "TIR rebuilt from SWIR alone beats the best conventional method on every test set."],
-  ["58% vs 44%", "Rock type from spectra, 12 classes on 26 unseen holes, against always guessing the commonest class."],
+const FOUND: [string, string, string][] = [
+  ["Which metres hold gold", "0.75 vs 0.64", "On 105 holes with assays, HyFormer's unusualness score ranks the gold-bearing metres with an AUC of 0.75, and 0.77 on 23 holes it never saw; the best conventional method, TSG scalars, stays near 0.64. Without any assays to calibrate against, the two tie."],
+  ["Where the rock changes", "0.45 vs 0.39 F1", "HyFormer's domain boundaries land within a metre of the geologists' logged contacts with an F1 of 0.45. The best conventional method, principal components of the raw spectra, reaches 0.39; TSG scalars and wavelets do worse. The gap holds up statistically (p = 0.002)."],
+  ["Thermal infrared without the sensor", "10 of 10 test sets", "Older scans have no TIR, so their quartz and feldspar were never recorded. HyFormer rebuilds the TIR spectrum from the SWIR alone, and does so better than the best conventional method on all ten test sets: unseen WA holes, far regions, other instruments, petroleum wells and four other States."],
+  ["Rock type from spectra", "58% vs 44%", "Fine-tuned on the training holes' logs, HyFormer names the rock class of a 10 cm interval correctly 58% of the time, over 12 classes on 26 unseen holes. Always guessing the commonest class gives 44%; TSG scalars with a linear model give 31%. Here pre-training adds little: the same network trained from scratch reaches 56%."],
 ];
 
 /** What it found: the four results of the hackathon deck, each against the best conventional method. */
@@ -357,12 +357,12 @@ export function CoreFound() {
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <Reveal><h2 className="font-display text-2xl font-medium tracking-tight text-ink md:text-4xl">What it found</h2></Reveal>
         </div>
-        <dl className="mt-8 grid gap-x-10 sm:grid-cols-2 xl:grid-cols-4">
-          {FOUND.map(([n, b]) => (
-            <Reveal key={n}>
+        <dl className="mt-8 grid gap-x-10 sm:grid-cols-2">
+          {FOUND.map(([t, n, b]) => (
+            <Reveal key={t}>
               <div className="border-t border-line py-6">
-                <dt className="font-display text-3xl font-semibold tracking-tight text-ink tabular-nums md:text-4xl">{n}</dt>
-                <dd className="mt-2 max-w-[38ch] text-[15px] leading-relaxed text-ink-soft">{b}</dd>
+                <dt><span className="block text-[13px] font-medium uppercase tracking-wide text-ink-soft">{t}</span><span className="mt-1 block font-display text-3xl font-semibold tracking-tight text-ink tabular-nums md:text-4xl">{n}</span></dt>
+                <dd className="mt-3 max-w-[52ch] text-[15px] leading-relaxed text-ink-soft">{b}</dd>
               </div>
             </Reveal>
           ))}
