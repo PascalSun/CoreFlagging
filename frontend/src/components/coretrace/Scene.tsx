@@ -38,10 +38,9 @@ export function Scene() {
   const key = sp.get("hole"); const [km, setKm] = useState<number>(Number(sp.get("km")) || 2);
   const colourAll = true;                                        // the neighbours are always coloured from their own logs
   const [paint, setPaint] = useState<Paint>("swir");
-  const [frame, setFrame] = useState<"hole" | "all">("all");
   const [view, setView] = useState<"3d" | "section">(sp.get("view") === "section" ? "section" : "3d");
   const [azimuth, setAzimuth] = useState<number | null>(null);   // the section line's bearing, null = the hole's own dip direction
-  const [corridor, setCorridor] = useState<number>(250);         // the section takes holes within this many metres of its line      // what the view is framed on: this hole at true proportions, or every neighbour
+  const [corridor, setCorridor] = useState<number>(250);         // the section takes holes within this many metres of its line
   const q = useQuery({ queryKey: ["core-trace", key, km], queryFn: () => coreScan.trace(key as string, km), enabled: !!key, staleTime: 10 * 60_000 });
   const host = useRef<HTMLDivElement>(null);
   // the spectral logs (1 m) behind the mineral colouring: this hole's, and the neighbours' when they are coloured
@@ -104,24 +103,17 @@ export function Scene() {
       const H = d.hole.points; const ticks = H.filter((p) => Math.round(p.m) % 50 === 0 && Math.abs(p.m - Math.round(p.m)) < 0.05);
       if (ticks.length) traces.push({ type: "scatter3d", mode: "markers+text", x: ticks.map((p) => p.e), y: ticks.map((p) => p.n), z: ticks.map((p) => p.u), text: ticks.map((p) => `${Math.round(p.m)} m`),
         textposition: "middle right", textfont: { size: 10, color: "#475569" }, marker: { size: 2.5, color: "#0f172a" }, hoverinfo: "skip", showlegend: false });
-      // framed on this hole: a cube around it at true proportions, the ground as a faint square at the collar's level
-      const ex = H.map((p) => p.e), ny = H.map((p) => p.n), up = H.map((p) => p.u);
-      const lo = [Math.min(...ex), Math.min(...ny), Math.min(...up)], hi = [Math.max(...ex), Math.max(...ny), Math.max(...up)];
-      const half = Math.max(40, 0.62 * Math.max(hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2])); const c = lo.map((v, i) => (v + hi[i]) / 2);
-      const rng = (i: number) => [c[i] - half, c[i] + half];
-      if (frame === "hole") {
-        const [x0, x1] = rng(0), [y0, y1] = rng(1);
-        traces.push({ type: "mesh3d", x: [x0, x1, x1, x0], y: [y0, y0, y1, y1], z: [0, 0, 0, 0], i: [0, 0], j: [1, 2], k: [2, 3], color: "#cbd5e1", opacity: 0.25, hoverinfo: "skip", showlegend: false, name: "ground" });
-      }
-      // look at the hole side-on: from the side of its dip direction, so an inclined hole reads as inclined rather than
-      // being seen end-on and looking vertical (a vertical hole is viewed from the south-east)
-      const end = H[H.length - 1]; const hx = end.e - H[0].e, hy = end.n - H[0].n; const hl = Math.hypot(hx, hy);
-      const side = hl > 5 ? { x: (-hy / hl) * 1.7, y: (hx / hl) * 1.7 } : { x: 1.2, y: -1.2 };
-      const axis = (title: string, i: number) => ({ title: { text: title }, gridcolor: "#e2e8f0", zerolinecolor: "#cbd5e1", ...(frame === "hole" ? { range: rng(i), autorange: false } : {}) });
+      // the ground: a faint square at this collar's level, spanning every hole drawn
+      const all = [d.hole, ...d.nearby].flatMap((t) => { const { dx, dy } = rel(t); return t.points.map((p) => ({ e: p.e + dx, n: p.n + dy })); });
+      const ex = all.map((p) => p.e), ny = all.map((p) => p.n);
+      const x0 = Math.min(...ex) - 50, x1 = Math.max(...ex) + 50, y0 = Math.min(...ny) - 50, y1 = Math.max(...ny) + 50;
+      traces.push({ type: "mesh3d", x: [x0, x1, x1, x0], y: [y0, y0, y1, y1], z: [0, 0, 0, 0], i: [0, 0], j: [1, 2], k: [2, 3], color: "#cbd5e1", opacity: 0.2, hoverinfo: "skip", showlegend: false, name: "ground" });
+      // the view fits every hole at true proportions, seen from the south-east and a little above
+      const axis = (title: string) => ({ title: { text: title }, gridcolor: "#e2e8f0", zerolinecolor: "#cbd5e1" });
       const layout = {
         margin: { l: 0, r: 0, t: 0, b: 0 }, paper_bgcolor: "rgba(0,0,0,0)", showlegend: false,
-        scene: { aspectmode: frame === "hole" ? "cube" : "data", xaxis: axis("east (m)", 0), yaxis: axis("north (m)", 1), zaxis: axis(c0.rl !== null ? "up (m, from this collar)" : "up (m)", 2),
-          camera: { eye: frame === "hole" ? { ...side, z: 0.55 } : { x: 0.75, y: -0.9, z: 0.45 } }, bgcolor: "#f8fafc" },
+        scene: { aspectmode: "data", xaxis: axis("east (m)"), yaxis: axis("north (m)"), zaxis: axis(c0.rl !== null ? "up (m, from this collar)" : "up (m)"),
+          camera: { eye: { x: 0.75, y: -0.9, z: 0.45 } }, bgcolor: "#f8fafc" },
       };
       await Plotly.react(el, traces, layout, { displaylogo: false, responsive: true, modeBarButtonsToRemove: ["toImage"] });
       (el as any).on?.("plotly_click", (ev: any) => {
@@ -131,7 +123,7 @@ export function Scene() {
       });
     })();
     return () => { gone = true; };
-  }, [q.data, colourAll, frame, router, paint, mainMix, nearLogs, view]);
+  }, [q.data, colourAll, router, paint, mainMix, nearLogs, view]);
 
   const d: TraceView | undefined = q.data;
   const presets = [["N–S", 0], ["NE–SW", 45], ["E–W", 90], ["NW–SE", 135]] as const;
@@ -157,9 +149,7 @@ export function Scene() {
         <div className="pointer-events-auto"><Pill value={view} onChange={setView} items={[["3d", "3D"], ["section", "Section"]] as const} label="View" /></div>
         <div className="pointer-events-auto"><Pill value={km} onChange={setKm} items={RINGS.map((r) => [r, `${r} km`] as const)} label="Neighbours within" /></div>
         <div className="pointer-events-auto"><Pill value={paint} onChange={setPaint} items={PAINTS} label="Coloured by" /></div>
-        {view === "3d" ? (
-          <div className="pointer-events-auto"><Pill value={frame} onChange={setFrame} items={[["hole", "This hole"], ["all", "Everything"]] as const} label="Framed on" /></div>
-        ) : (
+        {view === "section" && (
           <>
             <div className={cn(glass, "pointer-events-auto flex h-11 items-center gap-1 rounded-full p-1")} role="group" aria-label="Section line" title="The section line's bearing">
               <span className="grid size-9 place-items-center text-slate-500"><Compass size={16} /></span>
