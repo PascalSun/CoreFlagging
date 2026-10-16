@@ -238,10 +238,11 @@ export function CoreRun({ rows, caption }: { rows: string[]; caption: string }) 
 }
 
 const NOTES: [string, string][] = [
-  ["A second opinion, not a replacement.", "CoreFlagging points at intervals worth another look. A geologist, the tray photograph and the core decide."],
-  ["Checked in Western Australia.", "Against the logs and the chemistry in GSWA's drillhole database. Holes from other States are read the same way but not yet checked."],
-  ["It is wrong sometimes.", "Some intervals it reads as ultramafic are basalt by their chemistry, and weathering clays hide the rock they came from."],
-  ["Not a grade estimate.", "It points at the metres worth assaying; it gives no grade and replaces no assay."],
+  ["It is a second opinion, not a replacement.", "CoreFlagging points at the intervals worth another look. The decision stays with the geologist, the tray photograph and the core itself."],
+  ["It has been checked in Western Australia only.", "The results above were measured against the logs and the chemistry in GSWA's drillhole database. Holes from other States are read the same way, but nobody has checked those results yet."],
+  ["It is sometimes wrong.", "Some intervals it calls ultramafic turn out to be basalt by their chemistry, and where the core is weathered, the clays hide the rock they came from."],
+  ["It does not estimate grade.", "It points at the metres worth assaying. It gives no grade and replaces no assay."],
+  ["It is a first version, and it will improve.", "The model is still being developed. The numbers above are from its first version: good enough to be useful, not as good as it can be. Each task has clear room to improve, and we will keep updating the model and these results."],
 ];
 
 /** What to keep in mind, in plain words. */
