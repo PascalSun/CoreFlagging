@@ -166,7 +166,7 @@ export function Scene() {
         <div className="pointer-events-auto"><Pill value={km} onChange={setKm} items={RINGS.map((r) => [r, `${r} km`, `Draw the scanned holes within ${r} km of this collar`] as const)} label="Neighbours within" /></div>
         <div className="pointer-events-auto"><Pill value={paint} onChange={setChosen} items={[
           ...(hasRock ? [["rock", "Logged rock", "Colour by the rock type the company geologist logged, in GSWA's map colours: the way a drillhole is usually drawn"] as const] : []),
-          ["swir", "SWIR minerals", "Colour by the SWIR reading: clays, micas, chlorite, carbonate (the alteration minerals), in TSG's colours"], ["tir", "TIR minerals", "Colour by the TIR reading: quartz, feldspars, pyroxene, garnet (the rock-forming minerals), in TSG's colours"]] as const} label="Coloured by" /></div>
+          ["swir", "SWIR minerals", "Colour each 10 cm by the SWIR group TSG read most of there: clays, micas, chlorite, carbonate (the alteration minerals), in TSG's colours"], ["tir", "TIR minerals", "Colour each 10 cm by the TIR group TSG read most of there: quartz, feldspars, pyroxene, garnet (the rock-forming minerals), in TSG's colours"]] as const} label="Coloured by" /></div>
         {view === "section" && (
           <>
             <div className={cn(glass, "pointer-events-auto flex h-11 items-center gap-1 rounded-full p-1")} role="group" aria-label="Section line">
@@ -188,7 +188,7 @@ export function Scene() {
         <aside aria-label="Key" className={cn(glass, "absolute right-3 bottom-3 z-10 w-[300px] max-w-[calc(100vw-24px)] overflow-hidden bg-white/90")}>
           <div className="flex items-center gap-2 border-b border-white/75 py-2 pr-3 pl-4">
             <b className="font-display text-sm font-bold tracking-tight">{paint === "rock" ? "Logged rock" : `${paint.toUpperCase()} mineral groups`}</b>
-            <span className="ml-auto text-[11.5px] whitespace-nowrap text-slate-500">{paint === "rock" ? "GSWA colours, per metre" : "TSG colours, every 10 cm"}</span>
+            <span className="ml-auto text-[11.5px] whitespace-nowrap text-slate-500">{paint === "rock" ? "GSWA colours, per metre" : "TSG colours, leading group per 10 cm"}</span>
           </div>
           <div className="grid grid-cols-2 gap-x-3 gap-y-1 px-4 py-2.5 text-xs text-slate-700">
             {mainGroups.slice(0, 12).map((g) => <span key={g} className="flex items-center gap-1.5"><i className="inline-block size-3 flex-none rounded-[3px] border border-slate-900/10" style={{ background: swatch(g) }} />{name(g)}</span>)}
@@ -201,7 +201,7 @@ export function Scene() {
             <span className="flex items-center gap-1.5"><i className="inline-block h-1.5 w-4 rounded-full" style={{ background: SERIES.orange }} />model disagrees with the log</span>
           </div>
           <p className="border-t border-white/75 px-4 py-2 text-[11px] leading-relaxed text-slate-500">
-            {paint === "rock" ? "Colours are the rock types in the hole's own log, mapped to GSWA's rock families in the colours of GSWA's bedrock map; a neighbour without a log is grey." : "Colours are the HyLogger data itself: the mineral groups TSG read in each 10 cm, in TSG&apos;s standard colours, each 10 cm split along the hole by their shares (as the strip log stacks them), so every colour is in the key."} True proportions, no vertical exaggeration.{" "}
+            {paint === "rock" ? "Colours are the rock types in the hole's own log, mapped to GSWA's rock families in the colours of GSWA's bedrock map; a neighbour without a log is grey." : "Colours are the HyLogger data itself: the mineral group TSG read most of in each 10 cm, in TSG&apos;s standard colours, as TSG&apos;s own group log draws it; hover gives the full mix."} True proportions, no vertical exaggeration.{" "}
             {view === "3d" ? "Drag to turn, scroll to zoom." : "A vertical section through this collar along the line; holes within the corridor are projected onto it, fainter the further off the line. Drag to pan, scroll to zoom, double-click to reset."} Click a point to open that depth on the map.
           </p>
         </aside>

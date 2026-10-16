@@ -1,14 +1,14 @@
 import type { HoleDetail, SpectralLog, Trace } from "@/lib/coreScan";
 import { groupColor, groupName, lithColor } from "@/components/coretrace/palette";
 
-// How the scene and the section colour a hole: every 10 cm from its spectral log, each piece split by its groups' shares in TSG's colours.
+// How the scene and the section colour a hole: every 10 cm from its spectral log, the group TSG read most of there, in TSG's colours.
 
 export const STEP = 0.1;                                               // the scene is coloured every 10 cm (a 1 m log paints its 10 pieces alike)
 
-/** What colours each 10 cm piece, keyed by the piece's top in decimetres: `parts` is the piece's colours with their shares,
- * largest first, the way the strip log stacks a metre's groups (a piece 60 % chlorite, 30 % white mica, 10 % carbonate is
- * drawn 6 cm green, 3 cm yellow, 1 cm blue along the hole, every colour one of the key's); `text` names them; `rank` is the
- * hole's groups, most core first, for the key. */
+/** What colours each 10 cm piece, keyed by the piece's top in decimetres: `parts` is the piece's colours with their shares
+ * along it. For the minerals it is one colour, the group TSG read most of in the piece, as TSG's own Grp log and the NVCL
+ * reports draw it (a piece 60 % chlorite, 30 % white mica is chlorite green; hover gives the shares); `text` names the
+ * groups; `rank` is the hole's groups, most core first, for the key. */
 export type Mix = { parts: Map<number, [string, number][]>; text: Map<number, string>; rank: string[] };
 export function mixed(log: SpectralLog | undefined, side: "swir" | "tir"): Mix {
   const parts = new Map<number, [string, number][]>(); const text = new Map<number, string>(); const tot = new Map<string, number>();
@@ -18,7 +18,7 @@ export function mixed(log: SpectralLog | undefined, side: "swir" | "tir"): Mix {
     const ranked = Object.entries(mix).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
     if (!ranked.length) continue;
     for (const [g, v] of ranked) tot.set(g, (tot.get(g) ?? 0) + v);
-    const ps: [string, number][] = ranked.map(([g, v]) => [groupColor(g), v]);
+    const ps: [string, number][] = [[groupColor(ranked[0][0]), 1]];           // the leading group alone
     const t = ranked.slice(0, 3).map(([g, v]) => `${groupName(g)} ${Math.round(v * 100)}%`).join(", ");   // "Chlorite 62%, White mica 30%"
     const d0 = Math.round(r.from_m / STEP);
     for (let i = 0; i < per; i++) { parts.set(d0 + i, ps); text.set(d0 + i, t); }
