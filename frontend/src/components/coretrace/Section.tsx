@@ -58,10 +58,11 @@ export function Section({ d, paint, mainMix, nearLogs, colourAll, azimuth, corri
     const g = el.getContext("2d"); if (!g) return;
     g.setTransform(R, 0, 0, R, 0, 0);
     g.fillStyle = "#f8fafc"; g.fillRect(0, 0, W, H);
-    const pad = 70; const w = Math.max(box.x1 - box.x0, 20), h = Math.max(box.y1 - box.y0, 20);
-    const s = Math.min((W - 2 * pad) / w, (H - 2 * pad) / h) * zoom;
-    const X = (x: number) => pad + (x - box.x0) * s + pan[0] + ((W - 2 * pad) - w * s) / 2;
-    const Y = (y: number) => H - pad - (y - box.y0) * s - pan[1] - ((H - 2 * pad) - h * s) / 2;
+    // room for the toolbar above and the key below-left; the section fits the rest
+    const padT = 120, padB = 70, padL = 80, padR = 80; const w = Math.max(box.x1 - box.x0, 20), h = Math.max(box.y1 - box.y0, 20);
+    const s = Math.min((W - padL - padR) / w, (H - padT - padB) / h) * zoom;
+    const X = (x: number) => padL + (x - box.x0) * s + pan[0] + ((W - padL - padR) - w * s) / 2;
+    const Y = (y: number) => H - padB - (y - box.y0) * s - pan[1] - ((H - padT - padB) - h * s) / 2;
     // grid: a round step in metres that gives 60–120 px
     const step = [5, 10, 20, 25, 50, 100, 200, 250, 500, 1000, 2000].find((v) => v * s >= 60) ?? 5000;
     g.font = "10px ui-sans-serif, system-ui"; g.textBaseline = "middle";
