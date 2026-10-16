@@ -101,11 +101,15 @@ def clean_dataset(hd: Path, dsid: str, inst: str, lenient: bool = False):
         return "no SWIR validity mask"
     want = ["start_depth", "mask_swir", "mask_tir"] + [c for pair in LABELS.values() for c in pair]
     t = pd.read_parquet(f, columns=[c for c in want if c in names]); sw = np.load(fs, mmap_mode="r")
-    if lenient and len(sw) == len(t) and sw.shape[1] != len(SW_WL):
+    if len(sw) == len(t) and sw.shape[1] != len(SW_WL):
+        # Another band grid. Most are the same 4 nm grid starting at 416 nm instead of 380 (522 bands): resampled
+        # onto the standard grid the bands line up, and the nine below 416 nm, at the noisy blue end, take the
+        # 416 nm value. A grid that does not reach from 416 to 2490 nm is left to display only.
         wf = hd / "spectra" / f"vnswir_{d8}_wavelengths.npy"
         if wf.exists():
             src = np.load(wf).astype("f8")
-            sw = np.stack([np.interp(SW_WL, src, row) for row in np.asarray(sw, dtype="f8")]).astype("f4")
+            if lenient or (src.min() <= C.SWIR_MIN_START and src.max() >= C.SWIR_MIN_END):
+                sw = np.stack([np.interp(SW_WL, src, row) for row in np.asarray(sw, dtype="f8")]).astype("f4")
     if len(sw) != len(t) or sw.shape[1] != len(SW_WL):
         return f"SWIR shape {sw.shape} does not match the sample table ({len(t)})"
     depth = t.start_depth.to_numpy(); step = np.diff(depth); step = np.median(step[step > 0]) if (step > 0).any() else np.inf

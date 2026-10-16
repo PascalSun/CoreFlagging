@@ -42,5 +42,6 @@ TIR_OVER_SHARE = 0.05             # more than 5 % of samples above 1 = miscalibr
 TIR_BANDS = (6500.0, 14000.0)     # TIR range given to the model (noisy band ends trimmed)
 TIR_GRID = (6000.0, 14500.0, 341) # HyLogger 3 TIR grid; HyLogger 4 TIR is resampled onto it
 SWIR_GRID = (380.0, 2500.0, 531)  # VNIR-SWIR grid
+SWIR_MIN_START, SWIR_MIN_END = 416.0, 2490.0   # another SWIR grid is resampled onto it when it reaches this far
 PRIORITY = ("HyLogger 3", "HyLogger 4", "HyLogger 2")   # where datasets of one hole overlap in depth, keep this order
 STORE_DTYPE = "float16"
