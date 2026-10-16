@@ -259,3 +259,30 @@ def test_metre_arrays_fingerprint_is_the_metre_vector(monkeypatch):
     tir, fp = extras.metre_arrays(eng, "h")
     assert tir.shape == (4, 2) and fp.shape == (4, 2)
     np.testing.assert_allclose(fp[0], [1, 0], atol=1e-5)                       # the ramp only: unit vector along it
+
+
+def _scan(tmp_path, wl, n=200, step=0.01):
+    """A minimal cleaned-dataset input: n samples every `step` m, one SWIR spectrum per sample on grid `wl`."""
+    import pandas as pd
+    hd = tmp_path / "hd"; (hd / "spectra").mkdir(parents=True); (hd / "samples").mkdir()
+    d8 = "abcd1234"
+    pd.DataFrame({"start_depth": np.arange(n) * step, "mask_swir": np.ones(n, int)}).to_parquet(hd / "samples" / f"{d8}.parquet")
+    np.save(hd / "spectra" / f"vnswir_{d8}.npy", np.tile(np.linspace(0.2, 0.4, len(wl)), (n, 1)).astype("f4"))
+    np.save(hd / "spectra" / f"vnswir_{d8}_wavelengths.npy", np.asarray(wl, "f4"))
+    return hd, d8 + "-rest"
+
+
+def test_a_swir_grid_starting_at_416_nm_is_resampled_for_the_models(tmp_path):
+    from app.pipeline.preprocess import clean_dataset, SW_WL
+    hd, dsid = _scan(tmp_path, np.arange(416.0, 2500.1, 4.0))            # 522 bands, the common other grid
+    out = clean_dataset(hd, dsid, "HyLogger 3")
+    assert isinstance(out, tuple) or isinstance(out, dict), out
+    res = out[0] if isinstance(out, tuple) else out
+    assert res["swir"].shape[1] == len(SW_WL)
+
+
+def test_a_swir_grid_that_stops_short_stays_display_only(tmp_path):
+    from app.pipeline.preprocess import clean_dataset
+    hd, dsid = _scan(tmp_path, np.arange(500.0, 2400.1, 4.0))
+    out = clean_dataset(hd, dsid, "HyLogger 3")
+    assert isinstance(out, str) and out.startswith("SWIR shape")
