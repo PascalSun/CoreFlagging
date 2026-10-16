@@ -186,11 +186,11 @@ function TrayPicture({ offset }: { offset: number }) {
   );
 }
 
-const FEATURES: { title: string; body: string; offset: number; tint: string; to: "map" | "findings" }[] = [
-  { title: "Every hole, one map", body: "About 6,600 scanned holes from every State's core library, coloured by what each was drilled for \u2014 gold, copper, nickel \u2014 or by what the core is made of.", offset: 0.05, tint: "#0d3a4c", to: "map" },
-  { title: "The log next to the scan", body: "Open a hole: the log from the whole hole down to 10 cm, the tray photographs and the line scan, the minerals every 10 cm and CoreFlagging's reading, beside the geologist's log.", offset: 0.3, tint: "#173523", to: "map" },
-  { title: "Where they disagree", body: "The intervals where the core and the log tell different stories, each with its photograph, to look at again \u2014 and core like them, in the hole, nearby or across the State.", offset: 0.55, tint: "#3b2916", to: "findings" },
-  { title: "Ask about the core", body: "An assistant that answers from the same data, in plain words, and opens the hole it is talking about.", offset: 0.15, tint: "#2a2446", to: "map" },
+const FEATURES: { title: string; body: string; offset: number; tint: string; to: string }[] = [
+  { title: "Every hole, one map", body: "About 6,600 scanned holes from every State's core library, coloured by what each was drilled for or by what the core is made of. Upload a scan, or fetch one by drillhole name from NVCL.", offset: 0.05, tint: "#0d3a4c", to: "map" },
+  { title: "A drillhole report", body: "Domain boundaries, the TIR an older scan never recorded, the intervals that stand out and why, and the metres most worth assaying \u2014 beside the tray photographs and the geologist's log.", offset: 0.3, tint: "#173523", to: "map" },
+  { title: "Core like this one", body: "For any interval or whole hole, the most similar core nearby or across the State, matched metre by metre on the model's reading.", offset: 0.55, tint: "#3b2916", to: "map" },
+  { title: "Ask about the core", body: "An assistant that answers from the same data, finds the reports behind a hole and sums them up, and opens the hole it is talking about.", offset: 0.15, tint: "#2a2446", to: "map" },
 ];
 
 /** What you can do: four large picture cards, title at the foot, as on the platform's landing page. */
@@ -241,7 +241,7 @@ const NOTES: [string, string][] = [
   ["A second opinion, not a replacement.", "CoreFlagging points at intervals worth another look. A geologist, the tray photograph and the core decide."],
   ["Checked in Western Australia.", "Against the logs and the chemistry in GSWA's drillhole database. Holes from other States are read the same way but not yet checked."],
   ["It is wrong sometimes.", "Some intervals it reads as ultramafic are basalt by their chemistry, and weathering clays hide the rock they came from."],
-  ["Not a targeting tool.", "We make no claim about gold or nickel. Differing from the log points at the rock, not at grade."],
+  ["Not a grade estimate.", "It points at the metres worth assaying; it gives no grade and replaces no assay."],
 ];
 
 /** What to keep in mind, in plain words. */
@@ -315,9 +315,9 @@ export function CoreTeam() {
 
 const STEPS: [string, string][] = [
   ["Spectra every 10 cm", "The HyLogger measures short-wave infrared (clays, micas, carbonates, talc) and thermal infrared (quartz, feldspar) all along the core."],
-  ["A model learns the core", "Trained with no labels, it learns what core looks like to the scanner. It never sees the logs, the assays or the deposits."],
-  ["A reading for every 10 cm", "Each stretch of core gets a reading, grouped into 12 rock classes named by their minerals."],
-  ["Set beside the log", "Where the reading and the log agree, the log is confirmed. Where they differ, the interval is worth another look."],
+  ["Cleaned the same way for every hole", "Chip and cuttings scans dropped, bad readings masked, every instrument on one wavelength grid, the good readings averaged per 10 cm."],
+  ["One model, trained by filling in blanks", "Pre-trained on millions of unlabelled intervals to rebuild hidden depths, sensors and wavelengths. Logs and assays are kept for scoring; the rock classes alone are fine-tuned on training holes."],
+  ["One representation, every function", "The same reading drives the rock classes, the virtual TIR, the domain boundaries, the unusual metres and the similar core."],
 ];
 
 /** How it works: four steps in order, in the notes' quiet card style. */
@@ -343,12 +343,13 @@ export function CoreHow() {
 }
 
 const FOUND: [string, string][] = [
-  ["74%", "When CoreFlagging and the log disagree, the chemistry backs CoreFlagging in 74% of cases, against 51% by chance."],
-  ["79 intervals", "Ultramafic rock in WA logged as something else, confirmed by the scanner's own minerals."],
-  ["5,846 holes", "Read across Australia. Checked against logs and chemistry in Western Australia."],
+  ["0.75 vs 0.64", "Which metres hold gold: AUC over 105 assayed holes, against the best conventional method."],
+  ["+0.06 F1", "Domain boundaries closer to the geologists' logged contacts (p = 0.002)."],
+  ["10 of 10", "TIR rebuilt from SWIR alone beats the best conventional method on every test set."],
+  ["58% vs 44%", "Rock type from spectra, 12 classes on 26 unseen holes, against always guessing the commonest class."],
 ];
 
-/** A short look at the findings: three tested numbers. */
+/** What it found: the four results of the hackathon deck, each against the best conventional method. */
 export function CoreFound() {
   return (
     <section id="found" className="scroll-mt-24 bg-paper pb-16 md:pb-24">
@@ -356,11 +357,11 @@ export function CoreFound() {
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <Reveal><h2 className="font-display text-2xl font-medium tracking-tight text-ink md:text-4xl">What it found</h2></Reveal>
         </div>
-        <dl className="mt-8 grid gap-x-10 sm:grid-cols-3">
+        <dl className="mt-8 grid gap-x-10 sm:grid-cols-2 xl:grid-cols-4">
           {FOUND.map(([n, b]) => (
             <Reveal key={n}>
               <div className="border-t border-line py-6">
-                <dt className="font-display text-4xl font-semibold tracking-tight text-ink tabular-nums md:text-5xl">{n}</dt>
+                <dt className="font-display text-3xl font-semibold tracking-tight text-ink tabular-nums md:text-4xl">{n}</dt>
                 <dd className="mt-2 max-w-[38ch] text-[15px] leading-relaxed text-ink-soft">{b}</dd>
               </div>
             </Reveal>
