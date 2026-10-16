@@ -80,15 +80,13 @@ export function Section({ d, mixOf, colourAll, azimuth, corridor, onOpen }: {
       const alpha = hh.main ? 1 : Math.max(0.3, 1 - (0.7 * Math.abs(hh.off)) / Math.max(corridor, 1));
       g.globalAlpha = alpha;
       const P = hh.pts; const wd = hh.main ? 8 : 4;
-      if (hh.main) { g.strokeStyle = "#0f172a"; g.lineWidth = wd + 4; g.beginPath(); P.forEach((p, i) => (i ? g.lineTo(X(p.x), Y(p.y)) : g.moveTo(X(p.x), Y(p.y)))); g.stroke(); }
-      // each piece in its own colour: a run of one colour is one stroke
-      g.lineWidth = wd; let i = 0;
-      while (i < P.length - 1) {
-        const c = P[i].c ?? "#94a3b8"; let j = i + 1;
-        while (j < P.length - 1 && (P[j].c ?? "#94a3b8") === c) j++;
-        g.strokeStyle = c; g.beginPath(); g.moveTo(X(P[i].x), Y(P[i].y)); for (let k = i + 1; k <= j; k++) g.lineTo(X(P[k].x), Y(P[k].y)); g.stroke();
-        i = j;
-      }
+      // runs of one colour, each one stroke; a run with no colour (not scanned, or nothing read) is thin and pale, so it is
+      // never mistaken for a pale rock colour; this hole's dark halo goes under its coloured runs only
+      const runs: [number, number, string | null][] = []; let i = 0;
+      while (i < P.length - 1) { const c = P[i].c; let j = i + 1; while (j < P.length - 1 && P[j].c === c) j++; runs.push([i, j, c]); i = j; }
+      const stroke = (a: number, b: number) => { g.beginPath(); g.moveTo(X(P[a].x), Y(P[a].y)); for (let k = a + 1; k <= b; k++) g.lineTo(X(P[k].x), Y(P[k].y)); g.stroke(); };
+      if (hh.main) { g.strokeStyle = "#0f172a"; g.lineWidth = wd + 4; for (const [a, b, c] of runs) if (c !== null) stroke(a, b); }
+      for (const [a, b, c] of runs) { g.strokeStyle = c ?? "#cbd5e1"; g.lineWidth = c === null ? (hh.main ? 2 : 1.5) : wd; stroke(a, b); }
       // the flagged intervals beside this hole
       if (hh.main) {
         g.strokeStyle = "#6d28d9"; g.lineWidth = 3;
@@ -128,7 +126,7 @@ export function Section({ d, mixOf, colourAll, azimuth, corridor, onOpen }: {
           const dr = drag.current;
           if (dr) { setPan([dr.pan[0] + e.clientX - dr.x, dr.pan[1] - (e.clientY - dr.y)]); return; }
           const r = e.currentTarget.getBoundingClientRect(); const b = nearest(e.clientX - r.left, e.clientY - r.top);
-          setHover(b ? { x: e.clientX - r.left, y: e.clientY - r.top, text: `${b.h.t.name} · ${b.p.m.toFixed(1)} m${b.p.t ? ` · ${b.p.t}` : ""}` } : null);
+          setHover(b ? { x: e.clientX - r.left, y: e.clientY - r.top, text: `${b.h.t.name} · ${b.p.m.toFixed(1)} m · ${b.p.t ?? (b.p.m >= b.h.t.depth_min - 0.5 && b.p.m <= b.h.t.depth_max + 0.5 ? "no reading" : "not scanned")}` } : null);
         }}
         onDoubleClick={() => { setZoom(1); setPan([0, 0]); }} />
       {hover && <div className="pointer-events-none absolute z-10 rounded-md bg-slate-900/90 px-2 py-1 text-[11px] text-white" style={{ left: hover.x + 12, top: hover.y + 12 }}>{hover.text}</div>}
