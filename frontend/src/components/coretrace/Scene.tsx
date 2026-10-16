@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useQueries, useQuery } from "@tanstack/react-query";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Compass, Ruler } from "lucide-react";
 import { coreScan, type Trace, type TraceView } from "@/lib/coreScan";
 import { groupColor, groupName, SERIES } from "@/components/coretrace/palette";
 import { fine, mixed, STEP } from "@/components/coretrace/sceneColour";
@@ -14,6 +14,19 @@ import { cn } from "@/lib/utils";
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 const glass = "rounded-2xl border border-white/60 bg-white/85 shadow-glass backdrop-blur-xl";
+
+/** A row of choices in a glass pill, the chosen one in ink: the map page's tab bar, reused for every option here. */
+function Pill<T extends string | number>({ value, onChange, items, label, icon }: { value: T; onChange: (v: T) => void; items: readonly (readonly [T, string])[]; label: string; icon?: React.ReactNode }) {
+  return (
+    <div className={cn(glass, "flex h-11 items-center gap-0.5 rounded-full p-1")} role="group" aria-label={label} title={label}>
+      {icon && <span className="grid size-9 place-items-center text-slate-500">{icon}</span>}
+      {items.map(([v, text]) => (
+        <button key={String(v)} type="button" aria-pressed={value === v} onClick={() => onChange(v)}
+          className={cn("flex h-9 items-center whitespace-nowrap rounded-full px-3 text-sm font-semibold transition-colors", value === v ? "bg-ink text-white" : "text-slate-600 hover:text-slate-900")}>{text}</button>
+      ))}
+    </div>
+  );
+}
 const RINGS = [2, 5, 10] as const;
 const NEIGHBOUR_LOGS = 30;                                      // how many neighbours' spectral logs to fetch when they are coloured
 const FINE_NEIGHBOURS = 12;                                     // up to this many neighbours take the 0.1 m log; more take the 1 m one
@@ -23,7 +36,7 @@ const PAINTS: [Paint, string][] = [["swir", "SWIR minerals"], ["tir", "TIR miner
 export function Scene() {
   const sp = useSearchParams(); const router = useRouter();
   const key = sp.get("hole"); const [km, setKm] = useState<number>(Number(sp.get("km")) || 2);
-  const [colourAll, setColourAll] = useState(true);
+  const colourAll = true;                                        // the neighbours are always coloured from their own logs
   const [paint, setPaint] = useState<Paint>("swir");
   const [frame, setFrame] = useState<"hole" | "all">("all");
   const [view, setView] = useState<"3d" | "section">(sp.get("view") === "section" ? "section" : "3d");
@@ -33,7 +46,7 @@ export function Scene() {
   const host = useRef<HTMLDivElement>(null);
   // the spectral logs (1 m) behind the mineral colouring: this hole's, and the neighbours' when they are coloured
   const sq = useQuery({ queryKey: ["core-spectral-whole", key, 0.1], queryFn: () => coreScan.spectralLog(key as string, 0.1), enabled: !!key, staleTime: 60 * 60_000, retry: false });
-  const nearKeys = useMemo(() => (colourAll ? (q.data?.nearby ?? []).slice(0, NEIGHBOUR_LOGS).map((n) => n.key) : []), [q.data, colourAll]);
+  const nearKeys = useMemo(() => (q.data?.nearby ?? []).slice(0, NEIGHBOUR_LOGS).map((n) => n.key), [q.data]);
   const nearStep: 1 | 0.1 = nearKeys.length <= FINE_NEIGHBOURS ? 0.1 : 1;
   const nq = useQueries({ queries: nearKeys.map((k) => ({ queryKey: ["core-spectral-whole", k, nearStep], queryFn: () => coreScan.spectralLog(k, nearStep), staleTime: 60 * 60_000, retry: false })) });
   const nearStamp = nq.map((r) => r.dataUpdatedAt).join(",");                 // useQueries hands back a new array each render; redraw only when a log arrives
@@ -121,50 +134,65 @@ export function Scene() {
   }, [q.data, colourAll, frame, router, paint, mainMix, nearLogs, view]);
 
   const d: TraceView | undefined = q.data;
+  const presets = [["N–S", 0], ["NE–SW", 45], ["E–W", 90], ["NW–SE", 135]] as const;
   return (
     <div className="fixed inset-0 bg-slate-100">
       {view === "3d" ? <div ref={host} className="absolute inset-0" /> : d && (
-        <Section d={d} paint={paint} mainMix={mainMix} nearLogs={nearLogs} colourAll={colourAll} azimuth={azimuth} corridor={corridor} onAzimuth={setAzimuth}
+        <Section d={d} paint={paint} mainMix={mainMix} nearLogs={nearLogs} colourAll azimuth={azimuth} corridor={corridor} onAzimuth={setAzimuth}
           onOpen={(k, m) => router.push(`/map?hole=${encodeURIComponent(k)}&full=1&m=${Math.floor(m)}`)} />
       )}
-      <div className={cn(glass, "absolute top-3 left-3 z-10 flex max-w-[calc(100vw-24px)] flex-wrap items-center gap-3 px-4 py-2.5")}>
-        <Link href={key ? `/map?hole=${encodeURIComponent(key)}` : "/map"} className="inline-flex items-center gap-1 text-xs font-medium text-slate-600 hover:text-slate-900"><ArrowLeft size={14} />Map</Link>
-        <h1 className="font-display text-sm font-semibold text-slate-900">{d ? d.hole.name : key ?? "A hole"} in space</h1>
-        {d && <span className="text-[11px] text-slate-500">{d.hole.source === "survey" ? `${d.hole.stations} survey stations` : d.hole.source === "header" ? "straight, from the scan header" : "no survey: drawn vertical"} · {d.nearby.length} holes within</span>}
-        <div className="flex overflow-hidden rounded-md border border-slate-200 text-[11px]" role="group" aria-label="Neighbours within">
-          {RINGS.map((r) => <button key={r} type="button" onClick={() => setKm(r)} className={cn("px-2 py-0.5", km === r ? "bg-slate-900 text-white" : "bg-white text-slate-600 hover:bg-slate-50")}>{r} km</button>)}
+      {/* top bar, as on the map: the brand and the way back on the left, the views and their options after */}
+      <div className="pointer-events-none absolute top-0 right-0 left-0 z-20 flex flex-wrap items-center gap-2 p-3 sm:gap-3">
+        <Link href="/" className={cn(glass, "pointer-events-auto hidden h-11 flex-none items-center gap-2 rounded-full pr-4 pl-1.5 font-display text-sm font-bold tracking-tight text-ink sm:flex")}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/brand/coretrace-mark.svg" alt="" className="size-8 rounded-full" />CoreFlagging
+        </Link>
+        <Link href={key ? `/map?hole=${encodeURIComponent(key)}` : "/map"} className={cn(glass, "pointer-events-auto flex h-11 items-center gap-1.5 rounded-full px-3.5 text-sm font-semibold text-slate-700 hover:bg-white hover:text-slate-900")}><ArrowLeft size={15} />Map</Link>
+        <div className={cn(glass, "pointer-events-auto flex h-11 min-w-0 items-center gap-2 rounded-full px-4")}>
+          <h1 className="font-display text-sm font-bold tracking-tight text-ink">{d ? d.hole.name : key ?? "A hole"}</h1>
+          {d && <span className="hidden truncate text-xs text-slate-500 md:inline">{d.hole.source === "survey" ? `${d.hole.stations} survey stations` : d.hole.source === "header" ? "straight, from the scan header" : "no survey, drawn vertical"} · {d.nearby.length} holes within {km} km</span>}
+          {q.isPending && <span className="text-xs text-slate-500">Loading…</span>}
+          {q.isError && <span className="text-xs text-rose-700">no collar position</span>}
         </div>
-        <div className="flex overflow-hidden rounded-md border border-slate-200 text-[11px]" role="group" aria-label="View">
-          {([["3d", "3D"], ["section", "Section"]] as const).map(([v, label]) => <button key={v} type="button" onClick={() => setView(v)} className={cn("px-2 py-0.5", view === v ? "bg-slate-900 text-white" : "bg-white text-slate-600 hover:bg-slate-50")}>{label}</button>)}
-        </div>
+        <div className="pointer-events-auto"><Pill value={view} onChange={setView} items={[["3d", "3D"], ["section", "Section"]] as const} label="View" /></div>
+        <div className="pointer-events-auto"><Pill value={km} onChange={setKm} items={RINGS.map((r) => [r, `${r} km`] as const)} label="Neighbours within" /></div>
+        <div className="pointer-events-auto"><Pill value={paint} onChange={setPaint} items={PAINTS} label="Coloured by" /></div>
         {view === "3d" ? (
-          <div className="flex overflow-hidden rounded-md border border-slate-200 text-[11px]" role="group" aria-label="Framed on">
-            {([["hole", "This hole"], ["all", "Everything"]] as const).map(([f, label]) => <button key={f} type="button" onClick={() => setFrame(f)} className={cn("px-2 py-0.5", frame === f ? "bg-slate-900 text-white" : "bg-white text-slate-600 hover:bg-slate-50")}>{label}</button>)}
-          </div>
+          <div className="pointer-events-auto"><Pill value={frame} onChange={setFrame} items={[["hole", "This hole"], ["all", "Everything"]] as const} label="Framed on" /></div>
         ) : (
           <>
-            <label className="flex items-center gap-1.5 text-[11px] text-slate-600">line <input type="range" min={0} max={179} value={azimuth ?? 0} onChange={(e) => setAzimuth(Number(e.target.value))} className="w-24 accent-slate-900" aria-label="Section line bearing" /><span className="w-10 tabular-nums">{azimuth === null ? "dip" : `${azimuth}°`}</span></label>
-            <div className="flex overflow-hidden rounded-md border border-slate-200 text-[11px]" role="group" aria-label="Holes within">
-              {[100, 250, 500, 2000].map((c) => <button key={c} type="button" onClick={() => setCorridor(c)} className={cn("px-2 py-0.5", corridor === c ? "bg-slate-900 text-white" : "bg-white text-slate-600 hover:bg-slate-50")}>±{c} m</button>)}
+            <div className={cn(glass, "pointer-events-auto flex h-11 items-center gap-1 rounded-full p-1")} role="group" aria-label="Section line" title="The section line's bearing">
+              <span className="grid size-9 place-items-center text-slate-500"><Compass size={16} /></span>
+              <button type="button" aria-pressed={azimuth === null} onClick={() => setAzimuth(null)} className={cn("flex h-9 items-center rounded-full px-3 text-sm font-semibold", azimuth === null ? "bg-ink text-white" : "text-slate-600 hover:text-slate-900")}>Along the dip</button>
+              {presets.map(([l, a]) => <button key={l} type="button" aria-pressed={azimuth === a} onClick={() => setAzimuth(a)} className={cn("flex h-9 items-center rounded-full px-3 text-sm font-semibold", azimuth === a ? "bg-ink text-white" : "text-slate-600 hover:text-slate-900")}>{l}</button>)}
+              <input type="range" min={0} max={179} value={azimuth ?? 0} onChange={(e) => setAzimuth(Number(e.target.value))} className="mx-1 w-20 accent-ink" aria-label="Bearing" />
+              <span className="w-9 pr-2 text-right font-mono text-xs text-slate-600">{azimuth === null ? "dip" : `${azimuth}°`}</span>
             </div>
+            <div className="pointer-events-auto"><Pill value={corridor} onChange={setCorridor} items={[[100, "±100 m"], [250, "±250 m"], [500, "±500 m"], [2000, "±2 km"]] as const} label="Holes within the corridor" icon={<Ruler size={16} />} /></div>
           </>
         )}
-        <div className="flex overflow-hidden rounded-md border border-slate-200 text-[11px]" role="group" aria-label="Coloured by">
-          {PAINTS.map(([p, label]) => <button key={p} type="button" onClick={() => setPaint(p)} className={cn("px-2 py-0.5", paint === p ? "bg-slate-900 text-white" : "bg-white text-slate-600 hover:bg-slate-50")}>{label}</button>)}
-        </div>
-        <label className="flex items-center gap-1.5 text-[11px] text-slate-600"><input type="checkbox" checked={colourAll} onChange={(e) => setColourAll(e.target.checked)} className="size-3 accent-slate-900" />colour the neighbours too</label>
-        {q.isPending && <span className="text-[11px] text-slate-500">Loading…</span>}
-        {q.isError && <span className="text-[11px] text-rose-700">This hole has no collar position.</span>}
-        {sq.isError && <span className="text-[11px] text-amber-700">No spectral log for this hole: the line is grey.</span>}
       </div>
+      {/* the key, as on the map: the groups this hole shows, the marks, and what the view is */}
       {d && (
-        <div className={cn(glass, "absolute bottom-3 left-3 z-10 max-w-[360px] px-3 py-2 text-[11px] text-slate-600")}>
-          <div className="mb-1 flex flex-wrap gap-x-3 gap-y-1">
-            {mainGroups.slice(0, 10).map((g) => <span key={g} className="flex items-center gap-1"><i className="inline-block size-2.5 rounded-[2px] border border-slate-300/60" style={{ background: groupColor(g) }} />{groupName(g)}</span>)}
+        <aside aria-label="Key" className={cn(glass, "absolute right-3 bottom-3 z-10 w-[300px] max-w-[calc(100vw-24px)] overflow-hidden bg-white/90")}>
+          <div className="flex items-center gap-2 border-b border-white/75 py-2 pr-3 pl-4">
+            <b className="font-display text-sm font-bold tracking-tight">{paint === "swir" ? "SWIR" : "TIR"} mineral groups</b>
+            <span className="ml-auto text-[11.5px] whitespace-nowrap text-slate-500">every 10 cm</span>
           </div>
-          <div className="flex flex-wrap gap-x-3"><span className="flex items-center gap-1"><i className="inline-block h-1.5 w-4 rounded" style={{ background: SERIES.orange }} />model disagrees with the log</span><span className="flex items-center gap-1"><i className="inline-block h-1.5 w-4 rounded bg-violet-700" />stands out from its surroundings</span><span className="flex items-center gap-1"><i className="inline-block h-1.5 w-4 rounded bg-slate-900" />this hole (dark edge)</span></div>
-          <p className="mt-1 text-slate-400">Colours are the HyLogger data itself, every 10 cm: the {paint.toUpperCase()} mineral groups TSG read there, their standard colours mixed by share. True proportions, no vertical exaggeration. {view === "3d" ? "Drag to turn, scroll to zoom; Everything fits every neighbour in." : "A vertical section through this collar along the line (its bearing on the slider; \"dip\" follows the hole); holes within the corridor are projected onto it, the fainter the further off the line. Drag to pan, scroll to zoom."} Click a point to open that depth on the map.</p>
-        </div>
+          <div className="grid grid-cols-2 gap-x-3 gap-y-1 px-4 py-2.5 text-xs text-slate-700">
+            {mainGroups.slice(0, 10).map((g) => <span key={g} className="flex items-center gap-1.5"><i className="inline-block size-3 flex-none rounded-[3px] border border-slate-900/10" style={{ background: groupColor(g) }} />{groupName(g)}</span>)}
+            {sq.isError && <span className="col-span-2 text-amber-700">No spectral log for this hole: it is drawn grey.</span>}
+          </div>
+          <div className="flex flex-col gap-1 border-t border-white/75 px-4 py-2 text-xs text-slate-700">
+            <span className="flex items-center gap-1.5"><i className="inline-block h-1.5 w-4 rounded-full bg-ink" />this hole, with a dark edge</span>
+            <span className="flex items-center gap-1.5"><i className="inline-block h-1.5 w-4 rounded-full bg-violet-700" />stands out from its surroundings</span>
+            <span className="flex items-center gap-1.5"><i className="inline-block h-1.5 w-4 rounded-full" style={{ background: SERIES.orange }} />model disagrees with the log</span>
+          </div>
+          <p className="border-t border-white/75 px-4 py-2 text-[11px] leading-relaxed text-slate-500">
+            Colours are the HyLogger data itself: the mineral groups TSG read in each 10 cm, their standard colours mixed by share. True proportions, no vertical exaggeration.{" "}
+            {view === "3d" ? "Drag to turn, scroll to zoom." : "A vertical section through this collar along the line; holes within the corridor are projected onto it, fainter the further off the line. Drag to pan, scroll to zoom, double-click to reset."} Click a point to open that depth on the map.
+          </p>
+        </aside>
       )}
     </div>
   );
