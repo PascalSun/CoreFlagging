@@ -29,8 +29,9 @@ export function Section({ d, paint, mainMix, nearLogs, colourAll, azimuth, corri
   }, [azimuth, d]);
 
   // every hole projected: along the line (x) and up (y), each 10 cm piece with its colour; off = how far the collar sits off the line
+  const c0 = d.hole.collar; const mlat = 111_320, mlon = 111_320 * Math.cos((c0.lat * Math.PI) / 180);
+  const collars = useMemo(() => [d.hole, ...d.nearby].map((t) => ({ t, main: t === d.hole, dx: (t.collar.lon - c0.lon) * mlon, dy: (t.collar.lat - c0.lat) * mlat })), [d, c0, mlon, mlat]);
   const holes = useMemo(() => {
-    const c0 = d.hole.collar; const mlat = 111_320, mlon = 111_320 * Math.cos((c0.lat * Math.PI) / 180);
     const th = (bearing * Math.PI) / 180; const sx = Math.sin(th), cx = Math.cos(th);
     const proj = (t: Trace, main: boolean) => {
       const dx = (t.collar.lon - c0.lon) * mlon, dy = (t.collar.lat - c0.lat) * mlat, dz = t.collar.rl !== null && c0.rl !== null ? t.collar.rl - c0.rl : 0;
@@ -41,7 +42,7 @@ export function Section({ d, paint, mainMix, nearLogs, colourAll, azimuth, corri
       return { t, main, off, pts };
     };
     return [...d.nearby.map((n) => proj(n, false)).filter((h) => Math.abs(h.off) <= corridor).sort((a, b) => Math.abs(b.off) - Math.abs(a.off)), proj(d.hole, true)];
-  }, [d, bearing, corridor, colourAll, mainMix, nearLogs, paint]);
+  }, [d, c0, mlon, mlat, bearing, corridor, colourAll, mainMix, nearLogs, paint]);
 
   // the world box of what is drawn and the transform to the canvas, fitted then zoomed and panned
   const box = useMemo(() => {
@@ -59,7 +60,8 @@ export function Section({ d, paint, mainMix, nearLogs, colourAll, azimuth, corri
     g.setTransform(R, 0, 0, R, 0, 0);
     g.fillStyle = "#f8fafc"; g.fillRect(0, 0, W, H);
     // room for the toolbar above and the key below-left; the section fits the rest
-    const padT = 150, padB = 70, padL = 80, padR = 80; const w = Math.max(box.x1 - box.x0, 20), h = Math.max(box.y1 - box.y0, 20);
+    const padT = 150, padB = 70, padL = 80, padR = 330;   // the plan and the key sit on the right
+    const w = Math.max(box.x1 - box.x0, 20), h = Math.max(box.y1 - box.y0, 20);
     const s = Math.min((W - padL - padR) / w, (H - padT - padB) / h) * zoom;
     const X = (x: number) => padL + (x - box.x0) * s + pan[0] + ((W - padL - padR) - w * s) / 2;
     const Y = (y: number) => H - padB - (y - box.y0) * s - pan[1] - ((H - padT - padB) - h * s) / 2;
@@ -130,6 +132,49 @@ export function Section({ d, paint, mainMix, nearLogs, colourAll, azimuth, corri
         }}
         onDoubleClick={() => { setZoom(1); setPan([0, 0]); }} />
       {hover && <div className="pointer-events-none absolute z-10 rounded-md bg-slate-900/90 px-2 py-1 text-[11px] text-white" style={{ left: hover.x + 12, top: hover.y + 12 }}>{hover.text}</div>}
+      <Plan collars={collars} bearing={bearing} corridor={corridor} />
+    </div>
+  );
+}
+
+/** A small plan view beside the section: every collar seen from above, north up, with the section line through this
+ * collar and the corridor either side of it, so the bearing and the corridor read at a glance. */
+function Plan({ collars, bearing, corridor }: { collars: { t: Trace; main: boolean; dx: number; dy: number }[]; bearing: number; corridor: number }) {
+  const ref = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    const el = ref.current; if (!el) return;
+    const S = 200, R = window.devicePixelRatio || 1; el.width = S * R; el.height = S * R;
+    const g = el.getContext("2d"); if (!g) return;
+    g.setTransform(R, 0, 0, R, 0, 0); g.clearRect(0, 0, S, S);
+    const reach = Math.max(60, ...collars.map((c) => Math.hypot(c.dx, c.dy))) * 1.15; const k = (S / 2 - 10) / reach;
+    const X = (e: number) => S / 2 + e * k, Y = (n: number) => S / 2 - n * k;
+    const th = (bearing * Math.PI) / 180; const ux = Math.sin(th), uy = Math.cos(th);   // along the line
+    const vx = Math.cos(th), vy = -Math.sin(th);                                           // across it
+    // the corridor as a band, the line through its middle
+    const L = reach * 2, w = Math.min(corridor, reach) * k;
+    g.save(); g.translate(S / 2, S / 2); g.rotate(-Math.atan2(uy, ux));
+    g.fillStyle = "rgba(15,23,42,0.07)"; g.fillRect(-L * k, -w, 2 * L * k, 2 * w);
+    g.strokeStyle = "#0f172a"; g.lineWidth = 1.2; g.setLineDash([5, 3]); g.beginPath(); g.moveTo(-L * k, 0); g.lineTo(L * k, 0); g.stroke(); g.setLineDash([]);
+    g.restore();
+    // the collars: in the corridor dark, outside faint; this one in ink with a ring
+    g.font = "9px ui-sans-serif, system-ui"; g.textAlign = "left"; g.textBaseline = "middle";
+    for (const c of collars) {
+      const off = Math.abs(c.dx * vx + c.dy * vy); const inside = off <= corridor;
+      g.fillStyle = c.main ? "#0f172a" : inside ? "#475569" : "#cbd5e1";
+      g.beginPath(); g.arc(X(c.dx), Y(c.dy), c.main ? 4 : 2.5, 0, 2 * Math.PI); g.fill();
+      if (c.main) { g.strokeStyle = "#ffffff"; g.lineWidth = 1.5; g.stroke(); }
+      if (c.main || (inside && collars.length <= 12)) { g.fillStyle = c.main ? "#0f172a" : "#475569"; g.fillText(c.t.name, X(c.dx) + 6, Y(c.dy)); }
+    }
+    // north, and the scale
+    g.fillStyle = "#64748b"; g.textAlign = "center"; g.fillText("N", S / 2, 8);
+    g.beginPath(); g.moveTo(S / 2, 14); g.lineTo(S / 2, 24); g.strokeStyle = "#64748b"; g.lineWidth = 1; g.stroke();
+    const bar = [50, 100, 200, 500, 1000, 2000, 5000].find((b) => b * k >= 30) ?? 10000;
+    g.beginPath(); g.moveTo(8, S - 8); g.lineTo(8 + bar * k, S - 8); g.stroke(); g.textAlign = "left"; g.fillText(bar >= 1000 ? `${bar / 1000} km` : `${bar} m`, 8, S - 16);
+  }, [collars, bearing, corridor]);
+  return (
+    <div className="absolute top-[68px] right-3 z-10 w-[200px] overflow-hidden rounded-2xl border border-white/60 bg-white/85 shadow-glass backdrop-blur-xl" aria-label="Plan view of the section line">
+      <canvas ref={ref} style={{ width: 200, height: 200 }} />
+      <p className="border-t border-white/75 px-3 py-1.5 text-[10.5px] leading-snug text-slate-500">From above: the section line through this collar (bearing {Math.round(bearing)}°) and the holes within ±{corridor >= 1000 ? `${corridor / 1000} km` : `${corridor} m`} of it.</p>
     </div>
   );
 }
