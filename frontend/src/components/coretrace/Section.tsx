@@ -8,9 +8,9 @@ import { fine, mixed, STEP, type Mix } from "@/components/coretrace/sceneColour"
  * scale (no vertical exaggeration) the way a geologist draws a cross-section. The line's bearing is the hole's own dip direction
  * unless set; a hole is in the section when its collar is within the corridor, drawn fainter the further off the line it is.
  * Colours are the spectral log's, every 10 cm, as in the 3D view. Drag pans, the wheel zooms, hover reads a piece, click opens it. */
-export function Section({ d, paint, mainMix, nearLogs, colourAll, azimuth, corridor, onAzimuth, onOpen }: {
+export function Section({ d, paint, mainMix, nearLogs, colourAll, azimuth, corridor, onOpen }: {
   d: TraceView; paint: "swir" | "tir"; mainMix: Mix; nearLogs: Map<string, SpectralLog | undefined>; colourAll: boolean;
-  azimuth: number | null; corridor: number; onAzimuth: (a: number) => void; onOpen: (key: string, m: number) => void;
+  azimuth: number | null; corridor: number; onAzimuth?: (a: number) => void; onOpen: (key: string, m: number) => void;
 }) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const [zoom, setZoom] = useState(1); const [pan, setPan] = useState<[number, number]>([0, 0]);
@@ -59,7 +59,7 @@ export function Section({ d, paint, mainMix, nearLogs, colourAll, azimuth, corri
     g.setTransform(R, 0, 0, R, 0, 0);
     g.fillStyle = "#f8fafc"; g.fillRect(0, 0, W, H);
     // room for the toolbar above and the key below-left; the section fits the rest
-    const padT = 120, padB = 70, padL = 80, padR = 80; const w = Math.max(box.x1 - box.x0, 20), h = Math.max(box.y1 - box.y0, 20);
+    const padT = 150, padB = 70, padL = 80, padR = 80; const w = Math.max(box.x1 - box.x0, 20), h = Math.max(box.y1 - box.y0, 20);
     const s = Math.min((W - padL - padR) / w, (H - padT - padB) / h) * zoom;
     const X = (x: number) => padL + (x - box.x0) * s + pan[0] + ((W - padL - padR) - w * s) / 2;
     const Y = (y: number) => H - padB - (y - box.y0) * s - pan[1] - ((H - padT - padB) - h * s) / 2;
@@ -130,9 +130,6 @@ export function Section({ d, paint, mainMix, nearLogs, colourAll, azimuth, corri
         }}
         onDoubleClick={() => { setZoom(1); setPan([0, 0]); }} />
       {hover && <div className="pointer-events-none absolute z-10 rounded-md bg-slate-900/90 px-2 py-1 text-[11px] text-white" style={{ left: hover.x + 12, top: hover.y + 12 }}>{hover.text}</div>}
-      <div className="absolute right-3 top-16 z-10 flex gap-1 text-[11px]">
-        {[["N–S", 0], ["NE–SW", 45], ["E–W", 90], ["NW–SE", 135]].map(([l, a]) => <button key={l} type="button" onClick={() => onAzimuth(a as number)} className="rounded-md border border-slate-200 bg-white/85 px-2 py-0.5 text-slate-600 hover:bg-slate-50">{l}</button>)}
-      </div>
     </div>
   );
 }
