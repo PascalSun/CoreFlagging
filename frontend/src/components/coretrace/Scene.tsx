@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useQueries, useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Compass, Ruler } from "lucide-react";
+import { ArrowLeft, ChevronDown, Compass, Ruler } from "lucide-react";
 import { coreScan, type Trace, type TraceView } from "@/lib/coreScan";
 import { groupColor, groupName, lithColor, SERIES } from "@/components/coretrace/palette";
 import { fine, logged, mixed, pieces, STEP, type Mix } from "@/components/coretrace/sceneColour";
@@ -37,7 +37,9 @@ export function Scene() {
   const sp = useSearchParams(); const router = useRouter();
   const key = sp.get("hole"); const [km, setKm] = useState<number>(Number(sp.get("km")) || 2);
   const colourAll = true;                                        // the neighbours are always coloured from their own logs
-  const [chosen, setChosen] = useState<Paint | null>(null);     // null: the logged rock when the hole has one, else SWIR
+  const [chosen, setChosen] = useState<Paint | null>(null);
+  // on a phone the key folds to its title bar, so it does not cover the view
+  const [keyOpen, setKeyOpen] = useState(false);     // null: the logged rock when the hole has one, else SWIR
   const [view, setView] = useState<"3d" | "section">(sp.get("view") === "section" ? "section" : "3d");
   const [azimuth, setAzimuth] = useState<number | null>(null);   // the section line's bearing, null = the hole's own dip direction
   const [corridor, setCorridor] = useState<number>(250);         // the section takes holes within this many metres of its line
@@ -129,7 +131,8 @@ export function Scene() {
       const layout = {
         margin: { l: 0, r: 0, t: 0, b: 0 }, paper_bgcolor: "rgba(0,0,0,0)", showlegend: false,
         scene: { aspectmode: "data", xaxis: axis("east (m)"), yaxis: axis("north (m)"), zaxis: axis(c0.rl !== null ? "up (m, from this collar)" : "up (m)"),
-          camera: { eye: { x: 0.75, y: -0.9, z: 0.45 } }, bgcolor: "#f8fafc" },
+          // a narrow, tall screen sees the same box through a slit: step back so the holes stay in view
+          camera: { eye: (() => { const k = el.clientWidth < 640 ? 2.2 : 1; return { x: 0.75 * k, y: -0.9 * k, z: 0.45 * k }; })() }, bgcolor: "#f8fafc" },
       };
       await Plotly.react(el, traces, layout, { displaylogo: false, responsive: true, modeBarButtonsToRemove: ["toImage"] });
       (el as any).on?.("plotly_click", (ev: any) => {
@@ -186,10 +189,12 @@ export function Scene() {
       {/* the key, as on the map: the groups this hole shows, the marks, and what the view is */}
       {d && (
         <aside aria-label="Key" className={cn(glass, "absolute right-3 bottom-3 z-10 w-[300px] max-w-[calc(100vw-24px)] overflow-hidden bg-white/90")}>
-          <div className="flex items-center gap-2 border-b border-white/75 py-2 pr-3 pl-4">
+          <button type="button" onClick={() => setKeyOpen((o) => !o)} aria-expanded={keyOpen} className="flex w-full items-center gap-2 border-b border-white/75 py-2 pr-3 pl-4 text-left lg:pointer-events-none">
             <b className="font-display text-sm font-bold tracking-tight whitespace-nowrap">{paint === "rock" ? "Logged rock" : `${paint.toUpperCase()} minerals`}</b>
             <span className="ml-auto text-[11.5px] whitespace-nowrap text-slate-500">{paint === "rock" ? "GSWA colours · per metre" : "TSG colours · per 10 cm"}</span>
-          </div>
+            <ChevronDown size={15} className={cn("flex-none text-slate-500 transition-transform lg:hidden", keyOpen && "rotate-180")} />
+          </button>
+          <div className={cn("max-lg:max-h-[45vh] max-lg:overflow-y-auto", !keyOpen && "max-lg:hidden")}>
           <div className="grid grid-cols-2 gap-x-3 gap-y-1 px-4 py-2.5 text-xs text-slate-700">
             {mainGroups.slice(0, 12).map((g) => <span key={g} className="flex items-center gap-1.5"><i className="inline-block size-3 flex-none rounded-[3px] border border-slate-900/10" style={{ background: swatch(g) }} />{name(g)}</span>)}
             {paint !== "rock" && sq.isError && <span className="col-span-2 text-amber-700">No spectral log for this hole: it is drawn grey.</span>}
@@ -202,8 +207,9 @@ export function Scene() {
           </div>
           <p className="border-t border-white/75 px-4 py-2 text-[11px] leading-relaxed text-slate-500">
             {paint === "rock" ? "Colours are the rock types in the hole's own log, mapped to GSWA's rock families in the colours of GSWA's bedrock map; a neighbour without a log is grey." : "Colours are the HyLogger data itself: the mineral group TSG read most of in each 10 cm, in TSG's standard colours, as TSG's own group log draws it; hover gives the full mix."} True proportions, no vertical exaggeration.{" "}
-            {view === "3d" ? "Drag to turn, scroll to zoom." : "A vertical section through this collar along the line; holes within the corridor are projected onto it, fainter the further off the line. Drag to pan, scroll to zoom, double-click to reset."} Click a point to open that depth on the map.
+            {view === "3d" ? "Drag to turn, scroll or pinch to zoom." : "A vertical section through this collar along the line; holes within the corridor are projected onto it, fainter the further off the line. Drag to pan, scroll to zoom, double-click to reset."} Click a point to open that depth on the map.
           </p>
+          </div>
         </aside>
       )}
     </div>

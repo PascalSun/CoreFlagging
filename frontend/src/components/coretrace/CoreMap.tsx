@@ -20,6 +20,9 @@ type Look = { color: string; label: string; wait?: boolean; shape?: Shape; shape
 const BADGE_FROM = 6;      // zoom from which a mark with letters is drawn as a badge; further out it is a dot like the rest
 // the furthest the map zooms out: the scale bar at about 300 km (Australia's breadth fills a wide screen)
 const MIN_ZOOM = 4.5;
+/** The furthest zoom for a map this wide: Australia's width (about 44° of longitude) fits it, never further out than
+ * MIN_ZOOM's view on a desktop. On a phone that is about 2.7, and the bounds then leave room above and below. */
+const homeZoom = (w: number) => Math.min(MIN_ZOOM, Math.log2((w * 360) / (512 * 44)));
 const HOME: [number, number] = [134, -27];
 
 // the rarer marks draw over the common ones, so a raw scan is not buried under the circles around it
@@ -116,7 +119,8 @@ export function CoreMap({ holes, colour, card, selected, onSelect, padRight, pad
       const mapboxgl = (await import("mapbox-gl")).default;
       if (gone || !ref.current) return;
       mapboxgl.accessToken = TOKEN;
-      map = new mapboxgl.Map({ container: ref.current, style: STYLES[basemapRef.current], center: HOME, zoom: MIN_ZOOM, minZoom: MIN_ZOOM, maxBounds: [[100, -46], [160, -7]], fadeDuration: 0,
+      const z0 = homeZoom(ref.current.clientWidth), narrow = z0 < MIN_ZOOM;
+      map = new mapboxgl.Map({ container: ref.current, style: STYLES[basemapRef.current], center: HOME, zoom: z0, minZoom: z0, maxBounds: narrow ? [[88, -72], [180, 14]] : [[100, -46], [160, -7]], fadeDuration: 0,
         // flat at every zoom: Mapbox v3 draws a globe below about zoom 6, and the furthest zoom (4.5) is in that range, so
         // zooming out would bend the map into a globe pinned at the edge of its bounds
         projection: "mercator" });
@@ -226,7 +230,7 @@ export function CoreMap({ holes, colour, card, selected, onSelect, padRight, pad
     const apply = () => {
       const wide = map.getContainer().clientWidth > 900;
       const pts = holesRef.current.filter((h) => h.lon !== null && h.lat !== null && !h.offshore);
-      if (!fitTo || !pts.length) { map.easeTo({ center: HOME, zoom: MIN_ZOOM, offset: [-padRight / 2, 0], duration: 900 }); return; }
+      if (!fitTo || !pts.length) { map.easeTo({ center: HOME, zoom: map.getMinZoom(), offset: [-padRight / 2, 0], duration: 900 }); return; }
       const xs = pts.map((h) => h.lon as number), ys = pts.map((h) => h.lat as number);
       fit(map, [[Math.min(...xs), Math.min(...ys)], [Math.max(...xs), Math.max(...ys)]], { padding: wide ? { top: 60, bottom: 60, left: padLeftRef.current + 40, right: padRight + 40 } : 24, maxZoom: 8, duration: 900 });
     };

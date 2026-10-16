@@ -206,11 +206,15 @@ export function CoreFeatures() {
       <div className="container-site mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {FEATURES.map((f, i) => (
           <Reveal key={f.title} delay={i * 0.06}>
-            <Link href={`${base}/${f.to}`} className="group relative block aspect-[4/5] overflow-hidden rounded-3xl focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-blue">
-              <div className="absolute inset-0 transition-transform duration-700 ease-out group-hover:scale-[1.03]"><TrayPicture offset={f.offset} /></div>
-              {/* the words sit on a solid panel in the card's colour, which fades up into the core */}
-              <div aria-hidden className="absolute inset-0" style={{ background: `linear-gradient(to top, ${f.tint} 0%, ${f.tint} 44%, ${f.tint}00 64%)` }} />
-              <div className="absolute inset-x-0 bottom-0 p-6 text-white md:p-7">
+            {/* on a phone the core sits above the words (a fixed-shape card would push long text up over the core);
+                from sm up, the words sit on a solid panel in the card's colour, which fades up into the core */}
+            <Link href={`${base}/${f.to}`} style={{ background: f.tint }} className="group relative block overflow-hidden rounded-3xl focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-blue max-sm:flex max-sm:flex-col sm:aspect-[4/5]">
+              <div className="relative h-44 overflow-hidden sm:absolute sm:inset-0 sm:h-auto">
+                <div className="absolute inset-0 transition-transform duration-700 ease-out group-hover:scale-[1.03]"><TrayPicture offset={f.offset} /></div>
+                <div aria-hidden className="absolute inset-x-0 bottom-0 h-16 sm:hidden" style={{ background: `linear-gradient(to top, ${f.tint}, ${f.tint}00)` }} />
+              </div>
+              <div aria-hidden className="absolute inset-0 max-sm:hidden" style={{ background: `linear-gradient(to top, ${f.tint} 0%, ${f.tint} 44%, ${f.tint}00 64%)` }} />
+              <div className="relative p-6 text-white sm:absolute sm:inset-x-0 sm:bottom-0 md:p-7">
                 <h3 className="font-display text-2xl font-medium tracking-tight md:text-[28px]">{f.title}</h3>
                 <p className="mt-2 text-[15px] leading-relaxed text-white/80">{f.body}</p>
               </div>

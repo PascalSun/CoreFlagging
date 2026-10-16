@@ -57,9 +57,9 @@ export function DepthLens({ hole, mv, win, onWindow, trays, metre, onMetre, type
           <span className="text-slate-400">· {fmtSpan(span)} window</span>
         </nav>
         <div className="ml-auto flex items-center gap-1">
-          <button type="button" onClick={() => step(-1)} aria-label="Up the hole" className="grid h-6 w-6 place-items-center rounded border border-slate-200 text-slate-600 hover:bg-slate-50"><ChevronLeft size={13} className="rotate-90" /></button>
-          <button type="button" onClick={() => step(1)} aria-label="Down the hole" className="grid h-6 w-6 place-items-center rounded border border-slate-200 text-slate-600 hover:bg-slate-50"><ChevronRight size={13} className="rotate-90" /></button>
-          <button type="button" onClick={() => onWindow([round1(Math.max(d0, from - span / 2)), round1(Math.min(d1, to + span / 2))])} title="Zoom out" className="grid h-6 w-6 place-items-center rounded border border-slate-200 text-slate-600 hover:bg-slate-50"><Maximize2 size={12} /></button>
+          <button type="button" onClick={() => step(-1)} aria-label="Up the hole" className="grid h-6 w-6 pointer-coarse:h-8 pointer-coarse:w-8 place-items-center rounded border border-slate-200 text-slate-600 hover:bg-slate-50"><ChevronLeft size={13} className="rotate-90" /></button>
+          <button type="button" onClick={() => step(1)} aria-label="Down the hole" className="grid h-6 w-6 pointer-coarse:h-8 pointer-coarse:w-8 place-items-center rounded border border-slate-200 text-slate-600 hover:bg-slate-50"><ChevronRight size={13} className="rotate-90" /></button>
+          <button type="button" onClick={() => onWindow([round1(Math.max(d0, from - span / 2)), round1(Math.min(d1, to + span / 2))])} title="Zoom out" className="grid h-6 w-6 pointer-coarse:h-8 pointer-coarse:w-8 place-items-center rounded border border-slate-200 text-slate-600 hover:bg-slate-50"><Maximize2 size={12} /></button>
         </div>
       </div>
 
@@ -174,7 +174,7 @@ function TenMetres({ hole, mv, spectral, from, to, typeName, onWindow }: {
   return (
     <section>
       <H4>Every 10 m: what each reading says</H4>
-      <table className="w-full border-collapse">
+      <div className="overflow-x-auto"><table className="w-full min-w-[26rem] border-collapse">
         {/* the model's column is tinted: what HyFormer predicts, beside what the scanner's software read */}
         <thead><tr>{["Depth (m)", "SWIR", "TIR"].map((h) => <th key={h} className={th10}>{h}</th>)}<th className={cn(th10, PRED, "rounded-t-md")}>Rock Classification</th></tr></thead>
         <tbody>{rows.map((r) => (
@@ -184,7 +184,7 @@ function TenMetres({ hole, mv, spectral, from, to, typeName, onWindow }: {
             <td className={td10}>{sw(r.tr, groupColor)}</td>
             <td className={cn(td10, PRED)}>{sw(r.rc, (c) => coreTypeBg(typeName(Number(c))))}</td>
           </tr>))}</tbody>
-      </table>
+      </table></div>
       <p className="pt-1 text-[10.5px] text-slate-400">SWIR and TIR: the share of each mineral group the scanner&rsquo;s TSG software reads, over the 10 m. Rock Classification: the class HyFormer reads in most of its metres, and in what share of them.</p>
     </section>
   );
@@ -269,7 +269,7 @@ export function WindowStart({ hole, mv, onWindow, spectral, typeName }: { hole: 
       <section>
         <H4>Read the hole at any scale</H4>
         <p className="text-xs leading-relaxed text-slate-600">The log on the left is the whole hole. Zoom with the wheel or double-click a depth, pick a level above it, or drag the box in the narrow column beside it. Each level shows what there is at that scale: where the model disagrees with the log, the metres that stand out and the photographs over 10 m; at 1 m, everything about the metre (the model&rsquo;s reading, the photograph, the spectra against the core around it) and its 10 cm bins; at 10 cm, the bins and their spectra.</p>
-        <div className="mt-2 flex flex-wrap gap-1.5">{levels.map((l) => <button key={l.label} type="button" onClick={() => onWindow(windowAt(l.label === "10 m" ? "10m" : l.label === "1 m" ? "1m" : "10cm", (d0 + d1) / 2, d0, d1) as Window)} className="rounded-full bg-slate-900 px-3 py-1 text-[11px] font-medium text-white hover:bg-slate-700">Open {l.label} at the middle</button>)}</div>
+        <div className="mt-2 flex flex-wrap gap-1.5">{levels.map((l) => <button key={l.label} type="button" onClick={() => onWindow(windowAt(l.label === "10 m" ? "10m" : l.label === "1 m" ? "1m" : "10cm", (d0 + d1) / 2, d0, d1) as Window)} className="rounded-full bg-slate-900 px-3 py-1 pointer-coarse:py-2 text-[11px] font-medium text-white hover:bg-slate-700">Open {l.label} at the middle</button>)}</div>
       </section>
       {flags.length > 0 && (
         <section>

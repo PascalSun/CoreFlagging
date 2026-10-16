@@ -22,7 +22,7 @@ export function LookAgain({ mv, metre, onJump }: { mv: ModelView; metre: number 
         <H n={flags.length}>Metres that stand out from their surroundings</H>
         <p className="text-[11px] leading-relaxed text-slate-500">A metre is flagged when it differs from the 15 m either side of it more than {pct(1 - mv.anomaly.top_share)} of this hole does, and more than {pct(mv.anomaly.flag_at, 1)} of the State&rsquo;s training core. Nearby metres are joined into one interval.</p>
         {flags.length === 0 ? <Empty>Nothing in this hole stands out from its surroundings enough to flag.</Empty> : (
-          <table className="w-full border-collapse">
+          <div className="overflow-x-auto"><table className="w-full min-w-[26rem] border-collapse">
             <thead><tr>{["Interval (m)", "Most unusual at", "Contrast with surroundings", "State percentile"].map((h) => <th key={h} className={th}>{h}</th>)}</tr></thead>
             <tbody>{flags.map((r) => (
               <tr key={r.from_m} onClick={() => onJump(r.peak_m, r.to_m + 1)} className={cn("cursor-pointer hover:bg-slate-50", on(r) && "bg-cyan/10")}>
@@ -30,7 +30,7 @@ export function LookAgain({ mv, metre, onJump }: { mv: ModelView; metre: number 
                 <td className={td}><span className="flex items-center gap-2"><span className="h-2 rounded-r-[4px]" style={{ width: `${Math.min(100, (r.raw / (flags[0].raw || 1)) * 100) * 0.6}%`, background: SERIES.orange }} /><span className="font-mono">{r.raw.toFixed(2)}</span></span></td>
                 <td className={cn(td, "font-mono")}>{pct(r.peak, 1)}</td>
               </tr>))}</tbody>
-          </table>
+          </table></div>
         )}
       </section>
 

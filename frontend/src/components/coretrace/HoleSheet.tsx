@@ -22,7 +22,7 @@ export function HoleSheet({ full, onFull, onClose, children }: { full: boolean; 
         onPointerMove={(e) => { if (start.current !== null) { const d = e.clientY - start.current; if (Math.abs(d) > 6) moved.current = true; setDrag(d); } }}
         onPointerUp={end} onPointerCancel={end}
         onClick={() => { if (!moved.current) onFull(!full); }}>
-        <button type="button" aria-label={full ? "Show the map" : "Full screen"} className="h-1.5 w-11 rounded-full bg-slate-300" />
+        <button type="button" aria-label={full ? "Show the map" : "Full screen"} className="grid h-6 w-16 place-items-center"><span className="h-1.5 w-11 rounded-full bg-slate-300" /></button>
       </div>
       <div className="min-h-0 flex-1">{children}</div>
     </aside>

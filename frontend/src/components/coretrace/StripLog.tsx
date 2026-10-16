@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Info } from "lucide-react";
+import { ChevronDown, Info } from "lucide-react";
 import type { Metres, ModelView, SpectralLog, TokenScores } from "@/lib/coreScan";
 import { GRID, INK, MUTED, SERIES, fmt, groupColor, groupName, pct, coreTypeBg, coreTypePaint } from "@/components/coretrace/palette";
 import { cn } from "@/lib/utils";
@@ -217,9 +217,9 @@ export function StripLog({ metres, model, cursor, onCursor, onHover, hasLith, ra
         <span className="text-[11px] font-medium text-slate-500">Depth (m)</span>
         {onRange ? (
           <div className="flex items-center gap-1" role="group" aria-label="Depth window">
-            <button type="button" onClick={() => stepLevel(-1)} disabled={!range} aria-label="Zoom out a level" title="Zoom out (−)" className="grid h-6 w-6 place-items-center rounded-full border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-30">−</button>
+            <button type="button" onClick={() => stepLevel(-1)} disabled={!range} aria-label="Zoom out a level" title="Zoom out (−)" className="grid h-6 w-6 pointer-coarse:h-8 pointer-coarse:w-8 place-items-center rounded-full border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-30">−</button>
             <span className="min-w-[44px] text-center font-mono text-[11px] text-slate-700" title="The window">{range ? fmtSpan(range[1] - range[0]) : "all"}</span>
-            <button type="button" onClick={() => stepLevel(1)} disabled={levelOf(range ?? null) === "10cm"} aria-label="Zoom in a level" title="Zoom in (+)" className="grid h-6 w-6 place-items-center rounded-full border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-30">+</button>
+            <button type="button" onClick={() => stepLevel(1)} disabled={levelOf(range ?? null) === "10cm"} aria-label="Zoom in a level" title="Zoom in (+)" className="grid h-6 w-6 pointer-coarse:h-8 pointer-coarse:w-8 place-items-center rounded-full border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-30">+</button>
           </div>
         ) : (
           <div className="flex overflow-hidden rounded-md border border-slate-200 text-[11px]" role="group" aria-label="Depth scale">
@@ -235,7 +235,7 @@ export function StripLog({ metres, model, cursor, onCursor, onHover, hasLith, ra
       {onRange && (
         <div className="flex gap-1 pb-2" role="tablist" aria-label="Level">
           {LEVELS.map((l) => { const on = l.id === "hole" ? !range : levelOf(range ?? null) === l.id; return (
-            <button key={l.id} type="button" role="tab" aria-selected={on} onClick={() => toLevel(l.id)} className={cn("flex-1 rounded-full px-1.5 py-1 text-[11px] font-medium ring-1 transition-colors", on ? "bg-slate-900 text-white ring-slate-900" : "bg-white text-slate-600 ring-slate-200 hover:ring-slate-400")}>{l.label}</button>); })}
+            <button key={l.id} type="button" role="tab" aria-selected={on} onClick={() => toLevel(l.id)} className={cn("flex-1 rounded-full px-1.5 py-1 pointer-coarse:py-2 text-[11px] font-medium ring-1 transition-colors", on ? "bg-slate-900 text-white ring-slate-900" : "bg-white text-slate-600 ring-slate-200 hover:ring-slate-400")}>{l.label}</button>); })}
         </div>)}
       {/* each column's name, and under it an ⓘ that says what the column is (the bubble is drawn by KeyTips) */}
       <div className="flex text-[10px] font-semibold text-slate-600" style={{ height: HEAD_H, width: width + (onRange ? NAV_W : 0) }}>
@@ -319,6 +319,20 @@ function mixText(log: SpectralLog | undefined, m: number, side: "swir" | "tir"):
 
 /** What the colours and marks of the log mean, for the foot of the full log: every tab reads the same log, so the
  * key sits under all of them. The groups are this hole's, in the order the bars stack them. */
+/** The key as a footer: always open on a wide screen; on a phone or tablet a one-line bar that opens it, so it does not
+ * cover the tabs it explains. */
+export function StripKeyBar(props: { metres: Metres; model: ModelView | undefined; spectral?: SpectralLog }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="flex-none border-t border-slate-200/70 bg-white/70 px-4 py-2 max-lg:py-1">
+      <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} className="flex w-full items-center justify-between py-1.5 text-xs font-medium text-slate-700 lg:hidden">
+        Key: minerals and rock classes<ChevronDown size={15} className={cn("transition-transform", open && "rotate-180")} />
+      </button>
+      <div className={cn("lg:block", open ? "max-h-[40vh] overflow-y-auto pb-1" : "hidden")}><StripKey {...props} /></div>
+    </div>
+  );
+}
+
 export function StripKey({ metres, model, spectral }: { metres: Metres; model: ModelView | undefined; spectral?: SpectralLog }) {
   const groups = useMemo(() => {
     const ordered = groupOrder(spectral);

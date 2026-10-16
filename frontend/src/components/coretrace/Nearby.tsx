@@ -23,7 +23,7 @@ export function Nearby({ hole, onOpen, onRing, onCompare }: { hole: HoleDetail; 
         <span className="text-[11px] text-slate-500">Within</span>
         {RINGS.map((r) => (
           <button key={r} type="button" onClick={() => setKm(km === r ? null : r)} aria-pressed={km === r}
-            className={cn("rounded-full border px-2.5 py-0.5 text-[11px] font-medium", km === r ? "border-slate-900 bg-slate-900 text-white" : "border-slate-200 bg-white text-slate-700 hover:border-slate-400")}>{r} km</button>
+            className={cn("rounded-full border px-2.5 py-0.5 pointer-coarse:py-1.5 text-[11px] font-medium", km === r ? "border-slate-900 bg-slate-900 text-white" : "border-slate-200 bg-white text-slate-700 hover:border-slate-400")}>{r} km</button>
         ))}
         {km !== null && !q.isPending && <span className="text-[11px] text-slate-500">{rows.length ? `${rows.length} ${rows.length === 1 ? "hole" : "holes"}` : "no other scanned hole"}</span>}
       </div>
