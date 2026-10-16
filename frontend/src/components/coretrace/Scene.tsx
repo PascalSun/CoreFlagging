@@ -36,9 +36,9 @@ function leading(log: SpectralLog | undefined, side: "swir" | "tir"): Map<number
 export function Scene() {
   const sp = useSearchParams(); const router = useRouter();
   const key = sp.get("hole"); const [km, setKm] = useState<number>(Number(sp.get("km")) || 2);
-  const [colourAll, setColourAll] = useState(false);
+  const [colourAll, setColourAll] = useState(true);
   const [paint, setPaint] = useState<Paint>("swir");
-  const [frame, setFrame] = useState<"hole" | "all">("hole");      // what the view is framed on: this hole at true proportions, or every neighbour
+  const [frame, setFrame] = useState<"hole" | "all">("all");      // what the view is framed on: this hole at true proportions, or every neighbour
   const q = useQuery({ queryKey: ["core-trace", key, km], queryFn: () => coreScan.trace(key as string, km), enabled: !!key, staleTime: 10 * 60_000 });
   const host = useRef<HTMLDivElement>(null);
   // the spectral logs (1 m) behind the mineral colouring: this hole's, and the neighbours' when they are coloured
@@ -77,14 +77,16 @@ export function Scene() {
         // point instead of blending along the segment (Plotly shades a segment between its ends' colours)
         const L = P.map((p) => labelOf(t, p, main));
         const V: { p: Trace["points"][number]; l: string | null }[] = coloured ? P.flatMap((p, i) => (i < P.length - 1 ? [{ p, l: L[i] }, { p: P[i + 1], l: L[i] }] : [])) : P.map((p, i) => ({ p, l: L[i] }));
+        // this hole wears a dark halo under its colours, so it stands out among coloured neighbours in the wide view
+        if (main) traces.push({ type: "scatter3d", mode: "lines", x: P.map((p) => p.e + dx), y: P.map((p) => p.n + dy), z: P.map((p) => p.u + dz), line: { color: "#0f172a", width: 22 }, opacity: 0.9, hoverinfo: "skip", showlegend: false });
         traces.push({ type: "scatter3d", mode: "lines", x: V.map((v) => v.p.e + dx), y: V.map((v) => v.p.n + dy), z: V.map((v) => v.p.u + dz),
           line: coloured ? { color: V.map((v) => idx(v.l)), width: main ? 14 : 5, showscale: false } : { color: "#94a3b8", width: 3 },
           hovertemplate: `${t.name}${main ? "" : ` · ${t.km} km`}<br>%{text}<extra></extra>`,
           text: V.map((v) => `${v.p.m.toFixed(0)} m${coloured ? `<br>${v.l === null ? "no reading" : groupName(v.l)}` : ""}${!main && t.target ? `<br>drilled for ${t.target}` : ""}${!main && t.n_again ? `<br>look again: ${t.n_again} intervals` : ""}`),
           customdata: V.map((v) => [t.key, v.p.m]), showlegend: false, opacity: main ? 1 : coloured ? 0.85 : 0.7 });
         // the collar, labelled
-        traces.push({ type: "scatter3d", mode: "markers+text", x: [dx], y: [dy], z: [dz], text: [t.name], textposition: "top center", textfont: { size: main ? 12 : 10, color: main ? "#0f172a" : "#475569" },
-          marker: { size: main ? 5 : 3, color: main ? "#0f172a" : "#64748b" }, hoverinfo: "skip", showlegend: false });
+        traces.push({ type: "scatter3d", mode: "markers+text", x: [dx], y: [dy], z: [dz], text: [main ? `▶ ${t.name}` : t.name], textposition: "top center", textfont: { size: main ? 14 : 10, color: main ? "#0f172a" : "#475569" },
+          marker: { size: main ? 8 : 3, color: main ? "#0f172a" : "#64748b", ...(main ? { line: { color: "#ffffff", width: 2 } } : {}) }, hoverinfo: "skip", showlegend: false });
       };
       for (const n of d.nearby) line(n, false);
       line(d.hole, true);
@@ -161,7 +163,7 @@ export function Scene() {
           <div className="mb-1 flex flex-wrap gap-x-3 gap-y-1">
             {mainGroups.slice(0, 10).map((g) => <span key={g} className="flex items-center gap-1"><i className="inline-block size-2.5 rounded-[2px] border border-slate-300/60" style={{ background: groupColor(g) }} />{groupName(g)}</span>)}
           </div>
-          <div className="flex flex-wrap gap-x-3"><span className="flex items-center gap-1"><i className="inline-block h-1.5 w-4 rounded" style={{ background: SERIES.orange }} />model disagrees with the log</span><span className="flex items-center gap-1"><i className="inline-block h-1.5 w-4 rounded bg-violet-700" />stands out from its surroundings</span><span className="flex items-center gap-1"><i className="inline-block h-1 w-4 rounded bg-slate-400" />neighbour</span></div>
+          <div className="flex flex-wrap gap-x-3"><span className="flex items-center gap-1"><i className="inline-block h-1.5 w-4 rounded" style={{ background: SERIES.orange }} />model disagrees with the log</span><span className="flex items-center gap-1"><i className="inline-block h-1.5 w-4 rounded bg-violet-700" />stands out from its surroundings</span><span className="flex items-center gap-1"><i className="inline-block h-1.5 w-4 rounded bg-slate-900" />this hole (dark edge)</span></div>
           <p className="mt-1 text-slate-400">Colours are the HyLogger data itself: the {paint.toUpperCase()} mineral group TSG read most of in each metre, in TSG&apos;s standard colours. True proportions, no vertical exaggeration. Drag to turn, scroll to zoom; Everything fits every neighbour in. Click a point to open that depth on the map.</p>
         </div>
       )}
