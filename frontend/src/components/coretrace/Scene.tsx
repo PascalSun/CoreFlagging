@@ -9,6 +9,7 @@ import { coreScan, type Trace, type TraceView } from "@/lib/coreScan";
 import { groupColor, groupName, SERIES } from "@/components/coretrace/palette";
 import { fine, mixed, STEP } from "@/components/coretrace/sceneColour";
 import { Section } from "@/components/coretrace/Section";
+import { KeyTips } from "@/components/coretrace/MapKey";
 import { cn } from "@/lib/utils";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -16,12 +17,12 @@ import { cn } from "@/lib/utils";
 const glass = "rounded-2xl border border-white/60 bg-white/85 shadow-glass backdrop-blur-xl";
 
 /** A row of choices in a glass pill, the chosen one in ink: the map page's tab bar, reused for every option here. */
-function Pill<T extends string | number>({ value, onChange, items, label, icon }: { value: T; onChange: (v: T) => void; items: readonly (readonly [T, string])[]; label: string; icon?: React.ReactNode }) {
+function Pill<T extends string | number>({ value, onChange, items, label, icon, tip }: { value: T; onChange: (v: T) => void; items: readonly (readonly [T, string] | readonly [T, string, string])[]; label: string; icon?: React.ReactNode; tip?: string }) {
   return (
-    <div className={cn(glass, "flex h-11 items-center gap-0.5 rounded-full p-1")} role="group" aria-label={label} title={label}>
-      {icon && <span className="grid size-9 place-items-center text-slate-500">{icon}</span>}
-      {items.map(([v, text]) => (
-        <button key={String(v)} type="button" aria-pressed={value === v} onClick={() => onChange(v)}
+    <div className={cn(glass, "flex h-11 items-center gap-0.5 rounded-full p-1")} role="group" aria-label={label}>
+      {icon && <span className="grid size-9 place-items-center text-slate-500" data-keytip={tip}>{icon}</span>}
+      {items.map(([v, text, t]) => (
+        <button key={String(v)} type="button" aria-pressed={value === v} onClick={() => onChange(v)} data-keytip={t ?? tip}
           className={cn("flex h-9 items-center whitespace-nowrap rounded-full px-3 text-sm font-semibold transition-colors", value === v ? "bg-ink text-white" : "text-slate-600 hover:text-slate-900")}>{text}</button>
       ))}
     </div>
@@ -126,7 +127,7 @@ export function Scene() {
   }, [q.data, colourAll, router, paint, mainMix, nearLogs, view]);
 
   const d: TraceView | undefined = q.data;
-  const presets = [["N–S", 0], ["NE–SW", 45], ["E–W", 90], ["NW–SE", 135]] as const;
+  const presets = [["N–S", 0, "The line runs north–south: look at the holes from the east or west"], ["NE–SW", 45, "The line runs north-east to south-west"], ["E–W", 90, "The line runs east–west: look at the holes from the north or south"], ["NW–SE", 135, "The line runs north-west to south-east"]] as const;
   return (
     <div className="fixed inset-0 bg-slate-100">
       {view === "3d" ? <div ref={host} className="absolute inset-0" /> : d && (
@@ -146,22 +147,25 @@ export function Scene() {
           {q.isPending && <span className="text-xs text-slate-500">Loading…</span>}
           {q.isError && <span className="text-xs text-rose-700">no collar position</span>}
         </div>
-        <div className="pointer-events-auto"><Pill value={view} onChange={setView} items={[["3d", "3D"], ["section", "Section"]] as const} label="View" /></div>
-        <div className="pointer-events-auto"><Pill value={km} onChange={setKm} items={RINGS.map((r) => [r, `${r} km`] as const)} label="Neighbours within" /></div>
-        <div className="pointer-events-auto"><Pill value={paint} onChange={setPaint} items={PAINTS} label="Coloured by" /></div>
+        <div className="pointer-events-auto"><Pill value={view} onChange={setView} items={[["3d", "3D", "The holes as lines in space, to turn and zoom"], ["section", "Section", "A vertical slice through this collar: the nearby holes projected onto one plane, as a geologist draws a cross-section"]] as const} label="View" /></div>
+        <div className="pointer-events-auto"><Pill value={km} onChange={setKm} items={RINGS.map((r) => [r, `${r} km`, `Draw the scanned holes within ${r} km of this collar`] as const)} label="Neighbours within" /></div>
+        <div className="pointer-events-auto"><Pill value={paint} onChange={setPaint} items={[["swir", "SWIR minerals", "Colour by the SWIR reading: clays, micas, chlorite, carbonate (the alteration minerals)"], ["tir", "TIR minerals", "Colour by the TIR reading: quartz, feldspars, pyroxene, garnet (the rock-forming minerals)"]] as const} label="Coloured by" /></div>
         {view === "section" && (
           <>
-            <div className={cn(glass, "pointer-events-auto flex h-11 items-center gap-1 rounded-full p-1")} role="group" aria-label="Section line" title="The section line's bearing">
-              <span className="grid size-9 place-items-center text-slate-500"><Compass size={16} /></span>
-              <button type="button" aria-pressed={azimuth === null} onClick={() => setAzimuth(null)} className={cn("flex h-9 items-center rounded-full px-3 text-sm font-semibold", azimuth === null ? "bg-ink text-white" : "text-slate-600 hover:text-slate-900")}>Along the dip</button>
-              {presets.map(([l, a]) => <button key={l} type="button" aria-pressed={azimuth === a} onClick={() => setAzimuth(a)} className={cn("flex h-9 items-center rounded-full px-3 text-sm font-semibold", azimuth === a ? "bg-ink text-white" : "text-slate-600 hover:text-slate-900")}>{l}</button>)}
-              <input type="range" min={0} max={179} value={azimuth ?? 0} onChange={(e) => setAzimuth(Number(e.target.value))} className="mx-1 w-20 accent-ink" aria-label="Bearing" />
-              <span className="w-9 pr-2 text-right font-mono text-xs text-slate-600">{azimuth === null ? "dip" : `${azimuth}°`}</span>
+            <div className={cn(glass, "pointer-events-auto flex h-11 items-center gap-1 rounded-full p-1")} role="group" aria-label="Section line">
+              <span className="grid size-9 place-items-center text-slate-500" data-keytip="Which way the section line runs through this collar: the slice is the vertical plane along it"><Compass size={16} /></span>
+              <button type="button" aria-pressed={azimuth === null} onClick={() => setAzimuth(null)} data-keytip="The line runs the way this hole leans, so the hole lies flat in the slice and shows its true dip"
+                className={cn("flex h-9 items-center rounded-full px-3 text-sm font-semibold", azimuth === null ? "bg-ink text-white" : "text-slate-600 hover:text-slate-900")}>Along the dip</button>
+              {presets.map(([l, a, t]) => <button key={l} type="button" aria-pressed={azimuth === a} onClick={() => setAzimuth(a)} data-keytip={t} className={cn("flex h-9 items-center rounded-full px-3 text-sm font-semibold", azimuth === a ? "bg-ink text-white" : "text-slate-600 hover:text-slate-900")}>{l}</button>)}
+              <input type="range" min={0} max={179} value={azimuth ?? 0} onChange={(e) => setAzimuth(Number(e.target.value))} className="mx-1 w-20 accent-ink" aria-label="Bearing" data-keytip="Any bearing, 0° (north) to 179°: turn the slice to look at the holes from another side" />
+              <span className="w-9 pr-2 text-right font-mono text-xs text-slate-600" data-keytip="The line's bearing, clockwise from north">{azimuth === null ? "dip" : `${azimuth}°`}</span>
             </div>
-            <div className="pointer-events-auto"><Pill value={corridor} onChange={setCorridor} items={[[100, "±100 m"], [250, "±250 m"], [500, "±500 m"], [2000, "±2 km"]] as const} label="Holes within the corridor" icon={<Ruler size={16} />} /></div>
+            <div className="pointer-events-auto"><Pill value={corridor} onChange={setCorridor} items={[[100, "±100 m"], [250, "±250 m"], [500, "±500 m"], [2000, "±2 km"]] as const} label="Holes within the corridor" icon={<Ruler size={16} />}
+              tip="How far either side of the line a hole may sit and still be drawn in the slice. A hole off the line is projected onto it and drawn fainter; a wide corridor shows more holes but flattens the gaps between them" /></div>
           </>
         )}
       </div>
+      <KeyTips />
       {/* the key, as on the map: the groups this hole shows, the marks, and what the view is */}
       {d && (
         <aside aria-label="Key" className={cn(glass, "absolute right-3 bottom-3 z-10 w-[300px] max-w-[calc(100vw-24px)] overflow-hidden bg-white/90")}>
