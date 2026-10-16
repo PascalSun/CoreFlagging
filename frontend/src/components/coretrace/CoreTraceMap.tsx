@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, HelpCircle, Layers, MessageCircle, Minus, Plus, ScanSearch, Upload, X } from "lucide-react";
+import { Check, HelpCircle, Layers, LogIn, MessageCircle, Minus, MoreHorizontal, Plus, ScanSearch, Upload, X } from "lucide-react";
 import { AccountMenu } from "@/components/auth/AccountMenu";
 import { EmailGate } from "@ntlp/geodata-web/email-gate";
 import { VerifyEmailDialog } from "@/components/auth/VerifyEmailDialog";
@@ -75,6 +75,8 @@ export function CoreTraceMap() {
   // a search can be linked to (the regions page does)
   const [q, setQ] = useState(sp.get("q") ?? "");
   const [upload, setUpload] = useState(false); const [verify, setVerify] = useState(false);
+  // a phone's top bar: the brand, Map/Table, Ask and one menu with the rest (upload, second look, sign in)
+  const [menu, setMenu] = useState(false);
   const [authed, setAuthed] = useState(false);
   // the session lives in localStorage, which the server render cannot see
   // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -284,7 +286,7 @@ export function CoreTraceMap() {
           </div>
           {/* "worth a second look": one switch for the map and the table, beside the tabs, so it holds across both. At rest
               it is the magnifier alone; hovering slides out its name and count; switched on it stays open, in ink */}
-          {againN > 0 && (
+          {againN > 0 && !mobile && (
             <button type="button" role="switch" aria-checked={again} onClick={() => setAgain((a) => !a)} aria-label="Worth a second look"
               className={cn("group flex h-11 items-center rounded-full border px-[13px] text-sm font-semibold whitespace-nowrap shadow-glass backdrop-blur-xl transition-colors duration-300",
                 again ? "border-ink bg-ink text-white" : "border-white/60 bg-white/80 text-slate-700 hover:bg-white hover:text-slate-900")}>
@@ -297,7 +299,32 @@ export function CoreTraceMap() {
             </button>
           )}
         </div>
-        <div className="pointer-events-auto flex items-center gap-2">
+        {mobile && (
+          <div className="pointer-events-auto relative flex flex-none items-center gap-2">
+            {!chatOpen && <button type="button" onClick={() => setChatOpen(true)} aria-label="Ask about the core" className={cn(glass, "grid size-11 place-items-center rounded-full text-slate-800")}><MessageCircle size={17} /></button>}
+            {authed && <div className={cn(glass, "grid size-11 place-items-center rounded-full")}><AccountMenu /></div>}
+            <button type="button" onClick={() => setMenu((m) => !m)} aria-label="More" aria-expanded={menu} className={cn(glass, "relative grid size-11 place-items-center rounded-full text-slate-800", menu && "bg-white")}>
+              <MoreHorizontal size={18} />
+              {again && <span className="absolute top-2 right-2 size-2 rounded-full bg-cyan ring-2 ring-white" aria-hidden />}
+            </button>
+            {menu && <>
+              <button type="button" aria-label="Close the menu" onClick={() => setMenu(false)} className="fixed inset-0 z-0 cursor-default" />
+              <div role="menu" className={cn(glass, "absolute top-[52px] right-0 z-10 w-72 overflow-hidden bg-white/95 p-1.5")}>
+                <button type="button" role="menuitem" onClick={() => { setMenu(false); openUpload(); }} className="flex h-11 w-full items-center gap-3 rounded-xl px-3 text-left text-sm font-medium text-slate-800 active:bg-slate-100"><Upload size={16} className="text-slate-500" />Upload a scan</button>
+                {againN > 0 && <button type="button" role="menuitemcheckbox" aria-checked={again} onClick={() => setAgain((a) => !a)} className="flex h-11 w-full items-center gap-3 rounded-xl px-3 text-left text-sm font-medium text-slate-800 active:bg-slate-100">
+                  <ScanSearch size={16} className={again ? "text-cyan" : "text-slate-500"} /><span className="whitespace-nowrap">Worth a second look</span>
+                  <span className="ml-auto rounded-full bg-slate-200/70 px-1.5 font-mono text-[10px]">{againN.toLocaleString()}</span>
+                  <span className={cn("relative h-5 w-9 flex-none rounded-full transition-colors", again ? "bg-ink" : "bg-slate-300")}><span className={cn("absolute top-0.5 size-4 rounded-full bg-white transition-all", again ? "left-[18px]" : "left-0.5")} /></span>
+                </button>}
+                {!authed && <>
+                  <div className="my-1 h-px bg-slate-200" />
+                  <button type="button" role="menuitem" onClick={() => { setMenu(false); toSignIn(); }} className="flex h-11 w-full items-center gap-3 rounded-xl px-3 text-left text-sm font-semibold text-slate-900 active:bg-slate-100"><LogIn size={16} className="text-slate-500" />Sign in</button>
+                </>}
+              </div>
+            </>}
+          </div>
+        )}
+        <div className={cn("pointer-events-auto flex items-center gap-2", mobile && "hidden")}>
           {!mobile && <button type="button" onClick={() => { set({ view: null, hole: null }); setTouring(true); }} aria-label="Show the guided tour" title="Show the guided tour" className={cn(glass, "grid size-11 place-items-center rounded-full text-slate-600 hover:bg-white hover:text-slate-900")}><HelpCircle size={18} /></button>}
           {!chatOpen && <button type="button" onClick={() => setChatOpen(true)} aria-label="Ask about the core" className={cn(glass, "flex h-11 items-center gap-2 rounded-full px-3.5 text-sm font-semibold text-slate-800 hover:bg-white sm:px-4")}><MessageCircle size={15} /><span className="hidden sm:inline">Ask</span></button>}
           <button type="button" data-tour="upload" onClick={openUpload} aria-label="Upload a scan" className={cn(glass, "flex h-11 items-center gap-2 whitespace-nowrap rounded-full px-3.5 text-sm font-semibold text-slate-800 hover:bg-white hover:text-slate-900 sm:px-4")}><Upload size={15} />{!mobile && <span>{barW >= 1120 ? "Upload a scan" : "Upload"}</span>}</button>
