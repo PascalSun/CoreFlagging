@@ -13,6 +13,9 @@ const nextConfig: NextConfig = {
       },
       // The About tab became the Research hub; keep old links and bookmarks alive.
       { source: "/about", destination: "/research", permanent: true },
+      // the Findings and By-region pages are gone; their old links land on the home page
+      { source: "/findings", destination: "/", permanent: true },
+      { source: "/regions", destination: "/", permanent: true },
     ];
   },
 };

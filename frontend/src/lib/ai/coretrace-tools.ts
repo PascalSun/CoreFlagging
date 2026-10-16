@@ -76,7 +76,7 @@ export function coretraceTools(token: string) {
     }),
 
     hole_summary: tool({
-      description: "One hole: collar, instrument, cleaning report, data-quality issues, and each model's headline results (segments, unusual metres, TIR agreement, gold ranking against assays).",
+      description: "One hole: collar, instrument, cleaning report, data-quality issues, each model's headline results (segments, unusual metres, TIR agreement), and how many metres the scan has assays for.",
       inputSchema: z.object({ hole }),
       toModelOutput: modelView(),
       execute: async ({ hole: name }) => {
@@ -89,14 +89,13 @@ export function coretraceTools(token: string) {
             training_split: h.split || "not in the training list", tir: h.tir, assayed_m: h.au_m, au_ge_0_1ppm_m: h.au_pos_m, funnel: d.report.funnel,
             issues: d.issues.map((i) => ({ issue: i.issue, from_m: i.depth_from, to_m: i.depth_to, value: i.value, evidence: i.evidence })),
             models: d.results.map((r) => ({ run: r.run, name: r.model?.name, segments: r.summary.n_segments, main_core_types: r.summary.main_types, unusual_metres: r.anomaly.n_flag_m,
-              unusual_vs_gold_auc: r.anomaly.auc_gold, gold_auc_on_this_hole: r.gold.auc, gold_top10_share: r.gold.top10_share, gold_base_share: r.gold.base_share,
-              highest_gold_likelihood_at_m: r.summary.gold_top, tir: r.tir })) };
+              tir: r.tir })) };
         } catch (e) { return err(e); }
       },
     }),
 
     hole_log: tool({
-      description: "A model's reading of a whole hole: the auto log (segments with depths, rock class and description), the flagged unusual intervals, and the metres ranked highest for gold (with assays where the scan has them).",
+      description: "A model's reading of a whole hole: the auto log (segments with depths, rock class and description), and the flagged unusual intervals.",
       inputSchema: z.object({ hole, model }),
       toModelOutput: modelView(),
       execute: async ({ hole: name, model: run }) => {
@@ -106,8 +105,7 @@ export function coretraceTools(token: string) {
             gold_summary: { top: { m: number; p: number; au: number | null }[]; auc: number | null } };
           const v = await get<V>(`/holes/${encodeURIComponent(h.key)}/models/${encodeURIComponent(m)}/`);
           return { hole: h.key, state: h.state, model: m, segments: v.segments.map((s) => ({ from_m: s.from_m, to_m: s.to_m, core_type: s.core_type_name, description: s.desc_en })),
-            unusual_intervals: v.anomaly.runs.map((x) => ({ from_m: x.from_m, to_m: x.to_m, peak_m: x.peak_m, state_percentile: r3(x.peak) })),
-            gold_ranked_metres: v.gold_summary.top.map((g) => ({ m: g.m, likelihood: r3(g.p), assay_ppm: g.au })), gold_auc_on_this_hole: v.gold_summary.auc };
+            unusual_intervals: v.anomaly.runs.map((x) => ({ from_m: x.from_m, to_m: x.to_m, peak_m: x.peak_m, state_percentile: r3(x.peak) })) };
         } catch (e) { return err(e); }
       },
     }),
@@ -130,7 +128,7 @@ export function coretraceTools(token: string) {
     }),
 
     metre_detail: tool({
-      description: "One metre of one hole: logged rock and assay, the TSG software's minerals in it and in the 15 m around it, the spectral features that set it apart, and the model's readings (rock class, unusual percentile, gold likelihood, TIR group filled in from SWIR).",
+      description: "One metre of one hole: logged rock and assay, the TSG software's minerals in it and in the 15 m around it, the spectral features that set it apart, and the model's readings (rock class, unusual percentile, TIR group filled in from SWIR).",
       inputSchema: z.object({ hole, m: z.number().int().describe("Depth in metres; the metre from m to m+1."), model }),
       toModelOutput: modelView(),
       execute: async ({ hole: name, m, model: run }) => {
@@ -142,7 +140,7 @@ export function coretraceTools(token: string) {
           return { hole: h.key, state: h.state, metre: `${m}-${m + 1} m`, valid_10cm_bins: d.n_tokens, logged_rock: d.lith_raw || null, au_ppm: d.au,
             swir_minerals: d.mix_swir, swir_minerals_around: d.mix_swir_ring, tir_groups: d.mix_tir, tir_groups_around: d.mix_tir_ring,
             stands_apart_by: d.why.map((w) => `${w.en} (${w.z > 0 ? "+" : ""}${w.z} sd)`),
-            model: d.model && { run: mm, unusual_state_percentile: r3(d.model.anom), gold_likelihood: r3(d.model.gold), gold_percentile: r3(d.model.gold_pct),
+            model: d.model && { run: mm, unusual_state_percentile: r3(d.model.anom),
               tir_group: d.model.tir_group, tir_measured: d.model.has_tir, tir_confidence: r3(d.model.tir_conf) } };
         } catch (e) { return err(e); }
       },
@@ -268,12 +266,12 @@ export function coretracePrompt(ctx: { hole?: string | null; m?: number | null; 
 What the data is:
 - SWIR = visible to shortwave infrared, TIR = thermal infrared. Minerals named per bin come from the TSG software, not from the models.
 - Models: HyFormer (run v2) is the one model readers see and the one to use; CoreFlagging is the platform, HyFormer the model. HyFormer+DINO and HyFormer+JEPA are training variants that read core almost the same way, and "Conventional methods" (baseline) has no foundation model; mention them only when the reader asks to compare.
-- Per metre the model gives: a rock class, an unusual score (State percentile of how much the metre differs from the 15 m around it), a gold likelihood (a probe fitted on assayed holes; it reads spectra only), and a TIR mineral group filled in from SWIR.
+- Per metre the model gives: a rock class, an unusual score (State percentile of how much the metre differs from the 15 m around it), and a TIR mineral group filled in from SWIR. It gives no gold likelihood and no grade: do not rank metres or holes for gold, and do not suggest the model predicts mineralisation. Measured assays from the scan may be quoted as they are.
 - The auto log cuts the hole where the model's reading changes; descriptions are written by rule and no geologist has reviewed them.
 
 How to answer:
 - Use the tools for every fact about a hole; never invent depths, minerals or scores. Name the hole and the depths you mean.
-- Say plainly what a number means and how far to trust it: unusual is not mineralised; the gold ranking is a modest edge and can only be checked where the scan carries assays; a hole used in training (split train/val) flatters the models.
+- Say plainly what a number means and how far to trust it: unusual is not mineralised; a hole used in training (split train/val) flatters the models.
 - The models were trained on WA core only. For a hole from another State say that its results are read outside the training area and deserve more caution; "similar core" searches WA core only. Offshore wells are petroleum wells in Commonwealth waters.
 - Refer to a hole by the key the tools return (e.g. NSW-NKD002); two holes can share a name in different places.
 - When you talk about one hole or metre, call the open_hole tool once so the map shows it. Never write a tool's name in your answer, and do not say you opened something unless you called open_hole.
