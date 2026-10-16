@@ -37,7 +37,18 @@ function parseWin(w: string | null): [number, number] | null {
 /** The CoreFlagging map: every scanned hole in the State, and the way into any one of them.
  * What is open lives in the address (?hole=&m=&model=&full=1), so a view can be shared. */
 export function CoreTraceMap() {
-  const pathname = usePathname(); const sp = useSearchParams(); const qc = useQueryClient();
+  const pathname = usePathname(); const urlSp = useSearchParams(); const qc = useQueryClient();
+  // What is open: the query string, with the changes not yet written to it laid over it (see set below). Readers
+  // use sp.get as before.
+  const [over, setOver] = useState<Record<string, string | null>>({});
+  const sp = useMemo(() => {
+    const p = new URLSearchParams(urlSp.toString());
+    for (const [k, v] of Object.entries(over)) { if (v === null) p.delete(k); else p.set(k, v); }
+    return p;
+  }, [urlSp, over]);
+  // once the address bar holds a change, it no longer needs laying over
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { setOver((o) => { const n = Object.fromEntries(Object.entries(o).filter(([k, v]) => (urlSp.get(k) ?? null) !== v)); return Object.keys(n).length === Object.keys(o).length ? o : n; }); }, [urlSp]);
   const mobile = useIsMobile(); const base = coretraceBase(pathname);
   const holeKey = sp.get("hole"); const wide = sp.get("full") === "1";
   // a second hole to compare the open one with (?cmp=), in a panel over the map
@@ -86,11 +97,27 @@ export function CoreTraceMap() {
   // useSearchParams in step). Not router.replace: on CoreFlagging's own host /map is a rewrite of /coretrace/map,
   // and the router took a query-only change there for the same page and kept the old query, so a hole could
   // not be closed. The path is the one in the address bar for the same reason.
-  const set = (patch: Record<string, string | null>) => {
+  // The page follows a change at once (it is laid over the query string); the address bar follows at most every
+  // 250 ms. Dragging the depth navigator changes the window on every pointer move, and Safari throws once a page calls
+  // history.replaceState more than 100 times in 10 seconds, which took the whole app down on a phone.
+  const pending = useRef<Record<string, string | null>>({});
+  const flushAt = useRef<number | null>(null); const lastWrite = useRef(0);
+  const flush = () => {
+    flushAt.current = null; lastWrite.current = Date.now();
     const p = new URLSearchParams(window.location.search);
-    for (const [k, v] of Object.entries(patch)) { if (v === null) p.delete(k); else p.set(k, v); }
-    const s = p.toString(); window.history.replaceState(null, "", `${window.location.pathname}${s ? `?${s}` : ""}`);
+    for (const [k, v] of Object.entries(pending.current)) { if (v === null) p.delete(k); else p.set(k, v); }
+    pending.current = {};
+    const s = p.toString();
+    try { window.history.replaceState(null, "", `${window.location.pathname}${s ? `?${s}` : ""}`); } catch { /* refused by the browser: the page state still holds it */ }
   };
+  const set = (patch: Record<string, string | null>) => {
+    pending.current = { ...pending.current, ...patch };
+    setOver((o) => ({ ...o, ...patch }));
+    const wait = 250 - (Date.now() - lastWrite.current);
+    if (wait <= 0 && flushAt.current === null) flush();
+    else if (flushAt.current === null) flushAt.current = window.setTimeout(flush, Math.max(0, wait));
+  };
+  useEffect(() => () => { if (flushAt.current !== null) window.clearTimeout(flushAt.current); }, []);
 
   const mq = useQuery({ queryKey: ["core-models"], queryFn: coreScan.models, staleTime: 10 * 60_000 });
   const models = useMemo(() => mq.data ?? [], [mq.data]);
