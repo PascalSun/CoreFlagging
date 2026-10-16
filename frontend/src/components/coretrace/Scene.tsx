@@ -33,7 +33,6 @@ const NEIGHBOUR_LOGS = 30;                                      // how many neig
 const FINE_NEIGHBOURS = 12;                                     // up to this many neighbours take the 0.1 m log; more take the 1 m one
 /** What colours the lines: the mineral group TSG read most of in each metre, the HyLogger data itself, SWIR or TIR. */
 type Paint = "swir" | "tir";
-const PAINTS: [Paint, string][] = [["swir", "SWIR minerals"], ["tir", "TIR minerals"]];
 export function Scene() {
   const sp = useSearchParams(); const router = useRouter();
   const key = sp.get("hole"); const [km, setKm] = useState<number>(Number(sp.get("km")) || 2);
