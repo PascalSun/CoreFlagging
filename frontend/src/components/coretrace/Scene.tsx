@@ -5,59 +5,30 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useQueries, useQuery } from "@tanstack/react-query";
 import { ArrowLeft } from "lucide-react";
-import { coreScan, type SpectralLog, type Trace, type TraceView } from "@/lib/coreScan";
+import { coreScan, type Trace, type TraceView } from "@/lib/coreScan";
 import { groupColor, groupName, SERIES } from "@/components/coretrace/palette";
+import { fine, mixed, STEP } from "@/components/coretrace/sceneColour";
+import { Section } from "@/components/coretrace/Section";
 import { cn } from "@/lib/utils";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 const glass = "rounded-2xl border border-white/60 bg-white/85 shadow-glass backdrop-blur-xl";
 const RINGS = [2, 5, 10] as const;
+const NEIGHBOUR_LOGS = 30;                                      // how many neighbours' spectral logs to fetch when they are coloured
+const FINE_NEIGHBOURS = 12;                                     // up to this many neighbours take the 0.1 m log; more take the 1 m one
 /** What colours the lines: the mineral group TSG read most of in each metre, the HyLogger data itself, SWIR or TIR. */
 type Paint = "swir" | "tir";
 const PAINTS: [Paint, string][] = [["swir", "SWIR minerals"], ["tir", "TIR minerals"]];
-const NEIGHBOUR_LOGS = 30;                                      // how many neighbours' spectral logs to fetch when they are coloured
-const FINE_NEIGHBOURS = 12;                                     // up to this many neighbours take the 0.1 m log; more take the 1 m one
-const STEP = 0.1;                                               // the scene is coloured every 10 cm (a 1 m log paints its 10 pieces alike)
-
-const hex = (c: string) => [parseInt(c.slice(1, 3), 16), parseInt(c.slice(3, 5), 16), parseInt(c.slice(5, 7), 16)] as const;
-/** Each interval's colour: the mineral groups' TSG colours mixed by their shares (a metre half chlorite, half white mica is
- * the green and the yellow blended), keyed by the interval's top in decimetres; the mix's groups ranked, for the key. */
-function mixed(log: SpectralLog | undefined, side: "swir" | "tir"): { colour: Map<number, string>; text: Map<number, string>; rank: string[] } {
-  const colour = new Map<number, string>(); const text = new Map<number, string>(); const tot = new Map<string, number>();
-  const step = log?.step ?? 1; const per = Math.round(step / STEP);
-  for (const r of log?.rows ?? []) {
-    const mix = r[side]?.mix; if (!mix) continue;
-    let R = 0, G = 0, B = 0, W = 0;
-    for (const [g, v] of Object.entries(mix)) { const [cr, cg, cb] = hex(groupColor(g)); R += cr * v; G += cg * v; B += cb * v; W += v; tot.set(g, (tot.get(g) ?? 0) + v); }
-    if (W <= 0) continue;
-    const c = `rgb(${Math.round(R / W)},${Math.round(G / W)},${Math.round(B / W)})`;
-    const t = Object.entries(mix).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([g, v]) => `${groupName(g)} ${Math.round(v * 100)}%`).join(", ");   // "Chlorite 62%, White mica 30%"
-    const d0 = Math.round(r.from_m / STEP);
-    for (let i = 0; i < per; i++) { colour.set(d0 + i, c); text.set(d0 + i, t); }
-  }
-  return { colour, text, rank: [...tot.entries()].sort((a, b) => b[1] - a[1]).map(([g]) => g) };
-}
-/** A trace's points every 10 cm: the stored points (every 1 or 2 m) with the pieces between them interpolated. */
-function fine(P: Trace["points"]): Trace["points"] {
-  const out: Trace["points"] = [];
-  for (let i = 0; i < P.length - 1; i++) {
-    const a = P[i], b = P[i + 1]; const n = Math.max(1, Math.round((b.m - a.m) / STEP));
-    for (let j = 0; j < n; j++) { const f = j / n; out.push({ ...a, m: a.m + f * (b.m - a.m), e: a.e + f * (b.e - a.e), n: a.n + f * (b.n - a.n), u: a.u + f * (b.u - a.u) }); }
-  }
-  if (P.length) out.push(P[P.length - 1]);
-  return out;
-}
-
-/** A hole and its neighbours as lines in space, in metres from this hole's collar (east, north, up). The hole is
- * coloured every 10 cm by the HyLogger data itself (the mineral groups TSG read, their colours mixed by share); the neighbours are grey, or coloured the same way when "colour the neighbours" is on; the flagged
- * metres and the log disagreements are drawn thick. A click on a point opens that depth on the map. */
 export function Scene() {
   const sp = useSearchParams(); const router = useRouter();
   const key = sp.get("hole"); const [km, setKm] = useState<number>(Number(sp.get("km")) || 2);
   const [colourAll, setColourAll] = useState(true);
   const [paint, setPaint] = useState<Paint>("swir");
-  const [frame, setFrame] = useState<"hole" | "all">("all");      // what the view is framed on: this hole at true proportions, or every neighbour
+  const [frame, setFrame] = useState<"hole" | "all">("all");
+  const [view, setView] = useState<"3d" | "section">(sp.get("view") === "section" ? "section" : "3d");
+  const [azimuth, setAzimuth] = useState<number | null>(null);   // the section line's bearing, null = the hole's own dip direction
+  const [corridor, setCorridor] = useState<number>(250);         // the section takes holes within this many metres of its line      // what the view is framed on: this hole at true proportions, or every neighbour
   const q = useQuery({ queryKey: ["core-trace", key, km], queryFn: () => coreScan.trace(key as string, km), enabled: !!key, staleTime: 10 * 60_000 });
   const host = useRef<HTMLDivElement>(null);
   // the spectral logs (1 m) behind the mineral colouring: this hole's, and the neighbours' when they are coloured
@@ -71,7 +42,7 @@ export function Scene() {
   const mainGroups = mainMix.rank;                                // the groups this hole shows, most core first, for the key
 
   useEffect(() => {
-    const d = q.data; const el = host.current; if (!d || !el) return;
+    const d = q.data; const el = host.current; if (!d || !el || view !== "3d") return;
     let gone = false;
     (async () => {
       const Plotly = (await import("plotly.js-dist-min")).default as any;
@@ -147,12 +118,15 @@ export function Scene() {
       });
     })();
     return () => { gone = true; };
-  }, [q.data, colourAll, frame, router, paint, mainMix, nearLogs]);
+  }, [q.data, colourAll, frame, router, paint, mainMix, nearLogs, view]);
 
   const d: TraceView | undefined = q.data;
   return (
     <div className="fixed inset-0 bg-slate-100">
-      <div ref={host} className="absolute inset-0" />
+      {view === "3d" ? <div ref={host} className="absolute inset-0" /> : d && (
+        <Section d={d} paint={paint} mainMix={mainMix} nearLogs={nearLogs} colourAll={colourAll} azimuth={azimuth} corridor={corridor} onAzimuth={setAzimuth}
+          onOpen={(k, m) => router.push(`/map?hole=${encodeURIComponent(k)}&full=1&m=${Math.floor(m)}`)} />
+      )}
       <div className={cn(glass, "absolute top-3 left-3 z-10 flex max-w-[calc(100vw-24px)] flex-wrap items-center gap-3 px-4 py-2.5")}>
         <Link href={key ? `/map?hole=${encodeURIComponent(key)}` : "/map"} className="inline-flex items-center gap-1 text-xs font-medium text-slate-600 hover:text-slate-900"><ArrowLeft size={14} />Map</Link>
         <h1 className="font-display text-sm font-semibold text-slate-900">{d ? d.hole.name : key ?? "A hole"} in space</h1>
@@ -160,9 +134,21 @@ export function Scene() {
         <div className="flex overflow-hidden rounded-md border border-slate-200 text-[11px]" role="group" aria-label="Neighbours within">
           {RINGS.map((r) => <button key={r} type="button" onClick={() => setKm(r)} className={cn("px-2 py-0.5", km === r ? "bg-slate-900 text-white" : "bg-white text-slate-600 hover:bg-slate-50")}>{r} km</button>)}
         </div>
-        <div className="flex overflow-hidden rounded-md border border-slate-200 text-[11px]" role="group" aria-label="Framed on">
-          {([["hole", "This hole"], ["all", "Everything"]] as const).map(([f, label]) => <button key={f} type="button" onClick={() => setFrame(f)} className={cn("px-2 py-0.5", frame === f ? "bg-slate-900 text-white" : "bg-white text-slate-600 hover:bg-slate-50")}>{label}</button>)}
+        <div className="flex overflow-hidden rounded-md border border-slate-200 text-[11px]" role="group" aria-label="View">
+          {([["3d", "3D"], ["section", "Section"]] as const).map(([v, label]) => <button key={v} type="button" onClick={() => setView(v)} className={cn("px-2 py-0.5", view === v ? "bg-slate-900 text-white" : "bg-white text-slate-600 hover:bg-slate-50")}>{label}</button>)}
         </div>
+        {view === "3d" ? (
+          <div className="flex overflow-hidden rounded-md border border-slate-200 text-[11px]" role="group" aria-label="Framed on">
+            {([["hole", "This hole"], ["all", "Everything"]] as const).map(([f, label]) => <button key={f} type="button" onClick={() => setFrame(f)} className={cn("px-2 py-0.5", frame === f ? "bg-slate-900 text-white" : "bg-white text-slate-600 hover:bg-slate-50")}>{label}</button>)}
+          </div>
+        ) : (
+          <>
+            <label className="flex items-center gap-1.5 text-[11px] text-slate-600">line <input type="range" min={0} max={179} value={azimuth ?? 0} onChange={(e) => setAzimuth(Number(e.target.value))} className="w-24 accent-slate-900" aria-label="Section line bearing" /><span className="w-10 tabular-nums">{azimuth === null ? "dip" : `${azimuth}°`}</span></label>
+            <div className="flex overflow-hidden rounded-md border border-slate-200 text-[11px]" role="group" aria-label="Holes within">
+              {[100, 250, 500, 2000].map((c) => <button key={c} type="button" onClick={() => setCorridor(c)} className={cn("px-2 py-0.5", corridor === c ? "bg-slate-900 text-white" : "bg-white text-slate-600 hover:bg-slate-50")}>±{c} m</button>)}
+            </div>
+          </>
+        )}
         <div className="flex overflow-hidden rounded-md border border-slate-200 text-[11px]" role="group" aria-label="Coloured by">
           {PAINTS.map(([p, label]) => <button key={p} type="button" onClick={() => setPaint(p)} className={cn("px-2 py-0.5", paint === p ? "bg-slate-900 text-white" : "bg-white text-slate-600 hover:bg-slate-50")}>{label}</button>)}
         </div>
@@ -177,7 +163,7 @@ export function Scene() {
             {mainGroups.slice(0, 10).map((g) => <span key={g} className="flex items-center gap-1"><i className="inline-block size-2.5 rounded-[2px] border border-slate-300/60" style={{ background: groupColor(g) }} />{groupName(g)}</span>)}
           </div>
           <div className="flex flex-wrap gap-x-3"><span className="flex items-center gap-1"><i className="inline-block h-1.5 w-4 rounded" style={{ background: SERIES.orange }} />model disagrees with the log</span><span className="flex items-center gap-1"><i className="inline-block h-1.5 w-4 rounded bg-violet-700" />stands out from its surroundings</span><span className="flex items-center gap-1"><i className="inline-block h-1.5 w-4 rounded bg-slate-900" />this hole (dark edge)</span></div>
-          <p className="mt-1 text-slate-400">Colours are the HyLogger data itself, every 10 cm: the {paint.toUpperCase()} mineral groups TSG read there, their standard colours mixed by share. True proportions, no vertical exaggeration. Drag to turn, scroll to zoom; Everything fits every neighbour in. Click a point to open that depth on the map.</p>
+          <p className="mt-1 text-slate-400">Colours are the HyLogger data itself, every 10 cm: the {paint.toUpperCase()} mineral groups TSG read there, their standard colours mixed by share. True proportions, no vertical exaggeration. {view === "3d" ? "Drag to turn, scroll to zoom; Everything fits every neighbour in." : "A vertical section through this collar along the line (its bearing on the slider; \"dip\" follows the hole); holes within the corridor are projected onto it, the fainter the further off the line. Drag to pan, scroll to zoom."} Click a point to open that depth on the map.</p>
         </div>
       )}
     </div>
