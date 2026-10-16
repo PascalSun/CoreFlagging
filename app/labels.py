@@ -40,8 +40,7 @@ def rules() -> list[dict]:
                                     "is taken as miscalibrated and its TIR is not used."},
             {"step": "10 cm bins", "rule": f"Samples are averaged every {C.BIN_M * 100:.0f} cm of depth; a bin needs at least {C.MIN_VALID} valid samples."},
             {"step": "Overlaps", "rule": "Where datasets of one hole overlap in depth, one is kept, in the order HyLogger 3, 4, 2."},
-            {"step": "Band range", "rule": f"The models see TIR from {C.TIR_BANDS[0] / 1000:.1f} to {C.TIR_BANDS[1] / 1000:.0f} µm; the noisy ends are left out."},
-            {"step": "Software minerals", "rule": "Each bin carries the TSG software's mineral interpretation, for display and evaluation only. The models do not see it."}]
+            {"step": "Band range", "rule": f"The models see TIR from {C.TIR_BANDS[0] / 1000:.1f} to {C.TIR_BANDS[1] / 1000:.0f} µm; the noisy ends are left out."}]
 
 
 REASON_EN = {"fully covered by a higher-priority dataset of the same hole": "Another instrument's scan already covers the same depths."}
