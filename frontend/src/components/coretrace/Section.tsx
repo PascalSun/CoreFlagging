@@ -8,6 +8,17 @@ import { fine, pieces, STEP, type Mix } from "@/components/coretrace/sceneColour
  * scale (no vertical exaggeration) the way a geologist draws a cross-section. The line's bearing is the hole's own dip direction
  * unless set; a hole is in the section when its collar is within the corridor, drawn fainter the further off the line it is.
  * Colours are the spectral log's, every 10 cm, as in the 3D view. Drag pans, the wheel zooms, hover reads a piece, click opens it. */
+/** The section line's bearing by default (0–180°, clockwise from north): the way this hole leans (collar to toe), else
+ * towards the nearest neighbour, else east. */
+export function dipBearing(d: TraceView): number {
+  const P = d.hole.points; const a = P[0], b = P[P.length - 1];
+  const dx = b.e - a.e, dy = b.n - a.n;
+  if (Math.hypot(dx, dy) > 5) return ((Math.atan2(dx, dy) * 180) / Math.PI + 360) % 180;
+  const c0 = d.hole.collar; const n = d.nearby[0];
+  if (n) { const mlon = 111_320 * Math.cos((c0.lat * Math.PI) / 180); return ((Math.atan2((n.collar.lon - c0.lon) * mlon, (n.collar.lat - c0.lat) * 111_320) * 180) / Math.PI + 360) % 180; }
+  return 90;
+}
+
 export function Section({ d, mixOf, colourAll, azimuth, corridor, onOpen }: {
   d: TraceView; mixOf: (key: string) => Mix; colourAll: boolean;
   azimuth: number | null; corridor: number; onAzimuth?: (a: number) => void; onOpen: (key: string, m: number) => void;
@@ -17,16 +28,7 @@ export function Section({ d, mixOf, colourAll, azimuth, corridor, onOpen }: {
   const [hover, setHover] = useState<{ x: number; y: number; text: string } | null>(null);
   const drag = useRef<{ x: number; y: number; pan: [number, number] } | null>(null);
 
-  // the bearing by default: the way this hole leans (collar to toe), else towards the nearest neighbour, else east
-  const bearing = useMemo(() => {
-    if (azimuth !== null) return azimuth;
-    const P = d.hole.points; const a = P[0], b = P[P.length - 1];
-    const dx = b.e - a.e, dy = b.n - a.n;
-    if (Math.hypot(dx, dy) > 5) return ((Math.atan2(dx, dy) * 180) / Math.PI + 360) % 180;
-    const c0 = d.hole.collar; const n = d.nearby[0];
-    if (n) { const mlon = 111_320 * Math.cos((c0.lat * Math.PI) / 180); return ((Math.atan2((n.collar.lon - c0.lon) * mlon, (n.collar.lat - c0.lat) * 111_320) * 180) / Math.PI + 360) % 180; }
-    return 90;
-  }, [azimuth, d]);
+  const bearing = useMemo(() => (azimuth !== null ? azimuth : dipBearing(d)), [azimuth, d]);
 
   // every hole projected: along the line (x) and up (y), each 10 cm piece with its colour; off = how far the collar sits off the line
   const c0 = d.hole.collar; const mlat = 111_320, mlon = 111_320 * Math.cos((c0.lat * Math.PI) / 180);
@@ -60,8 +62,10 @@ export function Section({ d, mixOf, colourAll, azimuth, corridor, onOpen }: {
     const g = el.getContext("2d"); if (!g) return;
     g.setTransform(R, 0, 0, R, 0, 0);
     g.fillStyle = "#f8fafc"; g.fillRect(0, 0, W, H);
-    // room for the toolbar above and the key below-left; the section fits the rest
-    const padT = 150, padB = 70, padL = 80, padR = 330;   // the plan and the key sit on the right
+    // room for the toolbar above, the plan on the right and the key and the line's dial below; the section fits the
+    // rest. On a phone the toolbar is one line, the plan is small and the settings dock takes the lower part.
+    const phone = W < 640;
+    const padT = phone ? 64 : 150, padB = phone ? Math.round(H * 0.44) : 70, padL = phone ? 44 : 80, padR = phone ? 16 : 330;
     const w = Math.max(box.x1 - box.x0, 20), h = Math.max(box.y1 - box.y0, 20);
     const s = Math.min((W - padL - padR) / w, (H - padT - padB) / h) * zoom;
     const X = (x: number) => padL + (x - box.x0) * s + pan[0] + ((W - padL - padR) - w * s) / 2;
@@ -139,10 +143,12 @@ export function Section({ d, mixOf, colourAll, azimuth, corridor, onOpen }: {
 /** A small plan view beside the section: every collar seen from above, north up, with the section line through this
  * collar and the corridor either side of it, so the bearing and the corridor read at a glance. */
 function Plan({ collars, bearing, corridor }: { collars: { t: Trace; main: boolean; dx: number; dy: number }[]; bearing: number; corridor: number }) {
+  // smaller on a phone, where it sits under the one-line toolbar beside the section
+  const [size] = useState(() => (typeof window !== "undefined" && window.innerWidth < 640 ? 112 : 200));
   const ref = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
     const el = ref.current; if (!el) return;
-    const S = 200, R = window.devicePixelRatio || 1; el.width = S * R; el.height = S * R;
+    const S = size, R = window.devicePixelRatio || 1; el.width = S * R; el.height = S * R;
     const g = el.getContext("2d"); if (!g) return;
     g.setTransform(R, 0, 0, R, 0, 0); g.clearRect(0, 0, S, S);
     // the view reaches the corridor and the holes in it; holes further out sit at the edge, so the near ones keep their spacing
@@ -172,11 +178,11 @@ function Plan({ collars, bearing, corridor }: { collars: { t: Trace; main: boole
     g.beginPath(); g.moveTo(S / 2, 14); g.lineTo(S / 2, 24); g.strokeStyle = "#64748b"; g.lineWidth = 1; g.stroke();
     const bar = [50, 100, 200, 500, 1000, 2000, 5000].find((b) => b * k >= 30) ?? 10000;
     g.beginPath(); g.moveTo(8, S - 8); g.lineTo(8 + bar * k, S - 8); g.stroke(); g.textAlign = "left"; g.fillText(bar >= 1000 ? `${bar / 1000} km` : `${bar} m`, 8, S - 16);
-  }, [collars, bearing, corridor]);
+  }, [collars, bearing, corridor, size]);
   return (
-    <div className="absolute top-[68px] right-3 z-10 w-[200px] overflow-hidden rounded-2xl border border-white/60 bg-white/85 shadow-glass backdrop-blur-xl" aria-label="Plan view of the section line">
-      <canvas ref={ref} style={{ width: 200, height: 200 }} />
-      <p className="border-t border-white/75 px-3 py-1.5 text-[10.5px] leading-snug text-slate-500">From above: the section line through this collar (bearing {Math.round(bearing)}°) and the holes within ±{corridor >= 1000 ? `${corridor / 1000} km` : `${corridor} m`} of it.</p>
+    <div style={{ width: size }} className="absolute top-[68px] right-3 z-10 overflow-hidden rounded-2xl border border-white/60 bg-white/85 shadow-glass backdrop-blur-xl" aria-label="Plan view of the section line">
+      <canvas ref={ref} style={{ width: size, height: size }} />
+      <p className="max-sm:hidden border-t border-white/75 px-3 py-1.5 text-[10.5px] leading-snug text-slate-500">From above: the section line through this collar (bearing {Math.round(bearing)}°) and the holes within ±{corridor >= 1000 ? `${corridor / 1000} km` : `${corridor} m`} of it.</p>
     </div>
   );
 }
