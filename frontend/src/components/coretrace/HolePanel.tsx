@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, ArrowRight, Box, ChevronLeft, ChevronRight, Download, ExternalLink, FileDown, FileText, Loader2, Maximize2, Minimize2, Trash2, X } from "lucide-react";
+import { AlertTriangle, ArrowRight, Box, Check, ChevronLeft, ChevronRight, Download, ExternalLink, FileDown, FileText, Link2, Loader2, Maximize2, Minimize2, Trash2, X } from "lucide-react";
 import { downloadReportPdf } from "@/components/coretrace/pdf";
 import { PAGE_W, ReportDocument } from "@/components/coretrace/ReportDocument";
 import { ACTIVE, inferred, TARGET_SOURCE_LABEL, abstractParts, commodityName, coreScan, readDate, sourceLabel, surveyOf, type SimilarScope, type CoreModelInfo, type HoleDetail, type HoleDocuments, type MetreView, type ModelView, type Tray } from "@/lib/coreScan";
@@ -53,6 +53,7 @@ function fileLabel(name: string): string {
 function HoleDocumentsCard({ docs, loading }: { docs: HoleDocuments | undefined; loading: boolean }) {
   const [openAbs, setOpenAbs] = useState<string | null>(null);
   const [more, setMore] = useState(false);
+  const [moreFiles, setMoreFiles] = useState<string | null>(null);
   if (loading) return <p className="text-[11px] text-slate-500">Looking up the documents…</p>;
   if (!docs) return <p className="text-[11px] text-slate-500">The documents could not be listed right now.</p>;
   const linked = docs.wamex?.linked ?? []; const covering = docs.wamex?.covering ?? [];
@@ -103,8 +104,9 @@ function HoleDocumentsCard({ docs, loading }: { docs: HoleDocuments | undefined;
                 : <span className="text-[11px] text-slate-500">No PDF on the mirror; <a href={r.url} target="_blank" rel="noopener" className="underline underline-offset-2">see it on WAMEX</a>.</span>}
               {others.length > 0 && (
                 <div className="flex flex-wrap items-center gap-1.5">
-                  {others.map((f) => (
+                  {(moreFiles === r.anumber ? others : others.slice(0, 4)).map((f) => (
                     <a key={f.name} href={f.download_url} target="_blank" rel="noopener" title={`${f.name} · ${kb(f.bytes)}`} className="inline-flex items-center gap-1 rounded-full border border-slate-200 px-2 py-0.5 text-[11px] text-slate-600 hover:border-slate-400 hover:text-slate-900"><Download size={11} />{fileLabel(f.name)}</a>))}
+                  {others.length > 4 && <button type="button" onClick={() => setMoreFiles(moreFiles === r.anumber ? null : r.anumber)} className="rounded-full px-2 py-0.5 text-[11px] font-medium text-slate-700 hover:bg-slate-100">{moreFiles === r.anumber ? "Fewer files" : `+${others.length - 4} more files`}</button>}
                 </div>)}
             </div>
           </div>);
@@ -116,11 +118,15 @@ function HoleDocumentsCard({ docs, loading }: { docs: HoleDocuments | undefined;
             <span className="text-[11px] text-slate-500">{more ? "Hide" : "Show"}</span>
           </button>
           {more && (
-            <ol className="flex flex-col gap-1.5 border-t border-slate-100 px-3.5 py-2">
+            <ol className="divide-y divide-slate-100 border-t border-slate-100">
               {covering.filter((c) => !linked.some((l) => l.anumber === c.anumber)).map((c) => (
-                <li key={c.anumber} className="text-[11px] leading-snug text-slate-600">
-                  <a href={c.url} target="_blank" rel="noopener" className="font-medium text-slate-900 underline decoration-slate-300 underline-offset-2 hover:decoration-slate-900">{c.anumber}</a>{" "}{[c.year, c.company, c.type, c.commodities].filter(Boolean).join(" · ")}
-                  <div className="text-slate-700">{c.title}</div>
+                <li key={c.anumber} className="px-3.5 py-2">
+                  <div className="flex items-baseline gap-2 text-[11px]">
+                    <a href={c.url} target="_blank" rel="noopener" title="This report on WAMEX" className="font-mono font-medium text-slate-900 underline decoration-slate-300 underline-offset-2 hover:decoration-slate-900">{c.anumber}</a>
+                    <span className="text-slate-500">{[c.year, c.type].filter(Boolean).join(" · ")}</span>
+                    {c.company && <span className="min-w-0 truncate text-slate-400" title={c.company}>{c.company}</span>}
+                  </div>
+                  <div className="mt-0.5 text-xs leading-snug text-slate-700">{c.title}</div>
                 </li>))}
             </ol>)}
         </div>)}
@@ -376,7 +382,8 @@ export function HolePanel({ holeKey, tab: tabProp, onTab, models, run, metre, on
   const tkq = useQuery({ queryKey: ["core-tokens", holeKey, mq.data?.run, fineWin], queryFn: () => coreScan.tokenScores(holeKey, mq.data!.run, fineWin![0], fineWin![1]), enabled: ready && wide && !!fineWin && !!mq.data, staleTime: 60 * 60_000, retry: false, placeholderData: keepPreviousData });
   // the hole's documents: its own HyLogger PDFs, the WAMEX report(s) it was logged in, the reports covering its ground
   const dq = useQuery({ queryKey: ["core-documents", holeKey], queryFn: () => coreScan.documents(holeKey), enabled: ready, staleTime: 60 * 60_000, retry: false });
-  const mainReport = (() => { const r = dq.data?.wamex?.linked.find((x) => x.pdf && x.files); const f = r?.files?.find((x) => x.name === r.pdf); return r && f ? { anumber: r.anumber, url: f.download_url } : null; })();
+  const [copied, setCopied] = useState(false);
+  const copyLink = () => { const u = `${window.location.origin}/map?hole=${encodeURIComponent(holeKey)}`; navigator.clipboard?.writeText(u).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); }); };
   const typeName = useMemo(() => { const n = new Map((mvw?.core_types ?? []).map((c) => [c.k, c.name])); return (k: number) => n.get(k) ?? "—"; }, [mvw]);
   const res = hole?.results.find((r) => r.run === useRun);
   const jump = (m: number) => { onMetre(m); };
@@ -407,7 +414,7 @@ export function HolePanel({ holeKey, tab: tabProp, onTab, models, run, metre, on
         {hole?.target && <p className="truncate text-[11px] text-slate-600" title={`What the hole was drilled for, ${TARGET_SOURCE_LABEL[hole.target_source] || "from the record"}${hole.commodities.length > 1 ? `: ${hole.commodities.map(commodityName).join(", ")}` : ""}`}>{inferred(hole.target_source) ? <>Likely drilled for <b className="font-semibold text-slate-800">{commodityName(hole.target)}</b> <span className="text-slate-400">({hole.target_source === "deposit" ? "nearest deposit" : "the report"})</span></> : <>Drilled for <b className="font-semibold text-slate-800">{commodityName(hole.target)}</b></>}{hole.commodities.length > 1 ? <span className="text-slate-500"> · also {hole.commodities.filter((c) => c !== hole.target).map(commodityName).join(", ")}</span> : null}</p>}
       </div>
       <div className="flex flex-none items-center gap-1">
-        {mainReport && <a href={mainReport.url} target="_blank" rel="noopener" aria-label="Open the original report" title={`Open the original exploration report (WAMEX ${mainReport.anumber})`} className="grid h-8 w-8 place-items-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-900"><ExternalLink size={15} /></a>}
+        {hole && <button type="button" onClick={copyLink} aria-label="Copy the link to this hole" title={copied ? "Link copied" : "Copy the link to this hole"} className={cn("grid h-8 w-8 place-items-center rounded-lg hover:bg-slate-100", copied ? "text-emerald-700" : "text-slate-500 hover:text-slate-900")}>{copied ? <Check size={15} /> : <Link2 size={15} />}</button>}
         {hole && hole.lat !== null && <a href={`/scene?hole=${encodeURIComponent(hole.key)}`} aria-label="See this hole and its neighbours in 3D" title="See this hole and its neighbours in 3D" className="grid h-8 w-8 place-items-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-900"><Box size={15} /></a>}
         {hole?.mine && <button type="button" onClick={del} aria-label="Delete this scan" title="Delete this scan" className="grid h-8 w-8 place-items-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-red-600"><Trash2 size={15} /></button>}
         {ready && <button type="button" onClick={() => onWide(!wide)} aria-label={wide ? "Back to the summary" : "Open the full log"} title={wide ? "Back to the summary" : "Open the full log"} className={cn("h-8 w-8 place-items-center rounded-lg text-slate-500 hover:bg-slate-100", wide ? "grid" : "hidden sm:grid")}>{wide ? <Minimize2 size={15} /> : <Maximize2 size={15} />}</button>}
