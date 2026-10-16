@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { CoreModelInfo, HoleDetail, HoleDocuments, ModelView, Tray } from "@/lib/coreScan";
-import { coreScan, readDate, surveyOf } from "@/lib/coreScan";
+import { CORE_BASE, coreScan, readDate, surveyOf } from "@/lib/coreScan";
 import { HatchDefs, hatchFill } from "@/components/coretrace/HatchDefs";
 import { GRID, INK, MUTED, NONE, SERIES, fmt, groupColor, groupName, issueLabel, lithColor, pct, coreTypeBg } from "@/components/coretrace/palette";
 import { CORE_TEAM } from "@/components/coretrace/team";
@@ -12,6 +12,9 @@ import { useT } from "@/lib/i18n";
 // node is shown in the Report tab and rendered to the PDF, so what you see is what you download.
 
 export const PAGE_W = 794;
+const PLATFORM = CORE_BASE.replace(/\/core-scan\/api$/, "");
+const SITE = "https://coreflagging.nlp-tlp.org";
+const lnk = "text-slate-900 underline decoration-slate-300 underline-offset-2";
 const PAD = 48, W = PAGE_W - 2 * PAD;
 
 const nf = (v: number | null | undefined, d = 0) => (v === null || v === undefined || !Number.isFinite(v) ? "—" : v.toLocaleString(undefined, { maximumFractionDigits: d, minimumFractionDigits: d }));
@@ -254,19 +257,19 @@ export function ReportDocument({ hole, mv, run, models, trays, nodeRef }: {
       )}
 
       {docs && (docs.hole_pdfs.length > 0 || (docs.wamex && (docs.wamex.linked.length > 0 || docs.wamex.covering.length > 0))) && (
-        <Section n={next()} title="Related documents" intro="What is on file for this hole: its own HyLogger reports, the exploration report it was logged in, and the other reports whose ground covers its collar. All open from the hole's page on CoreFlagging.">
+        <Section n={next()} title="Related documents" intro="What is on file for this hole: its own HyLogger reports, the exploration report it was logged in, and the other reports whose ground covers its collar. Each name is a link.">
           <div data-keep className="grid grid-cols-2 gap-8">
             <div>
               {docs.hole_pdfs.length > 0 && <>
                 <h3 className="mb-1.5 text-[11.5px] font-semibold">This hole&rsquo;s own documents</h3>
                 <table className="w-full border-collapse"><tbody>
-                  {docs.hole_pdfs.map((p) => <tr key={p.key + p.file}><td className={td}>{p.title}</td><td className={`${td} text-slate-600`}>{p.kind}{p.pages ? `, ${p.pages} ${p.pages === 1 ? "page" : "pages"}` : ""}</td></tr>)}
+                  {docs.hole_pdfs.map((p) => <tr key={p.key + p.file}><td className={td}><a href={`${PLATFORM}${p.url}`} className={lnk}>{p.title}</a></td><td className={`${td} text-slate-600`}>{p.kind}{p.pages ? `, ${p.pages} ${p.pages === 1 ? "page" : "pages"}` : ""}</td></tr>)}
                 </tbody></table>
               </>}
               {docs.wamex && docs.wamex.linked.length > 0 && <>
                 <h3 className={`mb-1.5 text-[11.5px] font-semibold${docs.hole_pdfs.length ? " mt-4" : ""}`}>Logged in</h3>
                 <table className="w-full border-collapse"><tbody>
-                  {docs.wamex.linked.map((r) => <tr key={r.anumber}><td className={`${td} whitespace-nowrap font-mono`}>WAMEX {r.anumber}</td><td className={`${td} text-slate-600`}>{r.title || "Exploration report"}{[r.year, r.company].filter(Boolean).length ? ` (${[r.year, r.company].filter(Boolean).join(", ")})` : ""}</td></tr>)}
+                  {docs.wamex.linked.map((r) => { const body = r.files?.find((f) => f.name === r.pdf); return <tr key={r.anumber}><td className={`${td} whitespace-nowrap font-mono`}><a href={r.url} className={lnk}>WAMEX {r.anumber}</a></td><td className={`${td} text-slate-600`}>{body ? <a href={body.download_url} className={lnk}>{r.title || "Exploration report"}</a> : (r.title || "Exploration report")}{[r.year, r.company].filter(Boolean).length ? ` (${[r.year, r.company].filter(Boolean).join(", ")})` : ""}</td></tr>; })}
                 </tbody></table>
               </>}
             </div>
@@ -274,9 +277,9 @@ export function ReportDocument({ hole, mv, run, models, trays, nodeRef }: {
               {docs.wamex && docs.wamex.covering.length > 0 && <>
                 <h3 className="mb-1.5 text-[11.5px] font-semibold">Other reports covering this ground{docs.wamex.covering_count > docs.wamex.linked.length ? ` (${docs.wamex.covering_count - docs.wamex.linked.length})` : ""}</h3>
                 <table className="w-full border-collapse"><tbody>
-                  {docs.wamex.covering.filter((c) => !docs.wamex!.linked.some((l) => l.anumber === c.anumber)).slice(0, 8).map((c) => <tr key={c.anumber}><td className={`${td} whitespace-nowrap font-mono`}>{c.anumber}</td><td className={`${td} text-slate-600`}>{c.title}{c.year ? ` (${c.year})` : ""}</td></tr>)}
+                  {docs.wamex.covering.filter((c) => !docs.wamex!.linked.some((l) => l.anumber === c.anumber)).slice(0, 8).map((c) => <tr key={c.anumber}><td className={`${td} whitespace-nowrap font-mono`}><a href={c.url} className={lnk}>{c.anumber}</a></td><td className={`${td} text-slate-600`}>{c.title}{c.year ? ` (${c.year})` : ""}</td></tr>)}
                 </tbody></table>
-                {docs.wamex.covering_count - docs.wamex.linked.length > 8 && <p className="mt-1 text-[10px] text-slate-500">and {docs.wamex.covering_count - docs.wamex.linked.length - 8} more on the hole&rsquo;s page.</p>}
+                {docs.wamex.covering_count - docs.wamex.linked.length > 8 && <p className="mt-1 text-[10px] text-slate-500">and {docs.wamex.covering_count - docs.wamex.linked.length - 8} more on <a href={`${SITE}/map?hole=${encodeURIComponent(hole.key)}`} className={lnk}>the hole&rsquo;s page</a>.</p>}
               </>}
             </div>
           </div>
