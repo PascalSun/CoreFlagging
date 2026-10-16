@@ -98,7 +98,10 @@ function Legend({ hole, mv }: { hole: HoleDetail; mv: ModelView }) {
       <span className="flex items-center gap-1"><i className="inline-block h-2.5 w-px bg-slate-900" />auto-log boundary</span>
       <span className="flex items-center gap-1"><Sw c={SERIES.orange} />flagged unusual</span>
       {hole.au_m > 0 && <span className="flex items-center gap-1"><Sw c={INK} />assay ≥ 0.1 ppm</span>}
-      <span className="text-slate-400">· rock classes: {mv.summary.main_types.map(([n, s]) => `${n} ${pct(s)}`).join(", ")}</span>
+      {/* the Rock Classification track has its own colours (and hatching): one swatch per class, with its share of the hole */}
+      <span className="basis-full" />
+      <span className="text-slate-500">Rock classes</span>
+      {mv.summary.main_types.map(([n, s]) => <span key={n} className="flex items-center gap-1"><i className="inline-block size-2.5 rounded-[2px] ring-1 ring-inset ring-black/10" style={{ background: coreTypeBg(n) }} />{n} <span className="text-slate-400">{pct(s)}</span></span>)}
     </div>
   );
 }
