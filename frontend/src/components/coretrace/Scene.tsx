@@ -17,21 +17,40 @@ const RINGS = [2, 5, 10] as const;
 type Paint = "swir" | "tir";
 const PAINTS: [Paint, string][] = [["swir", "SWIR minerals"], ["tir", "TIR minerals"]];
 const NEIGHBOUR_LOGS = 30;                                      // how many neighbours' spectral logs to fetch when they are coloured
+const FINE_NEIGHBOURS = 12;                                     // up to this many neighbours take the 0.1 m log; more take the 1 m one
+const STEP = 0.1;                                               // the scene is coloured every 10 cm (a 1 m log paints its 10 pieces alike)
 
-/** The group with the largest share in each metre of a spectral log, keyed by the metre's top. */
-function leading(log: SpectralLog | undefined, side: "swir" | "tir"): Map<number, string> {
-  const out = new Map<number, string>();
+const hex = (c: string) => [parseInt(c.slice(1, 3), 16), parseInt(c.slice(3, 5), 16), parseInt(c.slice(5, 7), 16)] as const;
+/** Each interval's colour: the mineral groups' TSG colours mixed by their shares (a metre half chlorite, half white mica is
+ * the green and the yellow blended), keyed by the interval's top in decimetres; the mix's groups ranked, for the key. */
+function mixed(log: SpectralLog | undefined, side: "swir" | "tir"): { colour: Map<number, string>; text: Map<number, string>; rank: string[] } {
+  const colour = new Map<number, string>(); const text = new Map<number, string>(); const tot = new Map<string, number>();
+  const step = log?.step ?? 1; const per = Math.round(step / STEP);
   for (const r of log?.rows ?? []) {
     const mix = r[side]?.mix; if (!mix) continue;
-    let best: string | null = null, bv = -1;
-    for (const [g, v] of Object.entries(mix)) if (v > bv) { best = g; bv = v; }
-    if (best !== null) out.set(Math.floor(r.from_m), best);
+    let R = 0, G = 0, B = 0, W = 0;
+    for (const [g, v] of Object.entries(mix)) { const [cr, cg, cb] = hex(groupColor(g)); R += cr * v; G += cg * v; B += cb * v; W += v; tot.set(g, (tot.get(g) ?? 0) + v); }
+    if (W <= 0) continue;
+    const c = `rgb(${Math.round(R / W)},${Math.round(G / W)},${Math.round(B / W)})`;
+    const t = Object.entries(mix).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([g, v]) => `${groupName(g)} ${Math.round(v * 100)}%`).join(", ");   // "Chlorite 62%, White mica 30%"
+    const d0 = Math.round(r.from_m / STEP);
+    for (let i = 0; i < per; i++) { colour.set(d0 + i, c); text.set(d0 + i, t); }
   }
+  return { colour, text, rank: [...tot.entries()].sort((a, b) => b[1] - a[1]).map(([g]) => g) };
+}
+/** A trace's points every 10 cm: the stored points (every 1 or 2 m) with the pieces between them interpolated. */
+function fine(P: Trace["points"]): Trace["points"] {
+  const out: Trace["points"] = [];
+  for (let i = 0; i < P.length - 1; i++) {
+    const a = P[i], b = P[i + 1]; const n = Math.max(1, Math.round((b.m - a.m) / STEP));
+    for (let j = 0; j < n; j++) { const f = j / n; out.push({ ...a, m: a.m + f * (b.m - a.m), e: a.e + f * (b.e - a.e), n: a.n + f * (b.n - a.n), u: a.u + f * (b.u - a.u) }); }
+  }
+  if (P.length) out.push(P[P.length - 1]);
   return out;
 }
 
 /** A hole and its neighbours as lines in space, in metres from this hole's collar (east, north, up). The hole is
- * coloured every metre by the HyLogger data itself (the mineral group TSG read most of, in TSG's colours); the neighbours are grey, or coloured the same way when "colour the neighbours" is on; the flagged
+ * coloured every 10 cm by the HyLogger data itself (the mineral groups TSG read, their colours mixed by share); the neighbours are grey, or coloured the same way when "colour the neighbours" is on; the flagged
  * metres and the log disagreements are drawn thick. A click on a point opens that depth on the map. */
 export function Scene() {
   const sp = useSearchParams(); const router = useRouter();
@@ -42,14 +61,14 @@ export function Scene() {
   const q = useQuery({ queryKey: ["core-trace", key, km], queryFn: () => coreScan.trace(key as string, km), enabled: !!key, staleTime: 10 * 60_000 });
   const host = useRef<HTMLDivElement>(null);
   // the spectral logs (1 m) behind the mineral colouring: this hole's, and the neighbours' when they are coloured
-  const sq = useQuery({ queryKey: ["core-spectral", key], queryFn: () => coreScan.spectralLog(key as string, 1), enabled: !!key, staleTime: 60 * 60_000, retry: false });
+  const sq = useQuery({ queryKey: ["core-spectral-whole", key, 0.1], queryFn: () => coreScan.spectralLog(key as string, 0.1), enabled: !!key, staleTime: 60 * 60_000, retry: false });
   const nearKeys = useMemo(() => (colourAll ? (q.data?.nearby ?? []).slice(0, NEIGHBOUR_LOGS).map((n) => n.key) : []), [q.data, colourAll]);
-  const nq = useQueries({ queries: nearKeys.map((k) => ({ queryKey: ["core-spectral", k], queryFn: () => coreScan.spectralLog(k, 1), staleTime: 60 * 60_000, retry: false })) });
+  const nearStep: 1 | 0.1 = nearKeys.length <= FINE_NEIGHBOURS ? 0.1 : 1;
+  const nq = useQueries({ queries: nearKeys.map((k) => ({ queryKey: ["core-spectral-whole", k, nearStep], queryFn: () => coreScan.spectralLog(k, nearStep), staleTime: 60 * 60_000, retry: false })) });
   const nearStamp = nq.map((r) => r.dataUpdatedAt).join(",");                 // useQueries hands back a new array each render; redraw only when a log arrives
   const nearLogs = useMemo(() => new Map(nearKeys.map((k, i) => [k, nq[i]?.data])), [nearKeys, nearStamp]);  // eslint-disable-line react-hooks/exhaustive-deps
-  const mainLead = useMemo(() => leading(sq.data, paint), [sq.data, paint]);
-  // the groups this hole shows, most metres first, for the key
-  const mainGroups = useMemo(() => { const c = new Map<string, number>(); for (const g of mainLead.values()) c.set(g, (c.get(g) ?? 0) + 1); return [...c.entries()].sort((a, b) => b[1] - a[1]).map(([g]) => g); }, [mainLead]);
+  const mainMix = useMemo(() => mixed(sq.data, paint), [sq.data, paint]);
+  const mainGroups = mainMix.rank;                                // the groups this hole shows, most core first, for the key
 
   useEffect(() => {
     const d = q.data; const el = host.current; if (!d || !el) return;
@@ -63,26 +82,24 @@ export function Scene() {
       // One trace per hole, coloured point by point through a discrete colour scale (one step per rock class, grey for
       // no reading). One trace per run of the same class was 650+ traces at 10 km, which is what loses the WebGL
       // context on a laptop and what made every hover and click slow.
-      // Each point's label: the leading TSG mineral group of its metre, from the spectral log. The line is
-      // coloured through a discrete colour scale with one step per label (grey for no reading): one trace per hole, because one
-      // per run of the same colour was 650+ traces at 10 km, which is what loses the WebGL context on a laptop.
-      const labelOf = (t: Trace, p: Trace["points"][number], main: boolean): string | null => (main ? mainLead : leading(nearLogs.get(t.key), paint)).get(Math.floor(p.m)) ?? null;
-      const colourOf = (label: string) => groupColor(label);
-      const labels: string[] = []; const idx = (l: string | null) => { if (l === null) return -1; let i = labels.indexOf(l); if (i < 0) { i = labels.length; labels.push(l); } return i; };
+      // Every 10 cm of a coloured hole takes the colour of its interval in the spectral log: the groups' TSG colours mixed by
+      // share, grey where nothing was read. One trace per hole (one per run of a colour was 650+ traces at 10 km, which loses
+      // the WebGL context on a laptop); a line lists each piece's two ends with the piece's own colour, so a colour changes
+      // sharply at a point instead of shading across the piece.
+      const NO = "#94a3b8";
       const traces: any[] = [];
       const line = (t: Trace, main: boolean) => {
-        const { dx, dy, dz } = rel(t); const P = t.points;
-        const coloured = main || colourAll;
-        // a coloured line lists each segment's two ends with the label of its top end, so a colour changes sharply at a
-        // point instead of blending along the segment (Plotly shades a segment between its ends' colours)
-        const L = P.map((p) => labelOf(t, p, main));
-        const V: { p: Trace["points"][number]; l: string | null }[] = coloured ? P.flatMap((p, i) => (i < P.length - 1 ? [{ p, l: L[i] }, { p: P[i + 1], l: L[i] }] : [])) : P.map((p, i) => ({ p, l: L[i] }));
+        const { dx, dy, dz } = rel(t); const coloured = main || colourAll;
+        const mix = main ? mainMix : mixed(nearLogs.get(t.key), paint);
+        const P = coloured ? fine(t.points) : t.points;
+        const C = P.map((p) => mix.colour.get(Math.round(p.m / STEP)) ?? NO);
+        const V: { p: Trace["points"][number]; c: string }[] = coloured ? P.flatMap((p, i) => (i < P.length - 1 ? [{ p, c: C[i] }, { p: P[i + 1], c: C[i] }] : [])) : P.map((p, i) => ({ p, c: C[i] }));
         // this hole wears a dark halo under its colours, so it stands out among coloured neighbours in the wide view
-        if (main) traces.push({ type: "scatter3d", mode: "lines", x: P.map((p) => p.e + dx), y: P.map((p) => p.n + dy), z: P.map((p) => p.u + dz), line: { color: "#0f172a", width: 22 }, opacity: 0.9, hoverinfo: "skip", showlegend: false });
+        if (main) traces.push({ type: "scatter3d", mode: "lines", x: t.points.map((p) => p.e + dx), y: t.points.map((p) => p.n + dy), z: t.points.map((p) => p.u + dz), line: { color: "#0f172a", width: 22 }, opacity: 0.9, hoverinfo: "skip", showlegend: false });
         traces.push({ type: "scatter3d", mode: "lines", x: V.map((v) => v.p.e + dx), y: V.map((v) => v.p.n + dy), z: V.map((v) => v.p.u + dz),
-          line: coloured ? { color: V.map((v) => idx(v.l)), width: main ? 14 : 5, showscale: false } : { color: "#94a3b8", width: 3 },
+          line: coloured ? { color: V.map((v) => v.c), width: main ? 14 : 5 } : { color: NO, width: 3 },
           hovertemplate: `${t.name}${main ? "" : ` · ${t.km} km`}<br>%{text}<extra></extra>`,
-          text: V.map((v) => `${v.p.m.toFixed(0)} m${coloured ? `<br>${v.l === null ? "no reading" : groupName(v.l)}` : ""}${!main && t.target ? `<br>drilled for ${t.target}` : ""}${!main && t.n_again ? `<br>look again: ${t.n_again} intervals` : ""}`),
+          text: V.map((v) => `${v.p.m.toFixed(1)} m${coloured ? `<br>${mix.text.get(Math.round(v.p.m / STEP)) ?? "no reading"}` : ""}${!main && t.target ? `<br>drilled for ${t.target}` : ""}${!main && t.n_again ? `<br>look again: ${t.n_again} intervals` : ""}`),
           customdata: V.map((v) => [t.key, v.p.m]), showlegend: false, opacity: main ? 1 : coloured ? 0.85 : 0.7 });
         // the collar, labelled
         traces.push({ type: "scatter3d", mode: "markers+text", x: [dx], y: [dy], z: [dz], text: [main ? `▶ ${t.name}` : t.name], textposition: "top center", textfont: { size: main ? 14 : 10, color: main ? "#0f172a" : "#475569" },
@@ -90,10 +107,6 @@ export function Scene() {
       };
       for (const n of d.nearby) line(n, false);
       line(d.hole, true);
-      // the colour scale, now every label is known: label i at step i, "no reading" grey at the end
-      const steps = [...labels.map(colourOf), "#94a3b8"]; const n = steps.length; const NONE = labels.length;
-      const colorscale = steps.flatMap((c, i) => [[i / n, c], [(i + 1) / n, c]]);
-      for (const tr of traces) if (tr.type === "scatter3d" && tr.mode === "lines" && Array.isArray(tr.line?.color)) Object.assign(tr.line, { color: tr.line.color.map((i: number) => (i < 0 ? NONE : i)), colorscale, cmin: 0, cmax: n });
       // what to look at again, drawn thick on the hole
       const mark = (ivs: { from_m: number; to_m: number }[], color: string, label: string) => {
         for (const iv of ivs) {
@@ -134,7 +147,7 @@ export function Scene() {
       });
     })();
     return () => { gone = true; };
-  }, [q.data, colourAll, frame, router, paint, mainLead, nearLogs]);
+  }, [q.data, colourAll, frame, router, paint, mainMix, nearLogs]);
 
   const d: TraceView | undefined = q.data;
   return (
@@ -164,7 +177,7 @@ export function Scene() {
             {mainGroups.slice(0, 10).map((g) => <span key={g} className="flex items-center gap-1"><i className="inline-block size-2.5 rounded-[2px] border border-slate-300/60" style={{ background: groupColor(g) }} />{groupName(g)}</span>)}
           </div>
           <div className="flex flex-wrap gap-x-3"><span className="flex items-center gap-1"><i className="inline-block h-1.5 w-4 rounded" style={{ background: SERIES.orange }} />model disagrees with the log</span><span className="flex items-center gap-1"><i className="inline-block h-1.5 w-4 rounded bg-violet-700" />stands out from its surroundings</span><span className="flex items-center gap-1"><i className="inline-block h-1.5 w-4 rounded bg-slate-900" />this hole (dark edge)</span></div>
-          <p className="mt-1 text-slate-400">Colours are the HyLogger data itself: the {paint.toUpperCase()} mineral group TSG read most of in each metre, in TSG&apos;s standard colours. True proportions, no vertical exaggeration. Drag to turn, scroll to zoom; Everything fits every neighbour in. Click a point to open that depth on the map.</p>
+          <p className="mt-1 text-slate-400">Colours are the HyLogger data itself, every 10 cm: the {paint.toUpperCase()} mineral groups TSG read there, their standard colours mixed by share. True proportions, no vertical exaggeration. Drag to turn, scroll to zoom; Everything fits every neighbour in. Click a point to open that depth on the map.</p>
         </div>
       )}
     </div>
