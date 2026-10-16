@@ -187,10 +187,10 @@ function TrayPicture({ offset }: { offset: number }) {
 }
 
 const FEATURES: { title: string; body: string; offset: number; tint: string; to: string }[] = [
-  { title: "Every hole, one map", body: "About 6,600 scanned holes from every State's core library, coloured by what each was drilled for or by what the core is made of. Upload a scan, or fetch one by drillhole name from NVCL.", offset: 0.05, tint: "#0d3a4c", to: "map" },
-  { title: "A drillhole report", body: "Domain boundaries, the TIR an older scan never recorded, the intervals that stand out and why, and the metres most worth assaying \u2014 beside the tray photographs and the geologist's log.", offset: 0.3, tint: "#173523", to: "map" },
-  { title: "Core like this one", body: "For any interval or whole hole, the most similar core nearby or across the State, matched metre by metre on the model's reading.", offset: 0.55, tint: "#3b2916", to: "map" },
-  { title: "Ask about the core", body: "An assistant that answers from the same data, finds the reports behind a hole and sums them up, and opens the hole it is talking about.", offset: 0.15, tint: "#2a2446", to: "map" },
+  { title: "All the holes, on one map", body: "About 6,600 scanned holes from every State's core library, coloured by what each was drilled for or by what the core is made of. Open any of them, or add your own: upload a scan, or fetch one by drillhole name from NVCL.", offset: 0.05, tint: "#0d3a4c", to: "map" },
+  { title: "A report you can take away", body: "For any hole, a PDF report with the model's reading down the hole, the data-quality problems found in the scan, the domain boundaries it drew, the intervals that stand out and why, and the metres most worth assaying. The problems export as CSV for fixing at the source.", offset: 0.3, tint: "#173523", to: "map" },
+  { title: "Core like this one", body: "Pick an interval or a whole hole and CoreFlagging finds the core most like it, nearby or across the State. Likeness is measured in HyFormer's representation space: two intervals are alike when the model represents them alike, whoever logged them and whatever they were called.", offset: 0.55, tint: "#3b2916", to: "map" },
+  { title: "Ask about the core", body: "An assistant that answers questions about a hole from the same data, finds the WAMEX reports and drillhole descriptions behind it, sums them up, and opens the hole or the report it is talking about.", offset: 0.15, tint: "#2a2446", to: "map" },
 ];
 
 /** What you can do: four large picture cards, title at the foot, as on the platform's landing page. */
