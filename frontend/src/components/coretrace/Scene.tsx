@@ -6,8 +6,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useQueries, useQuery } from "@tanstack/react-query";
 import { ArrowLeft, Compass, Ruler } from "lucide-react";
 import { coreScan, type Trace, type TraceView } from "@/lib/coreScan";
-import { groupColor, groupName, SERIES } from "@/components/coretrace/palette";
-import { fine, mixed, STEP } from "@/components/coretrace/sceneColour";
+import { groupColor, groupName, lithColor, SERIES } from "@/components/coretrace/palette";
+import { fine, logged, mixed, STEP, type Mix } from "@/components/coretrace/sceneColour";
 import { Section } from "@/components/coretrace/Section";
 import { KeyTips } from "@/components/coretrace/MapKey";
 import { cn } from "@/lib/utils";
@@ -32,12 +32,12 @@ const RINGS = [2, 5, 10] as const;
 const NEIGHBOUR_LOGS = 30;                                      // how many neighbours' spectral logs to fetch when they are coloured
 const FINE_NEIGHBOURS = 12;                                     // up to this many neighbours take the 0.1 m log; more take the 1 m one
 /** What colours the lines: the mineral group TSG read most of in each metre, the HyLogger data itself, SWIR or TIR. */
-type Paint = "swir" | "tir";
+type Paint = "rock" | "swir" | "tir";
 export function Scene() {
   const sp = useSearchParams(); const router = useRouter();
   const key = sp.get("hole"); const [km, setKm] = useState<number>(Number(sp.get("km")) || 2);
   const colourAll = true;                                        // the neighbours are always coloured from their own logs
-  const [paint, setPaint] = useState<Paint>("swir");
+  const [chosen, setChosen] = useState<Paint | null>(null);     // null: the logged rock when the hole has one, else SWIR
   const [view, setView] = useState<"3d" | "section">(sp.get("view") === "section" ? "section" : "3d");
   const [azimuth, setAzimuth] = useState<number | null>(null);   // the section line's bearing, null = the hole's own dip direction
   const [corridor, setCorridor] = useState<number>(250);         // the section takes holes within this many metres of its line
@@ -50,8 +50,20 @@ export function Scene() {
   const nq = useQueries({ queries: nearKeys.map((k) => ({ queryKey: ["core-spectral-whole", k, nearStep], queryFn: () => coreScan.spectralLog(k, nearStep), staleTime: 60 * 60_000, retry: false })) });
   const nearStamp = nq.map((r) => r.dataUpdatedAt).join(",");                 // useQueries hands back a new array each render; redraw only when a log arrives
   const nearLogs = useMemo(() => new Map(nearKeys.map((k, i) => [k, nq[i]?.data])), [nearKeys, nearStamp]);  // eslint-disable-line react-hooks/exhaustive-deps
-  const mainMix = useMemo(() => mixed(sq.data, paint), [sq.data, paint]);
+  // the holes' own logs (the hole panel's record) for the logged-rock colouring: this hole's always, to know whether it has one
+  const hq = useQuery({ queryKey: ["core-hole", key], queryFn: () => coreScan.hole(key as string), enabled: !!key, staleTime: 10 * 60_000 });
+  const hasRock = (hq.data?.metres.lith ?? []).some(Boolean);
+  const paint: Paint = chosen ?? (hasRock ? "rock" : "swir");
+  const rockKeys = paint === "rock" ? nearKeys.slice(0, FINE_NEIGHBOURS) : [];
+  const rq = useQueries({ queries: rockKeys.map((k) => ({ queryKey: ["core-hole", k], queryFn: () => coreScan.hole(k), staleTime: 10 * 60_000, retry: false })) });
+  const rockStamp = rq.map((r) => r.dataUpdatedAt).join(",");
+  const rockLogs = useMemo(() => new Map(rockKeys.map((k, i) => [k, rq[i]?.data])), [rockKeys, rockStamp]);  // eslint-disable-line react-hooks/exhaustive-deps
+  const mainMix = useMemo(() => (paint === "rock" ? logged(hq.data) : mixed(sq.data, paint)), [hq.data, sq.data, paint]);
+  // every hole's colouring by key, for the 3D view and the section alike
+  const mixOf = useMemo(() => (k: string): Mix => (k === key ? mainMix : paint === "rock" ? logged(rockLogs.get(k)) : mixed(nearLogs.get(k), paint)), [key, mainMix, paint, rockLogs, nearLogs]);
   const mainGroups = mainMix.rank;                                // the groups this hole shows, most core first, for the key
+  const swatch = (g: string) => (paint === "rock" ? lithColor(g) : groupColor(g));
+  const name = (g: string) => (paint === "rock" ? g : groupName(g));
 
   useEffect(() => {
     const d = q.data; const el = host.current; if (!d || !el || view !== "3d") return;
@@ -73,7 +85,7 @@ export function Scene() {
       const traces: any[] = [];
       const line = (t: Trace, main: boolean) => {
         const { dx, dy, dz } = rel(t); const coloured = main || colourAll;
-        const mix = main ? mainMix : mixed(nearLogs.get(t.key), paint);
+        const mix = mixOf(t.key);
         const P = coloured ? fine(t.points) : t.points;
         const C = P.map((p) => mix.colour.get(Math.round(p.m / STEP)) ?? NO);
         const V: { p: Trace["points"][number]; c: string }[] = coloured ? P.flatMap((p, i) => (i < P.length - 1 ? [{ p, c: C[i] }, { p: P[i + 1], c: C[i] }] : [])) : P.map((p, i) => ({ p, c: C[i] }));
@@ -123,14 +135,14 @@ export function Scene() {
       });
     })();
     return () => { gone = true; };
-  }, [q.data, colourAll, router, paint, mainMix, nearLogs, view]);
+  }, [q.data, colourAll, router, mixOf, view]);
 
   const d: TraceView | undefined = q.data;
   const presets = [["N–S", 0, "The line runs north–south: look at the holes from the east or west"], ["NE–SW", 45, "The line runs north-east to south-west"], ["E–W", 90, "The line runs east–west: look at the holes from the north or south"], ["NW–SE", 135, "The line runs north-west to south-east"]] as const;
   return (
     <div className="fixed inset-0 bg-slate-100">
       {view === "3d" ? <div ref={host} className="absolute inset-0" /> : d && (
-        <Section d={d} paint={paint} mainMix={mainMix} nearLogs={nearLogs} colourAll azimuth={azimuth} corridor={corridor} onAzimuth={setAzimuth}
+        <Section d={d} mixOf={mixOf} colourAll azimuth={azimuth} corridor={corridor} onAzimuth={setAzimuth}
           onOpen={(k, m) => router.push(`/map?hole=${encodeURIComponent(k)}&full=1&m=${Math.floor(m)}`)} />
       )}
       {/* top bar, as on the map: the brand and the way back on the left, the views and their options after */}
@@ -148,7 +160,9 @@ export function Scene() {
         </div>
         <div className="pointer-events-auto"><Pill value={view} onChange={setView} items={[["3d", "3D", "The holes as lines in space, to turn and zoom"], ["section", "Section", "A vertical slice through this collar: the nearby holes projected onto one plane, as a geologist draws a cross-section"]] as const} label="View" /></div>
         <div className="pointer-events-auto"><Pill value={km} onChange={setKm} items={RINGS.map((r) => [r, `${r} km`, `Draw the scanned holes within ${r} km of this collar`] as const)} label="Neighbours within" /></div>
-        <div className="pointer-events-auto"><Pill value={paint} onChange={setPaint} items={[["swir", "SWIR minerals", "Colour by the SWIR reading: clays, micas, chlorite, carbonate (the alteration minerals)"], ["tir", "TIR minerals", "Colour by the TIR reading: quartz, feldspars, pyroxene, garnet (the rock-forming minerals)"]] as const} label="Coloured by" /></div>
+        <div className="pointer-events-auto"><Pill value={paint} onChange={setChosen} items={[
+          ...(hasRock ? [["rock", "Logged rock", "Colour by the rock type the company geologist logged, in GSWA's map colours: the way a drillhole is usually drawn"] as const] : []),
+          ["swir", "SWIR minerals", "Colour by the SWIR reading: clays, micas, chlorite, carbonate (the alteration minerals), in TSG's colours"], ["tir", "TIR minerals", "Colour by the TIR reading: quartz, feldspars, pyroxene, garnet (the rock-forming minerals), in TSG's colours"]] as const} label="Coloured by" /></div>
         {view === "section" && (
           <>
             <div className={cn(glass, "pointer-events-auto flex h-11 items-center gap-1 rounded-full p-1")} role="group" aria-label="Section line">
@@ -169,12 +183,12 @@ export function Scene() {
       {d && (
         <aside aria-label="Key" className={cn(glass, "absolute right-3 bottom-3 z-10 w-[300px] max-w-[calc(100vw-24px)] overflow-hidden bg-white/90")}>
           <div className="flex items-center gap-2 border-b border-white/75 py-2 pr-3 pl-4">
-            <b className="font-display text-sm font-bold tracking-tight">{paint === "swir" ? "SWIR" : "TIR"} mineral groups</b>
-            <span className="ml-auto text-[11.5px] whitespace-nowrap text-slate-500">every 10 cm</span>
+            <b className="font-display text-sm font-bold tracking-tight">{paint === "rock" ? "Logged rock" : `${paint.toUpperCase()} mineral groups`}</b>
+            <span className="ml-auto text-[11.5px] whitespace-nowrap text-slate-500">{paint === "rock" ? "GSWA colours, per metre" : "TSG colours, every 10 cm"}</span>
           </div>
           <div className="grid grid-cols-2 gap-x-3 gap-y-1 px-4 py-2.5 text-xs text-slate-700">
-            {mainGroups.slice(0, 10).map((g) => <span key={g} className="flex items-center gap-1.5"><i className="inline-block size-3 flex-none rounded-[3px] border border-slate-900/10" style={{ background: groupColor(g) }} />{groupName(g)}</span>)}
-            {sq.isError && <span className="col-span-2 text-amber-700">No spectral log for this hole: it is drawn grey.</span>}
+            {mainGroups.slice(0, 12).map((g) => <span key={g} className="flex items-center gap-1.5"><i className="inline-block size-3 flex-none rounded-[3px] border border-slate-900/10" style={{ background: swatch(g) }} />{name(g)}</span>)}
+            {paint !== "rock" && sq.isError && <span className="col-span-2 text-amber-700">No spectral log for this hole: it is drawn grey.</span>}
           </div>
           <div className="flex flex-col gap-1 border-t border-white/75 px-4 py-2 text-xs text-slate-700">
             <span className="flex items-center gap-1.5"><i className="inline-block h-1.5 w-4 rounded-full bg-ink" />this hole, with a dark edge</span>
@@ -182,7 +196,7 @@ export function Scene() {
             <span className="flex items-center gap-1.5"><i className="inline-block h-1.5 w-4 rounded-full" style={{ background: SERIES.orange }} />model disagrees with the log</span>
           </div>
           <p className="border-t border-white/75 px-4 py-2 text-[11px] leading-relaxed text-slate-500">
-            Colours are the HyLogger data itself: the mineral groups TSG read in each 10 cm, their standard colours mixed by share. True proportions, no vertical exaggeration.{" "}
+            {paint === "rock" ? "Colours are the rock types in the hole's own log, mapped to GSWA's rock families in the colours of GSWA's bedrock map; a neighbour without a log is grey." : "Colours are the HyLogger data itself: the mineral groups TSG read in each 10 cm, their standard colours mixed by share."} True proportions, no vertical exaggeration.{" "}
             {view === "3d" ? "Drag to turn, scroll to zoom." : "A vertical section through this collar along the line; holes within the corridor are projected onto it, fainter the further off the line. Drag to pan, scroll to zoom, double-click to reset."} Click a point to open that depth on the map.
           </p>
         </aside>

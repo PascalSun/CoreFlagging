@@ -1,5 +1,5 @@
-import type { SpectralLog, Trace } from "@/lib/coreScan";
-import { groupColor, groupName } from "@/components/coretrace/palette";
+import type { HoleDetail, SpectralLog, Trace } from "@/lib/coreScan";
+import { groupColor, groupName, lithColor } from "@/components/coretrace/palette";
 
 // How the scene and the section colour a hole: every 10 cm from its spectral log, the mineral groups' TSG colours mixed by share.
 
@@ -38,3 +38,17 @@ export function fine(P: Trace["points"]): Trace["points"] {
 /** A hole and its neighbours as lines in space, in metres from this hole's collar (east, north, up). The hole is
  * coloured every 10 cm by the HyLogger data itself (the mineral groups TSG read, their colours mixed by share); the neighbours are grey, or coloured the same way when "colour the neighbours" is on; the flagged
  * metres and the log disagreements are drawn thick. A click on a point opens that depth on the map. */
+
+/** The logged rock per metre in GSWA's map colours (the hole's own log, mapped to GSWA's rock families), every 10 cm of
+ * the metre alike: the way the industry colours a drillhole in 3D. Empty where the log has no family for the metre. */
+export function logged(h: HoleDetail | undefined): Mix {
+  const colour = new Map<number, string>(); const text = new Map<number, string>(); const tot = new Map<string, number>();
+  const ms = h?.metres; if (!ms) return { colour, text, rank: [] };
+  ms.m.forEach((m, i) => {
+    const l = ms.lith[i]; if (!l) return;
+    tot.set(l, (tot.get(l) ?? 0) + 1); const raw = ms.lith_raw[i];
+    const d0 = m * 10; const c = lithColor(l); const t = raw && raw !== l ? `${l} · logged "${raw}"` : l;
+    for (let k = 0; k < 10; k++) { colour.set(d0 + k, c); text.set(d0 + k, t); }
+  });
+  return { colour, text, rank: [...tot.entries()].sort((a, b) => b[1] - a[1]).map(([g]) => g) };
+}
