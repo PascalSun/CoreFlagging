@@ -123,6 +123,9 @@ export function CoreMap({ holes, colour, card, selected, onSelect, padRight, pad
       mapRef.current = map;
       if (apiRef) apiRef.current = { zoomIn: () => map.zoomIn(), zoomOut: () => map.zoomOut() };
       map.addControl(new mapboxgl.ScaleControl({ unit: "metric" }), "bottom-left");
+      // the map's box changes when the chat column opens or closes (the map is pushed aside, not covered): follow it
+      const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(() => map.resize()) : null; ro?.observe(ref.current);
+      map.once("remove", () => ro?.disconnect());
       const corner = map.getContainer().querySelector(".mapboxgl-ctrl-bottom-left") as HTMLElement | null;
       if (corner) corner.style.left = `${padLeftRef.current}px`;
       const tip = new mapboxgl.Popup({ closeButton: false, closeOnClick: false, className: "ct-popup", offset: 12, maxWidth: "none" });

@@ -193,8 +193,9 @@ export function CoreTraceMap() {
 
   return (
     <div className="fixed inset-0 overflow-hidden bg-slate-50 text-slate-900">
-      <div className="absolute inset-0 z-0"><CoreMap holes={drawn} basemap={basemap} colour={colour} card={(h) => holeCard(h, colour(h), typeName, "Target")} selected={selected} ringKm={ringKm} onSelect={(k) => set({ hole: k, m: null, full: null })}
-        padRight={mobile ? 0 : panelW + chatW + ctlW} padLeft={!mobile && view === "map" && holes.length > 0 && !keyFolded ? PANEL_W + 22 : 6} padBottom={mobile && holeKey ? Math.round(vh * 0.56) : 0} apiRef={mapApi} /></div>
+      {/* the map is pushed aside by the chat column, not covered by it */}
+      <div className="absolute inset-y-0 left-0 z-0" style={{ right: chatW }}><CoreMap holes={drawn} basemap={basemap} colour={colour} card={(h) => holeCard(h, colour(h), typeName, "Target")} selected={selected} ringKm={ringKm} onSelect={(k) => set({ hole: k, m: null, full: null })}
+        padRight={mobile ? 0 : panelW + ctlW} padLeft={!mobile && view === "map" && holes.length > 0 && !keyFolded ? PANEL_W + 22 : 6} padBottom={mobile && holeKey ? Math.round(vh * 0.56) : 0} apiRef={mapApi} /></div>
 
       {/* the key: a single column down the left edge; every row can be shown alone or hidden, and every count
           follows what the other sections let through */}
@@ -307,7 +308,7 @@ export function CoreTraceMap() {
 
       {/* the holes tab: every hole on the map as a table */}
       {view === "holes" && (
-        <div className={cn(glass, "absolute top-[68px] bottom-3 left-3 z-20 overflow-hidden bg-white/92")} style={{ right: chatW + 12 }}>
+        <div className={cn(glass, "absolute top-[68px] bottom-3 left-3 z-[32] overflow-hidden bg-white/92")} style={{ right: chatW + 12 }}>
           <HoleTable holes={list} q={q} onQ={setQ} look={colour} typeName={typeName} loading={hq.isLoading} sheet={{ state: "", q }} onOpen={(k) => set({ hole: k, m: null, full: null, view: null })}
             onAsk={chatOpen ? undefined : () => setChatOpen(true)} />
         </div>
