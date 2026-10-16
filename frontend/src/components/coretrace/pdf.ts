@@ -33,12 +33,22 @@ export async function downloadReportPdf(node: HTMLElement, filename: string, foo
     }
     pages.push([y, end]); y = end;
   }
+  // every link in the document keeps working in the PDF: an invisible link box over where it was drawn
+  const links = [...node.querySelectorAll<HTMLAnchorElement>("a[href^='http']")].map((a) => {
+    const r = a.getBoundingClientRect();
+    return { url: a.href, x: (r.left - box.left) * ratio, y: (r.top - box.top) * ratio, w: r.width * ratio, h: r.height * ratio };
+  }).filter((l) => l.w > 0 && l.h > 0);
   const slice = document.createElement("canvas"); const g = slice.getContext("2d")!;
   pages.forEach(([a, b], i) => {
     slice.width = canvas.width; slice.height = b - a;
     g.fillStyle = "#ffffff"; g.fillRect(0, 0, slice.width, slice.height); g.drawImage(canvas, 0, a, canvas.width, b - a, 0, 0, canvas.width, b - a);
     if (i) pdf.addPage();
-    pdf.addImage(slice.toDataURL("image/jpeg", 0.92), "JPEG", margin, i ? vmargin : 0, w, (b - a) * scale);
+    const top = i ? vmargin : 0;
+    pdf.addImage(slice.toDataURL("image/jpeg", 0.92), "JPEG", margin, top, w, (b - a) * scale);
+    for (const l of links) {
+      if (l.y + l.h / 2 < a || l.y + l.h / 2 >= b) continue;
+      pdf.link(margin + l.x * scale, top + (l.y - a) * scale, l.w * scale, l.h * scale, { url: l.url });
+    }
     pdf.setFontSize(7.5); pdf.setTextColor(140);
     pdf.text(footer, 36, ph - 20); pdf.text(`${i + 1} / ${pages.length}`, pw - 36, ph - 20, { align: "right" });
   });
