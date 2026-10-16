@@ -209,11 +209,9 @@ function MetreTab({ hole, metre, previewing, mv, loading, trays, onMetre, typeNa
         <span className="text-xs text-slate-500">{mv.n_tokens} of 10 ten-centimetre bins have valid core{mv.lith_raw ? ` · logged as ${mv.lith_raw}` : ""}{mv.au !== null ? ` · Au ${fmt(mv.au, 2)} ppm` : ""}</span>
       </div>
       {md && (
-        <div className="grid grid-cols-2 gap-2 @2xl:grid-cols-4">
+        <div className="grid grid-cols-2 gap-2">
           <Fact k="Rock Classification" v={<span className="flex items-start gap-1.5"><i className="mt-[0.4em] inline-block h-2.5 w-2.5 flex-none rounded-[2px]" style={{ background: coreTypeBg(typeName(md.core)) }} /><span className="line-clamp-2 text-[15px] leading-snug" title={typeName(md.core)}>{typeName(md.core)}</span></span>} />
           <Fact k="Unusual" v={pct(md.anom)} sub="State percentile of its most unusual 10 cm" />
-          <Fact k="Gold likelihood" v={fmt(md.gold)} sub={`higher than ${pct(md.gold_pct)} of training metres`} />
-          <Fact k={md.has_tir ? "TIR from SWIR" : "TIR filled in"} v={groupName(md.tir_group)} sub={md.tir_conf !== null ? `confidence ${pct(md.tir_conf)}` : undefined} />
         </div>
       )}
       <TrayPhoto holeKey={hole.key} trays={trays} metre={at} onMetre={onMetre} />
