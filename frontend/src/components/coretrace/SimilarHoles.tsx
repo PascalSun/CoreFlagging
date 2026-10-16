@@ -32,7 +32,7 @@ export function SimilarHoles({ hole, run, onOpenHole, onCompare }: { hole: HoleD
         <>
           <p className="text-xs leading-relaxed text-slate-600">This hole, {d.mine.from_m}–{d.mine.to_m} m ({d.mine.n} metres), against {d.n_candidates.toLocaleString()} scanned holes{scope === "nearby" ? " within 25 km" : scope === "region" ? ` in ${hole.region}` : " across the State"}{d.compared < d.n_candidates ? ` (the ${d.compared} closest by their mean vector compared metre by metre)` : ""}: each metre finds the metre of the other hole the model reads as most alike, and the cosines are averaged both ways into the <b className="font-medium text-slate-800">likeness</b>. <b className="font-medium text-slate-800">ρ</b> says whether the other hole repeats this one&rsquo;s order down the hole: 1 the same order, 0 no relation, −1 the other way up.</p>
           {d.results.length === 0 ? <p className="text-xs text-slate-500">No other hole to compare with here.</p> : (
-            <table className="w-full border-collapse">
+            <div className="overflow-x-auto"><table className="w-full min-w-[30rem] border-collapse">
               <thead><tr>{["Hole", "Likeness", "ρ (order)", "Metres", scope === "nearby" ? "Distance" : "Region", "Drilled for"].map((h) => <th key={h} className={th}>{h}</th>)}</tr></thead>
               <tbody>{d.results.map((r) => (
                 <tr key={r.key} onClick={() => onOpenHole(r.key)} className="cursor-pointer hover:bg-slate-50">
@@ -40,7 +40,7 @@ export function SimilarHoles({ hole, run, onOpenHole, onCompare }: { hole: HoleD
                   <td className={cn(td, "font-mono")}>{r.score.toFixed(2)}</td><td className={cn(td, "font-mono text-slate-500")}>{r.rho === null ? "—" : r.rho.toFixed(2)}</td><td className={cn(td, "font-mono text-slate-500")}>{r.n}</td>
                   <td className={td}>{scope === "nearby" ? (r.km !== null ? `${fmt(r.km, 1)} km` : "—") : r.region || "—"}</td>
                   <td className={cn(td, "text-slate-500")}>{r.target || "—"}</td></tr>))}</tbody>
-            </table>)}
+            </table></div>)}
         </>)}
     </div>
   );

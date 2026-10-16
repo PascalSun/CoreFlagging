@@ -8,7 +8,7 @@ import { PAGE_W, ReportDocument } from "@/components/coretrace/ReportDocument";
 import { ACTIVE, inferred, TARGET_SOURCE_LABEL, abstractParts, commodityName, coreScan, readDate, sourceLabel, surveyOf, type SimilarScope, type CoreModelInfo, type HoleDetail, type HoleDocuments, type MetreView, type ModelView, type Tray } from "@/lib/coreScan";
 import { STATUS_LABEL, SERIES, fmt, groupColor, groupName, issueLabel, mineralName, pct, coreTypeBg } from "@/components/coretrace/palette";
 import { LINE, SpectraChart } from "@/components/coretrace/SpectraChart";
-import { StripKey, StripLog, groupOrder } from "@/components/coretrace/StripLog";
+import { StripKeyBar, StripLog, groupOrder } from "@/components/coretrace/StripLog";
 import { TrayViewer } from "@/components/coretrace/DeepZoom";
 import { TrayPhoto } from "@/components/coretrace/TrayPhoto";
 import { LookAgain } from "@/components/coretrace/LookAgain";
@@ -536,7 +536,7 @@ export function HolePanel({ holeKey, tab: tabProp, onTab, models, run, metre, on
             {tab === "log" && (mvw ? (
               <div className="flex flex-col gap-3">
                 <p className="text-xs leading-relaxed text-slate-600">The model cuts the hole where its reading of the spectra changes, then each piece is described from the TSG software&rsquo;s minerals. {mvw.segments.length} segments, typically {fmt(mvw.segments.map((s) => s.length_m).sort((a, b) => a - b)[Math.floor(mvw.segments.length / 2)], 1)} m long. Click a row to go there.</p>
-                <table className="w-full border-collapse">
+                <div className="overflow-x-auto"><table className="w-full min-w-[30rem] border-collapse">
                   <thead><tr>{["From–to (m)", "Rock Classification", "SWIR minerals", "TIR groups"].map((h) => <th key={h} className={th}>{h}</th>)}</tr></thead>
                   <tbody>{mvw.segments.map((s) => { const on = metre !== null && metre >= Math.floor(s.from_m) && metre < s.to_m; return (
                     <tr key={s.seg} onClick={() => jump(Math.floor(s.from_m))} className={cn("cursor-pointer hover:bg-slate-50", on && "bg-cyan/10")}>
@@ -544,7 +544,7 @@ export function HolePanel({ holeKey, tab: tabProp, onTab, models, run, metre, on
                       <td className={td}><span className="flex items-center gap-1.5"><i className="inline-block h-2.5 w-2.5 flex-none rounded-[2px]" style={{ background: coreTypeBg(s.core_type_name) }} />{s.core_type_name}</span></td>
                       <td className={td}>{s.swir_minerals.slice(0, 3).map(([c, , p]) => `${mineralName(c)} ${pct(p)}`).join(", ") || "—"}</td>
                       <td className={td}>{s.tir_groups.slice(0, 2).map(([c, , p]) => `${groupName(c)} ${pct(p)}`).join(", ") || "—"}</td></tr>); })}</tbody>
-                </table>
+                </table></div>
               </div>) : <Empty>Loading…</Empty>)}
             {tab === "again" && (mvw ? <LookAgain mv={mvw} metre={metre} onJump={(m, to) => { jump(m); if (to !== undefined && onWindow) onWindow([m, to]); }} /> : <Empty>Loading…</Empty>)}
             {tab === "gold" && (mvw ? (
@@ -567,7 +567,7 @@ export function HolePanel({ holeKey, tab: tabProp, onTab, models, run, metre, on
               const asking = (
                 <div className="flex flex-wrap items-center gap-1.5" role="tablist" aria-label="What to compare">
                   <span className="text-[11px] text-slate-500">Compare</span>
-                  {([false, true] as const).map((w) => <button key={String(w)} type="button" role="tab" aria-selected={simWhole === w} onClick={() => setSimWhole(w)} className={cn("rounded-full px-2.5 py-0.5 text-[11px] font-medium ring-1", simWhole === w ? "bg-slate-900 text-white ring-slate-900" : "bg-white text-slate-700 ring-slate-200 hover:ring-slate-400")}>{w ? "The whole hole" : "A stretch of core"}</button>)}
+                  {([false, true] as const).map((w) => <button key={String(w)} type="button" role="tab" aria-selected={simWhole === w} onClick={() => setSimWhole(w)} className={cn("rounded-full px-2.5 py-0.5 pointer-coarse:py-1.5 text-[11px] font-medium ring-1", simWhole === w ? "bg-slate-900 text-white ring-slate-900" : "bg-white text-slate-700 ring-slate-200 hover:ring-slate-400")}>{w ? "The whole hole" : "A stretch of core"}</button>)}
                 </div>);
               if (simWhole) return <div className="flex flex-col gap-3">{asking}{useRun ? <SimilarHoles hole={hole} run={useRun} onOpenHole={(k) => onOpenHole(k)} onCompare={(k) => onCompare?.(k)} /> : <Empty>Loading…</Empty>}</div>;
               return (
@@ -575,14 +575,14 @@ export function HolePanel({ holeKey, tab: tabProp, onTab, models, run, metre, on
                   {asking}
                   <div className="flex flex-wrap items-center gap-1.5" role="tablist" aria-label="Where to look">
                     <span className="text-[11px] text-slate-500">Look in</span>
-                    {scopes.filter((sc) => sc.id !== "region" || hole.region).map((sc) => <button key={sc.id} type="button" role="tab" aria-selected={simScope === sc.id} title={sc.hint} onClick={() => setSimScope(sc.id)} className={cn("rounded-full px-2.5 py-0.5 text-[11px] font-medium ring-1", simScope === sc.id ? "bg-slate-900 text-white ring-slate-900" : "bg-white text-slate-700 ring-slate-200 hover:ring-slate-400")}>{sc.label}</button>)}
+                    {scopes.filter((sc) => sc.id !== "region" || hole.region).map((sc) => <button key={sc.id} type="button" role="tab" aria-selected={simScope === sc.id} title={sc.hint} onClick={() => setSimScope(sc.id)} className={cn("rounded-full px-2.5 py-0.5 pointer-coarse:py-1.5 text-[11px] font-medium ring-1", simScope === sc.id ? "bg-slate-900 text-white ring-slate-900" : "bg-white text-slate-700 ring-slate-200 hover:ring-slate-400")}>{sc.label}</button>)}
                   </div>
                   {simAt === null ? <Empty>Click a metre on the log, or zoom to a window, then look for core like it.</Empty>
                   : sq.isLoading ? <Empty>Searching…</Empty>
                   : sq.isError || !sq.data ? <Empty>The similarity search is not available right now. Everything else on this page still works.</Empty> : (
                 <>
                   <p className="text-xs leading-relaxed text-slate-600">{what}{sq.data.query.metres && sq.data.query.metres > 1 ? ` (${sq.data.query.metres} metres averaged)` : ""}, compared with {simScope === "hole" ? "every interval of this hole" : `${sq.data.library.intervals.toLocaleString()} two-metre intervals from ${sq.data.library.holes.toLocaleString()} holes`}{simScope === "nearby" ? ", within 10 km" : simScope === "region" ? `, in ${hole.region}` : simScope === "state" ? "; holes within 5 km are left out" : ""}. {simScope === "hole" ? "Every matching interval is listed; the window itself comes first." : "Each hole appears once, at its best match."}</p>
-                  <table className="w-full border-collapse">
+                  <div className="overflow-x-auto"><table className="w-full min-w-[32rem] border-collapse">
                     <thead><tr>{["Hole", "Interval (m)", "Similarity", "SWIR / TIR", "Region"].map((h) => <th key={h} className={th}>{h}</th>)}</tr></thead>
                     <tbody>{sq.data.results.map((r) => (
                       <tr key={`${r.hole}-${r.from_m}`} onClick={() => simScope === "hole" ? onWindow?.([r.from_m, r.to_m]) : r.key && onOpenHole(r.key, Math.floor(r.from_m))} className={cn((r.key || simScope === "hole") && "cursor-pointer hover:bg-slate-50")}>
@@ -590,7 +590,7 @@ export function HolePanel({ holeKey, tab: tabProp, onTab, models, run, metre, on
                         <td className={cn(td, "font-mono")}>{r.from_m.toFixed(0)}–{r.to_m.toFixed(0)}</td><td className={cn(td, "font-mono")}>{r.sim.toFixed(2)}</td>
                         <td className={td}><span className="flex items-center gap-1.5"><i className="inline-block h-2.5 w-2.5 rounded-[2px]" style={{ background: groupColor(r.gs) }} />{groupName(r.gs)} / {groupName(r.gt)}</span></td>
                         <td className={td}>{r.region || "—"}{r.rock ? ` · ${r.rock}` : ""}</td></tr>))}</tbody>
-                  </table>
+                  </table></div>
                 </>)}
                 </div>);
             })()}
@@ -603,7 +603,7 @@ export function HolePanel({ holeKey, tab: tabProp, onTab, models, run, metre, on
   }
   // the full log's key, a footer under every tab: they all read the same log on the left
   const footer = hole && ready && wide && (
-    <div className="flex-none border-t border-slate-200/70 bg-white/70 px-4 py-2"><StripKey metres={hole.metres} model={mvw} spectral={slq.data} /></div>
+    <StripKeyBar metres={hole.metres} model={mvw} spectral={slq.data} />
   );
   return <div className="flex h-full min-h-0 flex-col">{header}<div className="flex min-h-0 flex-1 flex-col overflow-y-auto">{body}</div>{footer}</div>;
 }

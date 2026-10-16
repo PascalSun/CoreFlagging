@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Info, X } from "lucide-react";
 import { commodityName, coreScan, inferred, sourceLabel, TARGET_SOURCE_LABEL, type HoleDetail, type ModelView, type SpectralLog } from "@/lib/coreScan";
-import { StripLog, StripKey } from "@/components/coretrace/StripLog";
+import { StripLog, StripKeyBar } from "@/components/coretrace/StripLog";
 import { CORR_SHOW, CORR_TIP, CorrelationView, correlate, type Correlation, type CorrShow } from "@/components/coretrace/Correlate";
 import { fmt, pct, coreTypeBg } from "@/components/coretrace/palette";
 import { cn } from "@/lib/utils";
@@ -45,7 +45,7 @@ function Column({ hole, mv, spectral, cursor, onCursor, onOpen, missing, win, on
         {hole.has_lith && again.length > 0 && <p className="text-[11px] text-slate-600">{again.length} {again.length === 1 ? "interval" : "intervals"} where the model disagrees with the log: {again.slice(0, 3).map((d) => (
           <button key={d.from_m} type="button" onClick={() => onCursor(d.from_m)} className="mr-1 font-mono hover:underline">{d.from_m}–{d.to_m} m</button>))}</p>}
       </div>
-      <div className="flex min-h-0 flex-1 justify-center">
+      <div className="flex min-h-0 flex-1 justify-center max-lg:h-[70vh] max-lg:flex-none">
         <StripLog metres={hole.metres} model={mv} spectral={spectral} cursor={cursor} onCursor={onCursor} hasLith={hole.has_lith} hasAu={hole.au_m > 0} range={win ?? undefined} onRange={onWin} mirror={mirror} />
       </div>
     </div>
@@ -106,9 +106,9 @@ export function ComparePanel({ a: aKey, b: bKey, winA = null, winB = null, onClo
         </div>
         <button type="button" onClick={onClose} aria-label="Close the comparison" className="grid h-8 w-8 flex-none place-items-center rounded-lg text-slate-500 hover:bg-slate-100"><X size={16} /></button>
       </div>
-      <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 overflow-y-auto p-4 lg:grid-cols-[minmax(0,1fr)_minmax(300px,440px)_minmax(0,1fr)] lg:overflow-hidden">
+      <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 overflow-y-auto p-4 max-lg:auto-rows-max lg:grid-cols-[minmax(0,1fr)_minmax(300px,440px)_minmax(0,1fr)] lg:overflow-hidden">
         <Column hole={a.hole} mv={a.mv} spectral={a.spectral} cursor={ca} onCursor={pickA} onOpen={onOpenHole} missing={missing(a, "A")} win={wa} onWin={setWa} />
-        <div className="flex min-h-[420px] flex-col">
+        <div className="flex min-h-[420px] flex-col max-lg:h-[75vh]">
           {corr ? (
             <>
               <div className="flex items-baseline justify-center gap-4 pb-1 font-display text-2xl font-semibold text-[#b45f3c]">
@@ -117,7 +117,7 @@ export function ComparePanel({ a: aKey, b: bKey, winA = null, winB = null, onClo
               </div>
               <div className="flex justify-center pb-2" role="group" aria-label="Column beside RC">
                 <div className="flex overflow-hidden rounded-md border border-slate-200 text-[11px]">
-                  {CORR_SHOW.map((c) => <button key={c.id} type="button" aria-pressed={show === c.id} onClick={() => setShow(c.id)} className={cn("px-2 py-0.5", show === c.id ? "bg-slate-900 text-white" : "bg-white text-slate-600 hover:bg-slate-50")}>{c.label}</button>)}
+                  {CORR_SHOW.map((c) => <button key={c.id} type="button" aria-pressed={show === c.id} onClick={() => setShow(c.id)} className={cn("px-2 py-0.5 pointer-coarse:px-3 pointer-coarse:py-1.5", show === c.id ? "bg-slate-900 text-white" : "bg-white text-slate-600 hover:bg-slate-50")}>{c.label}</button>)}
                 </div>
               </div>
               <p className="pb-2 text-center text-[11px] text-slate-500">matched by {corr.basis === "representation" ? "HyFormer\u2019s representation (2 m fingerprints), as Similar core" : corr.basis === "rock class" ? "rock class (RC) for now, until the representation match is available" : "the mineral groups the scanner reads (SWIR and TIR) for now; no model reading on both holes"}</p>
@@ -127,7 +127,7 @@ export function ComparePanel({ a: aKey, b: bKey, winA = null, winB = null, onClo
         </div>
         <Column hole={b.hole} mv={b.mv} spectral={b.spectral} cursor={cb} onCursor={pickB} onOpen={onOpenHole} missing={missing(b, "B")} win={wb} onWin={setWb} mirror />
       </div>
-      {a.hole && <div className="flex-none border-t border-slate-200/70 bg-white/70 px-4 py-2"><StripKey metres={a.hole.metres} model={a.mv} spectral={a.spectral} /></div>}
+      {a.hole && <StripKeyBar metres={a.hole.metres} model={a.mv} spectral={a.spectral} />}
     </div>
   );
 }
