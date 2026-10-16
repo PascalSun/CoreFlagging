@@ -146,7 +146,10 @@ function Plan({ collars, bearing, corridor }: { collars: { t: Trace; main: boole
     const S = 200, R = window.devicePixelRatio || 1; el.width = S * R; el.height = S * R;
     const g = el.getContext("2d"); if (!g) return;
     g.setTransform(R, 0, 0, R, 0, 0); g.clearRect(0, 0, S, S);
-    const reach = Math.max(60, ...collars.map((c) => Math.hypot(c.dx, c.dy))) * 1.15; const k = (S / 2 - 10) / reach;
+    // the view reaches the corridor and the holes in it; holes further out sit at the edge, so the near ones keep their spacing
+    const th0 = (bearing * Math.PI) / 180; const inCorr = collars.filter((c) => Math.abs(c.dx * Math.cos(th0) - c.dy * Math.sin(th0)) <= corridor);
+    const reach = Math.max(1.6 * corridor, 100, ...inCorr.map((c) => Math.hypot(c.dx, c.dy) * 1.2)); const k = (S / 2 - 10) / reach;
+    const clamp = (e: number, n: number) => { const r = Math.hypot(e, n); return r > reach ? [(e / r) * reach, (n / r) * reach] : [e, n]; };
     const X = (e: number) => S / 2 + e * k, Y = (n: number) => S / 2 - n * k;
     const th = (bearing * Math.PI) / 180; const ux = Math.sin(th), uy = Math.cos(th);   // along the line
     const vx = Math.cos(th), vy = -Math.sin(th);                                           // across it
@@ -159,11 +162,11 @@ function Plan({ collars, bearing, corridor }: { collars: { t: Trace; main: boole
     // the collars: in the corridor dark, outside faint; this one in ink with a ring
     g.font = "9px ui-sans-serif, system-ui"; g.textAlign = "left"; g.textBaseline = "middle";
     for (const c of collars) {
-      const off = Math.abs(c.dx * vx + c.dy * vy); const inside = off <= corridor;
-      g.fillStyle = c.main ? "#0f172a" : inside ? "#475569" : "#cbd5e1";
-      g.beginPath(); g.arc(X(c.dx), Y(c.dy), c.main ? 4 : 2.5, 0, 2 * Math.PI); g.fill();
+      const off = Math.abs(c.dx * vx + c.dy * vy); const inside = off <= corridor; const [e, n] = clamp(c.dx, c.dy); const far = e !== c.dx;
+      g.fillStyle = c.main ? "#0f172a" : inside && !far ? "#475569" : "#cbd5e1";
+      g.beginPath(); g.arc(X(e), Y(n), c.main ? 4 : 2.5, 0, 2 * Math.PI); g.fill();
       if (c.main) { g.strokeStyle = "#ffffff"; g.lineWidth = 1.5; g.stroke(); }
-      if (c.main || (inside && collars.length <= 12)) { g.fillStyle = c.main ? "#0f172a" : "#475569"; g.fillText(c.t.name, X(c.dx) + 6, Y(c.dy)); }
+      if (c.main || (inside && !far && inCorr.length <= 8)) { g.fillStyle = c.main ? "#0f172a" : "#475569"; g.fillText(c.t.name, X(e) + 6, Y(n)); }
     }
     // north, and the scale
     g.fillStyle = "#64748b"; g.textAlign = "center"; g.fillText("N", S / 2, 8);
