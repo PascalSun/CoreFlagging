@@ -7,7 +7,7 @@ import { useQueries, useQuery } from "@tanstack/react-query";
 import { ArrowLeft, Compass, Ruler } from "lucide-react";
 import { coreScan, type Trace, type TraceView } from "@/lib/coreScan";
 import { groupColor, groupName, lithColor, SERIES } from "@/components/coretrace/palette";
-import { fine, logged, mixed, STEP, type Mix } from "@/components/coretrace/sceneColour";
+import { fine, logged, mixed, pieces, STEP, type Mix } from "@/components/coretrace/sceneColour";
 import { Section } from "@/components/coretrace/Section";
 import { KeyTips } from "@/components/coretrace/MapKey";
 import { cn } from "@/lib/utils";
@@ -86,11 +86,10 @@ export function Scene() {
       const line = (t: Trace, main: boolean) => {
         const { dx, dy, dz } = rel(t); const coloured = main || colourAll;
         const mix = mixOf(t.key);
-        const P = coloured ? fine(t.points) : t.points;
-        // a piece with no colour (not scanned, or nothing read there) is drawn thin and pale, so it is never mistaken for a pale
-        // rock colour such as GSWA's grey for sediments; the coloured line breaks there (Plotly ends a line at a null)
-        const C = P.map((p) => mix.colour.get(Math.round(p.m / STEP)) ?? null);
-        const V: { p: Trace["points"][number]; c: string | null }[] = coloured ? P.flatMap((p, i) => (i < P.length - 1 ? [{ p, c: C[i] }, { p: P[i + 1], c: C[i] }] : [])) : P.map((p, i) => ({ p, c: C[i] }));
+        // every piece's two ends carry the piece's own colour, so a colour changes sharply at a point instead of shading
+        // across the piece; a piece with no colour (not scanned, or nothing read there) is drawn thin and pale, so it is never
+        // mistaken for a pale rock colour such as GSWA's grey for sediments: the coloured line breaks there (a null ends it)
+        const V: { p: Trace["points"][number]; c: string | null }[] = pieces(coloured ? fine(t.points) : t.points, coloured ? mix : null).flatMap((s) => [{ p: s.a, c: s.c }, { p: s.b, c: s.c }]);
         const scanned = (m: number) => m >= t.depth_min - 0.5 && m <= t.depth_max + 0.5;
         const at = (v: (typeof V)[number], want: boolean) => (coloured && (v.c !== null) !== want ? null : v.p);
         const xyz = (want: boolean) => ({ x: V.map((v) => { const p = at(v, want); return p && p.e + dx; }), y: V.map((v) => { const p = at(v, want); return p && p.n + dy; }), z: V.map((v) => { const p = at(v, want); return p && p.u + dz; }) });
@@ -202,7 +201,7 @@ export function Scene() {
             <span className="flex items-center gap-1.5"><i className="inline-block h-1.5 w-4 rounded-full" style={{ background: SERIES.orange }} />model disagrees with the log</span>
           </div>
           <p className="border-t border-white/75 px-4 py-2 text-[11px] leading-relaxed text-slate-500">
-            {paint === "rock" ? "Colours are the rock types in the hole's own log, mapped to GSWA's rock families in the colours of GSWA's bedrock map; a neighbour without a log is grey." : "Colours are the HyLogger data itself: the mineral groups TSG read in each 10 cm, their standard colours mixed by share."} True proportions, no vertical exaggeration.{" "}
+            {paint === "rock" ? "Colours are the rock types in the hole's own log, mapped to GSWA's rock families in the colours of GSWA's bedrock map; a neighbour without a log is grey." : "Colours are the HyLogger data itself: the mineral groups TSG read in each 10 cm, in TSG&apos;s standard colours, each 10 cm split along the hole by their shares (as the strip log stacks them), so every colour is in the key."} True proportions, no vertical exaggeration.{" "}
             {view === "3d" ? "Drag to turn, scroll to zoom." : "A vertical section through this collar along the line; holes within the corridor are projected onto it, fainter the further off the line. Drag to pan, scroll to zoom, double-click to reset."} Click a point to open that depth on the map.
           </p>
         </aside>

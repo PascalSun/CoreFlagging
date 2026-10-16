@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Trace, TraceView } from "@/lib/coreScan";
-import { fine, STEP, type Mix } from "@/components/coretrace/sceneColour";
+import { fine, pieces, STEP, type Mix } from "@/components/coretrace/sceneColour";
 
 /** A vertical section: the holes near a line through this hole's collar, projected onto the vertical plane along it, drawn to
  * scale (no vertical exaggeration) the way a geologist draws a cross-section. The line's bearing is the hole's own dip direction
@@ -37,8 +37,9 @@ export function Section({ d, mixOf, colourAll, azimuth, corridor, onOpen }: {
       const dx = (t.collar.lon - c0.lon) * mlon, dy = (t.collar.lat - c0.lat) * mlat, dz = t.collar.rl !== null && c0.rl !== null ? t.collar.rl - c0.rl : 0;
       const off = (dx) * cx - (dy) * sx;
       const coloured = main || colourAll; const mix = mixOf(t.key);
-      const P = coloured ? fine(t.points) : t.points;
-      const pts = P.map((p) => ({ m: p.m, x: (p.e + dx) * sx + (p.n + dy) * cx, y: p.u + dz, c: coloured ? mix.colour.get(Math.round(p.m / STEP)) ?? null : null, t: mix.text.get(Math.round(p.m / STEP)) ?? null }));
+      // each piece's two ends in the section's plane, with the piece's colour on its first end (the stroke from it)
+      const at = (p: Trace["points"][number], c: string | null) => ({ m: p.m, x: (p.e + dx) * sx + (p.n + dy) * cx, y: p.u + dz, c, t: mix.text.get(Math.round(p.m / STEP)) ?? null });
+      const pts = pieces(coloured ? fine(t.points) : t.points, coloured ? mix : null).flatMap((s) => [at(s.a, s.c), at(s.b, s.c)]);
       return { t, main, off, pts };
     };
     return [...d.nearby.map((n) => proj(n, false)).filter((h) => Math.abs(h.off) <= corridor).sort((a, b) => Math.abs(b.off) - Math.abs(a.off)), proj(d.hole, true)];
