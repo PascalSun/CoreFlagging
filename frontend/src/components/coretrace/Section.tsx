@@ -1,15 +1,15 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { SpectralLog, Trace, TraceView } from "@/lib/coreScan";
-import { fine, mixed, STEP, type Mix } from "@/components/coretrace/sceneColour";
+import type { Trace, TraceView } from "@/lib/coreScan";
+import { fine, STEP, type Mix } from "@/components/coretrace/sceneColour";
 
 /** A vertical section: the holes near a line through this hole's collar, projected onto the vertical plane along it, drawn to
  * scale (no vertical exaggeration) the way a geologist draws a cross-section. The line's bearing is the hole's own dip direction
  * unless set; a hole is in the section when its collar is within the corridor, drawn fainter the further off the line it is.
  * Colours are the spectral log's, every 10 cm, as in the 3D view. Drag pans, the wheel zooms, hover reads a piece, click opens it. */
-export function Section({ d, paint, mainMix, nearLogs, colourAll, azimuth, corridor, onOpen }: {
-  d: TraceView; paint: "swir" | "tir"; mainMix: Mix; nearLogs: Map<string, SpectralLog | undefined>; colourAll: boolean;
+export function Section({ d, mixOf, colourAll, azimuth, corridor, onOpen }: {
+  d: TraceView; mixOf: (key: string) => Mix; colourAll: boolean;
   azimuth: number | null; corridor: number; onAzimuth?: (a: number) => void; onOpen: (key: string, m: number) => void;
 }) {
   const canvas = useRef<HTMLCanvasElement>(null);
@@ -36,13 +36,13 @@ export function Section({ d, paint, mainMix, nearLogs, colourAll, azimuth, corri
     const proj = (t: Trace, main: boolean) => {
       const dx = (t.collar.lon - c0.lon) * mlon, dy = (t.collar.lat - c0.lat) * mlat, dz = t.collar.rl !== null && c0.rl !== null ? t.collar.rl - c0.rl : 0;
       const off = (dx) * cx - (dy) * sx;
-      const coloured = main || colourAll; const mix = main ? mainMix : mixed(nearLogs.get(t.key), paint);
+      const coloured = main || colourAll; const mix = mixOf(t.key);
       const P = coloured ? fine(t.points) : t.points;
       const pts = P.map((p) => ({ m: p.m, x: (p.e + dx) * sx + (p.n + dy) * cx, y: p.u + dz, c: coloured ? mix.colour.get(Math.round(p.m / STEP)) ?? null : null, t: mix.text.get(Math.round(p.m / STEP)) ?? null }));
       return { t, main, off, pts };
     };
     return [...d.nearby.map((n) => proj(n, false)).filter((h) => Math.abs(h.off) <= corridor).sort((a, b) => Math.abs(b.off) - Math.abs(a.off)), proj(d.hole, true)];
-  }, [d, c0, mlon, mlat, bearing, corridor, colourAll, mainMix, nearLogs, paint]);
+  }, [d, c0, mlon, mlat, bearing, corridor, colourAll, mixOf]);
 
   // the world box of what is drawn and the transform to the canvas, fitted then zoomed and panned
   const box = useMemo(() => {
