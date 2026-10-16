@@ -68,7 +68,7 @@ export function HoleTable({ holes, q, onQ, look, typeName, onOpen, onAsk, loadin
       <div className="flex flex-wrap items-center gap-3 border-b border-slate-200/70 px-4 py-3">
         <label className="flex min-w-0 flex-1 basis-[240px] items-center gap-2 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 focus-within:ring-2 focus-within:ring-cyan">
           <Search size={14} className="text-slate-400" />
-          <input autoFocus value={q} onChange={(e) => { onQ(e.target.value); setShown(PAGE); }} placeholder="Find a hole, company, project or region" aria-label="Search holes"
+          <input autoFocus={typeof window !== "undefined" && window.matchMedia("(pointer: fine)").matches} value={q} onChange={(e) => { onQ(e.target.value); setShown(PAGE); }} placeholder="Find a hole, company, project or region" aria-label="Search holes"
             onKeyDown={(e) => { if (e.key === "Enter" && rows[0]) onOpen(rows[0].key); }} className="w-full bg-transparent text-sm outline-none placeholder:text-slate-400" />
           {q && <button type="button" onClick={() => onQ("")} aria-label="Clear the search" className="text-slate-400 hover:text-slate-700"><X size={14} /></button>}
         </label>

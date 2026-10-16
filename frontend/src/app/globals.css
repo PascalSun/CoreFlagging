@@ -242,3 +242,14 @@ body {
   filter: drop-shadow(0 0 1.5px rgba(2, 6, 23, 0.85)) drop-shadow(0 1px 2px rgba(2, 6, 23, 0.4));
   color: #fff; font: 600 10.5px/1.4 var(--font-mono), ui-monospace, monospace; letter-spacing: 0.02em;
 }
+
+/* iOS Safari zooms the whole page into a text field whose type is under 16px when it gets focus, and leaves it
+ * zoomed. On a touch screen every text field is 16px, so tapping the search box (or the chat, or the sign-in
+ * email) never zooms the page. Unlayered, so it wins over the utility classes' smaller sizes. */
+@media (pointer: coarse) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="color"]),
+  textarea,
+  select {
+    font-size: 16px;
+  }
+}
