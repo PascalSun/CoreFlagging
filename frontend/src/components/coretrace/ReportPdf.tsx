@@ -6,6 +6,7 @@
 // when they drift away, so a long report costs what is on screen, not the whole document.
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { ExternalLink, Loader2, Maximize2, Minimize2, Minus, Plus } from "lucide-react";
 import { PLATFORM_URL } from "@ntlp/geodata-web/fetch";
 import { cn } from "@/lib/utils";
@@ -63,8 +64,8 @@ export function ReportPdf({ url, title, page: openAt, subtitle }: ReportPdfProps
     const el = scrollRef.current; if (!el || !dims.length) return;
     const measure = () => { const avail = el.clientWidth - 20; if (avail > 0) setFit((c) => { const n = Math.min(2, Math.max(0.3, avail / dims[0].w)); return Math.abs(c - n) < 0.01 ? c : n; }); };
     measure(); const ro = new ResizeObserver(measure); ro.observe(el); return () => ro.disconnect();
-  }, [dims]);
-  useEffect(() => { drawn.current.clear(); }, [scale]);
+  }, [dims, full]);
+  useEffect(() => { drawn.current.clear(); }, [scale, full]);
 
   const render = useCallback(async (n: number) => {
     const host = hosts.current.get(n); if (!doc || !host || !scale || drawn.current.get(n) === scale) return;
@@ -100,7 +101,7 @@ export function ReportPdf({ url, title, page: openAt, subtitle }: ReportPdfProps
     const onScroll = () => { if (!raf) raf = requestAnimationFrame(sweep); };
     el.addEventListener("scroll", onScroll); sweep();
     return () => { el.removeEventListener("scroll", onScroll); if (raf) cancelAnimationFrame(raf); };
-  }, [doc, scale, dims, render, release]);
+  }, [doc, scale, dims, render, release, full]);
 
   // the page the assistant cited, once the column has its sizes
   useEffect(() => {
@@ -111,15 +112,24 @@ export function ReportPdf({ url, title, page: openAt, subtitle }: ReportPdfProps
 
   const n = doc?.numPages ?? 0;
   const go = (p: number) => { const host = hosts.current.get(Math.min(n, Math.max(1, p))); const el = scrollRef.current; if (host && el) el.scrollTop = host.offsetTop - 6; };
+  // entering or leaving full screen mounts a new scroll box at a new width: put the reader back on the page they were
+  // on, taken at the click (the new box starts at the top), and again as the fit to the new width settles
+  const restoreTo = useRef<number | null>(null);
+  const toggle = (to: boolean) => { restoreTo.current = current; setFull(to); window.setTimeout(() => { restoreTo.current = null; }, 800); };
+  useEffect(() => {
+    const at = restoreTo.current; if (at === null) return;
+    const id = requestAnimationFrame(() => requestAnimationFrame(() => { const host = hosts.current.get(at); const el = scrollRef.current; if (host && el) el.scrollTop = host.offsetTop - 6; }));
+    return () => cancelAnimationFrame(id);
+  }, [full, scale]);
   const frame = (
-    <div className={cn("flex flex-col overflow-hidden rounded-xl border border-slate-200 bg-white", full ? "fixed inset-3 z-50 shadow-2xl" : "h-[460px] w-full")}>
+    <div className={cn("flex flex-col overflow-hidden rounded-xl border border-slate-200 bg-white", full ? "fixed inset-3 z-[71] shadow-2xl sm:inset-6" : "h-[460px] w-full")}>
       <div className="flex items-center gap-2 border-b border-slate-100 bg-slate-50/80 px-2.5 py-1.5 text-xs">
         <div className="min-w-0 flex-1"><div className="truncate font-semibold text-slate-900">{title}</div>{subtitle && <div className="truncate text-[11px] text-slate-500">{subtitle}</div>}</div>
         {n > 0 && <span className="font-mono text-[11px] text-slate-500"><input type="number" min={1} max={n} value={current} onChange={(e) => go(Number(e.target.value))} className="w-10 rounded border border-slate-200 px-1 text-right" aria-label="Page" /> / {n}</span>}
         <button type="button" onClick={() => setZoom((z) => Math.max(0.4, z / 1.25))} aria-label="Zoom out" className="grid size-6 place-items-center rounded hover:bg-white"><Minus size={13} /></button>
         <button type="button" onClick={() => setZoom((z) => Math.min(4, z * 1.25))} aria-label="Zoom in" className="grid size-6 place-items-center rounded hover:bg-white"><Plus size={13} /></button>
         <a href={src} target="_blank" rel="noopener" aria-label="Open in a new tab" className="grid size-6 place-items-center rounded hover:bg-white"><ExternalLink size={13} /></a>
-        <button type="button" onClick={() => setFull((f) => !f)} aria-label={full ? "Shrink" : "Enlarge"} className="grid size-6 place-items-center rounded hover:bg-white">{full ? <Minimize2 size={13} /> : <Maximize2 size={13} />}</button>
+        <button type="button" onClick={() => toggle(!full)} aria-label={full ? "Shrink" : "Enlarge"} className="grid size-6 place-items-center rounded hover:bg-white pointer-coarse:size-8">{full ? <Minimize2 size={13} /> : <Maximize2 size={13} />}</button>
       </div>
       {/* `relative`: page hosts are placed by offsetTop, which must be measured against this scroll box and not the
           chat panel around it (measured against the panel, every page looked far below the viewport and none was drawn). */}
@@ -132,5 +142,8 @@ export function ReportPdf({ url, title, page: openAt, subtitle }: ReportPdfProps
           </div>))}
       </div>
     </div>);
-  return full ? <>{<div className="fixed inset-0 z-40 bg-black/40" onClick={() => setFull(false)} />}{frame}</> : frame;
+  // full screen goes to the page's body: inside the chat panel, whose glass (backdrop-filter) makes a fixed box fixed to
+  // the panel, it could not cover the screen
+  if (!full) return frame;
+  return createPortal(<><div className="fixed inset-0 z-[70] bg-black/40" onClick={() => toggle(false)} />{frame}</>, document.body);
 }
