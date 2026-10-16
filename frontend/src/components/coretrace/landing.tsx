@@ -314,7 +314,7 @@ export function CoreTeam() {
 }
 
 const STEPS: [string, string][] = [
-  ["Spectra every 10 cm", "The HyLogger measures short-wave infrared (clays, micas, carbonates, talc) and thermal infrared (quartz, feldspar) all along the core."],
+  ["Spectra every centimetre", "About every centimetre along the core, the HyLogger records a visible to short-wave infrared spectrum (0.4\u20132.5 \u00b5m: iron oxides, clays, micas, chlorite, carbonates, talc) and a thermal infrared spectrum (6\u201314.5 \u00b5m: quartz, feldspar, pyroxene). Each 10 cm interval averages the readings in it."],
   ["Cleaned the same way for every hole", "Chip and cuttings scans dropped, bad readings masked, every instrument on one wavelength grid, the good readings averaged per 10 cm."],
   ["HyFormer, one model trained by filling in blanks", "HyFormer learns from millions of unlabelled 10 cm intervals the way language models learn from text: part of the scan is hidden \u2014 a stretch of depth, a whole sensor, a band of wavelengths \u2014 and the model learns to rebuild it. Logs and assays are never used for training, only for scoring; the rock classes alone are fine-tuned on the training holes' logs."],
   ["One representation, multiple functions", "The same HyFormer reading of each interval supports every task: rock classification, filling in the thermal infrared for scans made without that sensor, finding the domain boundaries, flagging the metres that stand out, and looking up similar core as neighbours in the representation space."],
