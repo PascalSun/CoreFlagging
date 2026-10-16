@@ -5,7 +5,7 @@ import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-quer
 import { AlertTriangle, ArrowRight, Box, ChevronLeft, ChevronRight, Download, ExternalLink, FileDown, FileText, Loader2, Maximize2, Minimize2, Trash2, X } from "lucide-react";
 import { downloadReportPdf } from "@/components/coretrace/pdf";
 import { PAGE_W, ReportDocument } from "@/components/coretrace/ReportDocument";
-import { ACTIVE, inferred, TARGET_SOURCE_LABEL, abstractParts, commodityName, coreScan, readDate, reportFileKind, sourceLabel, surveyOf, type SimilarScope, type CoreModelInfo, type HoleDetail, type HoleReport, type MetreView, type ModelView, type Tray } from "@/lib/coreScan";
+import { ACTIVE, inferred, TARGET_SOURCE_LABEL, abstractParts, commodityName, coreScan, readDate, sourceLabel, surveyOf, type SimilarScope, type CoreModelInfo, type HoleDetail, type HoleDocuments, type MetreView, type ModelView, type Tray } from "@/lib/coreScan";
 import { STATUS_LABEL, SERIES, fmt, groupColor, groupName, issueLabel, mineralName, pct, coreTypeBg } from "@/components/coretrace/palette";
 import { LINE, SpectraChart } from "@/components/coretrace/SpectraChart";
 import { StripKey, StripLog, groupOrder } from "@/components/coretrace/StripLog";
@@ -17,6 +17,7 @@ import { Nearby } from "@/components/coretrace/Nearby";
 import { QualityChecks } from "@/components/coretrace/QualityChecks";
 import { DepthLens, levelOf, type Window, WindowStart } from "@/components/coretrace/DepthLens";
 import { cn } from "@/lib/utils";
+import { PLATFORM_URL } from "@ntlp/geodata-web/fetch";
 
 export type Tab = "window" | "metre" | "again" | "log" | "gold" | "similar" | "quality" | "report";
 // "gold" and "log" (Auto log) are hidden: their views are kept below, but no tab opens them and a link with
@@ -38,51 +39,95 @@ const Empty = ({ children }: { children: React.ReactNode }) => <div className="r
 
 const kb = (b: number) => (b >= 1e6 ? `${(b / 1e6).toFixed(1)} MB` : `${Math.max(1, Math.round(b / 1e3))} KB`);
 
-/** The exploration report the hole was logged in: what the company wrote, one click from the scan.
- * A document card: the abstract's labelled parts (Location, Geology, Work done, Results…), the first two
- * shown and the rest a click away, the PDF button, and the mirror's other files as chips. */
-function OriginalReport({ report, loading }: { report: HoleReport | undefined; loading: boolean }) {
-  const [open, setOpen] = useState(false);
-  const parts = useMemo(() => (report?.abstract ? abstractParts(report.abstract) : []), [report]);
-  const shown = open ? parts : parts.slice(0, 2);
-  const others = report?.files.filter((f) => f.download_url !== report.pdf_url) ?? [];
-  if (loading) return <p className="text-[11px] text-slate-500">Looking up the report…</p>;
-  if (!report) return <p className="text-[11px] text-slate-500">The report is on the mirror but could not be listed right now.</p>;
+/** A mirror file's short label: the A-number prefixes and the "(OCR)" tag stripped, the extension kept as a hint. */
+function fileLabel(name: string): string {
+  const base = name.replace(/\.[^.]+$/, "").replace(/^(a\d{4,7}_)+/i, "").replace(/^[a-z]{2,5}\d{4}-\d{5,}[ _]*/i, "").replace(/_?\(ocr\)/i, "").replace(/_/g, " ").trim();
+  const ext = (name.split(".").pop() || "").toUpperCase();
+  return `${base.length > 42 ? base.slice(0, 40) + "…" : base}${ext && ext !== "PDF" ? ` (${ext})` : ""}`;
+}
+
+/** The hole's paperwork, three layers: its own HyLogger PDFs (NVCL's spectral summary, GSWA's mineralogy
+ * histograms); the WAMEX exploration report(s) it was logged in, each with the abstract's labelled parts, the
+ * report body as the button and the other files as chips; and, folded away, every other WAMEX report whose
+ * area covers the collar. */
+function HoleDocumentsCard({ docs, loading }: { docs: HoleDocuments | undefined; loading: boolean }) {
+  const [openAbs, setOpenAbs] = useState<string | null>(null);
+  const [more, setMore] = useState(false);
+  if (loading) return <p className="text-[11px] text-slate-500">Looking up the documents…</p>;
+  if (!docs) return <p className="text-[11px] text-slate-500">The documents could not be listed right now.</p>;
+  const linked = docs.wamex?.linked ?? []; const covering = docs.wamex?.covering ?? [];
+  const nCover = Math.max(0, (docs.wamex?.covering_count ?? covering.length) - linked.length);
+  if (!docs.hole_pdfs.length && !linked.length && !covering.length) return <p className="text-[11px] text-slate-500">No documents are on file for this hole{docs.portal ? <>; its survey&rsquo;s portal is <a href={docs.portal.url} target="_blank" rel="noopener" className="underline underline-offset-2">{docs.portal.name}</a></> : ""}.</p>;
   return (
-    <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
-      <div className="flex items-center gap-3 border-b border-slate-100 bg-slate-50/70 px-3.5 py-2.5">
-        <span className="grid h-9 w-9 flex-none place-items-center rounded-lg bg-white text-slate-700 shadow-sm ring-1 ring-slate-200"><FileText size={18} strokeWidth={1.6} /></span>
-        <div className="min-w-0">
-          <div className="truncate text-sm font-semibold text-slate-900">Exploration report {report.anumber}</div>
-          <div className="text-[11px] text-slate-500">The geologist&rsquo;s own account, lodged with GSWA (WAMEX)</div>
-        </div>
-      </div>
-      {parts.length > 0 && (
-        <dl className="flex flex-col gap-2 px-3.5 py-3 text-xs">
-          {shown.map((p, i) => (
-            <div key={i} className="grid grid-cols-[5.2rem_1fr] gap-x-2">
-              <dt className="pt-px text-[11px] font-medium text-slate-500">{p.label || "Abstract"}</dt>
-              <dd className={cn("leading-relaxed text-slate-700", !open && "line-clamp-3")}>{p.text}</dd>
+    <div className="flex flex-col gap-2">
+      {docs.hole_pdfs.length > 0 && (
+        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+          <div className="border-b border-slate-100 bg-slate-50/70 px-3.5 py-2 text-[11px] font-medium text-slate-600">This hole&rsquo;s own documents</div>
+          <ul className="divide-y divide-slate-100">
+            {docs.hole_pdfs.map((p) => (
+              <li key={p.key + p.file} className="flex items-center gap-2 px-3.5 py-2">
+                <FileText size={15} className="flex-none text-slate-500" />
+                <div className="min-w-0 flex-1"><a href={`${PLATFORM_URL}${p.url}`} target="_blank" rel="noopener" className="block truncate text-xs font-medium text-slate-900 underline-offset-2 hover:underline">{p.title}</a><div className="text-[11px] text-slate-500">{p.kind}{p.pages ? ` · ${p.pages} ${p.pages === 1 ? "page" : "pages"}` : ""}</div></div>
+                <a href={`${PLATFORM_URL}${p.url}`} target="_blank" rel="noopener" aria-label="Open the PDF" className="grid size-7 flex-none place-items-center rounded-full text-slate-500 hover:bg-slate-100 hover:text-slate-900"><ExternalLink size={13} /></a>
+              </li>))}
+          </ul>
+        </div>)}
+      {linked.map((r) => {
+        const parts = r.abstract ? abstractParts(r.abstract) : []; const open = openAbs === r.anumber; const shown = open ? parts : parts.slice(0, 2);
+        const body = r.files?.find((f) => f.name === r.pdf);
+        // the mirror often holds the same file under two or three prefixes: one chip per distinct label + size
+        const seen = new Set<string>(body ? [`${fileLabel(body.name)}|${body.bytes}`] : []);
+        const others = (r.files ?? []).filter((f) => { const k = `${fileLabel(f.name)}|${f.bytes}`; if (seen.has(k)) return false; seen.add(k); return true; });
+        return (
+          <div key={r.anumber} className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+            <div className="flex items-center gap-3 border-b border-slate-100 bg-slate-50/70 px-3.5 py-2.5">
+              <span className="grid h-9 w-9 flex-none place-items-center rounded-lg bg-white text-slate-700 shadow-sm ring-1 ring-slate-200"><FileText size={18} strokeWidth={1.6} /></span>
+              <div className="min-w-0">
+                <div className="truncate text-sm font-semibold text-slate-900">Exploration report <a href={r.url} target="_blank" rel="noopener" title="This report on WAMEX" className="underline-offset-2 hover:underline">{r.anumber}</a></div>
+                <div className="truncate text-[11px] text-slate-500" title={r.title ?? undefined}>{r.title || "The geologist\u2019s own account, lodged with GSWA (WAMEX)"}{[r.year, r.company].filter(Boolean).length ? ` · ${[r.year, r.company].filter(Boolean).join(" · ")}` : ""}</div>
+              </div>
             </div>
-          ))}
-          {parts.length > 2 || parts.some((p) => p.text.length > 200) ? (
-            <button type="button" onClick={() => setOpen((o) => !o)} className="self-start text-[11px] font-medium text-slate-700 underline-offset-2 hover:underline">{open ? "Show less" : parts.length > 2 ? `Show all ${parts.length} parts` : "Read in full"}</button>
-          ) : null}
-        </dl>
-      )}
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-slate-100 px-3.5 py-3">
-        {report.pdf_url && <a href={report.pdf_url} target="_blank" rel="noopener" className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-800"><ExternalLink size={13} />Open the report</a>}
-        {others.length > 0 && (
-          <div className="flex flex-wrap items-center gap-1.5">
-            {others.map((f) => (
-              <a key={f.name} href={f.download_url} target="_blank" rel="noopener" title={`${f.name} · ${kb(f.bytes)}`} className="inline-flex items-center gap-1 rounded-full border border-slate-200 px-2 py-0.5 text-[11px] text-slate-600 hover:border-slate-400 hover:text-slate-900"><Download size={10} />{reportFileKind(f.name)}</a>
-            ))}
-          </div>
-        )}
-      </div>
+            {parts.length > 0 && (
+              <dl className="flex flex-col gap-2 px-3.5 py-3 text-xs">
+                {shown.map((p, i) => (
+                  <div key={i} className="grid grid-cols-[5.2rem_1fr] gap-x-2">
+                    <dt className="pt-px text-[11px] font-medium text-slate-500">{p.label || "Abstract"}</dt>
+                    <dd className={cn("leading-relaxed text-slate-700", !open && "line-clamp-3")}>{p.text}</dd>
+                  </div>))}
+                {parts.length > 2 || parts.some((p) => p.text.length > 200) ? (
+                  <button type="button" onClick={() => setOpenAbs(open ? null : r.anumber)} className="self-start text-[11px] font-medium text-slate-700 underline-offset-2 hover:underline">{open ? "Show less" : parts.length > 2 ? `Show all ${parts.length} parts` : "Read in full"}</button>
+                ) : null}
+              </dl>)}
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-slate-100 px-3.5 py-3">
+              {body ? <a href={body.download_url} target="_blank" rel="noopener" title={body.name} className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-800"><ExternalLink size={13} />Open the report</a>
+                : <span className="text-[11px] text-slate-500">No PDF on the mirror; <a href={r.url} target="_blank" rel="noopener" className="underline underline-offset-2">see it on WAMEX</a>.</span>}
+              {others.length > 0 && (
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {others.map((f) => (
+                    <a key={f.name} href={f.download_url} target="_blank" rel="noopener" title={`${f.name} · ${kb(f.bytes)}`} className="inline-flex items-center gap-1 rounded-full border border-slate-200 px-2 py-0.5 text-[11px] text-slate-600 hover:border-slate-400 hover:text-slate-900"><Download size={11} />{fileLabel(f.name)}</a>))}
+                </div>)}
+            </div>
+          </div>);
+      })}
+      {covering.length > 0 && (
+        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+          <button type="button" onClick={() => setMore((m) => !m)} className="flex w-full items-center justify-between px-3.5 py-2 text-left">
+            <span className="text-xs font-medium text-slate-800">Other reports covering this ground{nCover ? ` (${nCover})` : ""}</span>
+            <span className="text-[11px] text-slate-500">{more ? "Hide" : "Show"}</span>
+          </button>
+          {more && (
+            <ol className="flex flex-col gap-1.5 border-t border-slate-100 px-3.5 py-2">
+              {covering.filter((c) => !linked.some((l) => l.anumber === c.anumber)).map((c) => (
+                <li key={c.anumber} className="text-[11px] leading-snug text-slate-600">
+                  <a href={c.url} target="_blank" rel="noopener" className="font-medium text-slate-900 underline decoration-slate-300 underline-offset-2 hover:decoration-slate-900">{c.anumber}</a>{" "}{[c.year, c.company, c.type, c.commodities].filter(Boolean).join(" · ")}
+                  <div className="text-slate-700">{c.title}</div>
+                </li>))}
+            </ol>)}
+        </div>)}
     </div>
   );
 }
+
 const th = "border-b border-slate-200 px-2 py-1.5 text-left text-[11px] font-medium text-slate-500";
 const td = "border-b border-slate-100 px-2 py-1.5 align-top text-xs text-slate-700";
 
@@ -329,9 +374,9 @@ export function HolePanel({ holeKey, tab: tabProp, onTab, models, run, metre, on
   const order = useMemo(() => groupOrder(slq.data), [slq.data]);
   // the model's reading per 10 cm token (core type, unusual score) for the same window: RC and Unusual draw at 10 cm with it
   const tkq = useQuery({ queryKey: ["core-tokens", holeKey, mq.data?.run, fineWin], queryFn: () => coreScan.tokenScores(holeKey, mq.data!.run, fineWin![0], fineWin![1]), enabled: ready && wide && !!fineWin && !!mq.data, staleTime: 60 * 60_000, retry: false, placeholderData: keepPreviousData });
-  // the original report: only holes whose scan names a WAMEX report have one
-  const hasReport = !!hole?.meta.wamex;
-  const rq = useQuery({ queryKey: ["core-report", holeKey], queryFn: () => coreScan.report(holeKey), enabled: hasReport, staleTime: 60 * 60_000, retry: false });
+  // the hole's documents: its own HyLogger PDFs, the WAMEX report(s) it was logged in, the reports covering its ground
+  const dq = useQuery({ queryKey: ["core-documents", holeKey], queryFn: () => coreScan.documents(holeKey), enabled: ready, staleTime: 60 * 60_000, retry: false });
+  const mainReport = (() => { const r = dq.data?.wamex?.linked.find((x) => x.pdf && x.files); const f = r?.files?.find((x) => x.name === r.pdf); return r && f ? { anumber: r.anumber, url: f.download_url } : null; })();
   const typeName = useMemo(() => { const n = new Map((mvw?.core_types ?? []).map((c) => [c.k, c.name])); return (k: number) => n.get(k) ?? "—"; }, [mvw]);
   const res = hole?.results.find((r) => r.run === useRun);
   const jump = (m: number) => { onMetre(m); };
@@ -362,7 +407,7 @@ export function HolePanel({ holeKey, tab: tabProp, onTab, models, run, metre, on
         {hole?.target && <p className="truncate text-[11px] text-slate-600" title={`What the hole was drilled for, ${TARGET_SOURCE_LABEL[hole.target_source] || "from the record"}${hole.commodities.length > 1 ? `: ${hole.commodities.map(commodityName).join(", ")}` : ""}`}>{inferred(hole.target_source) ? <>Likely drilled for <b className="font-semibold text-slate-800">{commodityName(hole.target)}</b> <span className="text-slate-400">({hole.target_source === "deposit" ? "nearest deposit" : "the report"})</span></> : <>Drilled for <b className="font-semibold text-slate-800">{commodityName(hole.target)}</b></>}{hole.commodities.length > 1 ? <span className="text-slate-500"> · also {hole.commodities.filter((c) => c !== hole.target).map(commodityName).join(", ")}</span> : null}</p>}
       </div>
       <div className="flex flex-none items-center gap-1">
-        {hasReport && rq.data?.pdf_url && <a href={rq.data.pdf_url} target="_blank" rel="noopener" aria-label="Open the original report" title={`Open the original exploration report (WAMEX ${rq.data.anumber})`} className="grid h-8 w-8 place-items-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-900"><ExternalLink size={15} /></a>}
+        {mainReport && <a href={mainReport.url} target="_blank" rel="noopener" aria-label="Open the original report" title={`Open the original exploration report (WAMEX ${mainReport.anumber})`} className="grid h-8 w-8 place-items-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-900"><ExternalLink size={15} /></a>}
         {hole && hole.lat !== null && <a href={`/scene?hole=${encodeURIComponent(hole.key)}`} aria-label="See this hole and its neighbours in 3D" title="See this hole and its neighbours in 3D" className="grid h-8 w-8 place-items-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-900"><Box size={15} /></a>}
         {hole?.mine && <button type="button" onClick={del} aria-label="Delete this scan" title="Delete this scan" className="grid h-8 w-8 place-items-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-red-600"><Trash2 size={15} /></button>}
         {ready && <button type="button" onClick={() => onWide(!wide)} aria-label={wide ? "Back to the summary" : "Open the full log"} title={wide ? "Back to the summary" : "Open the full log"} className={cn("h-8 w-8 place-items-center rounded-lg text-slate-500 hover:bg-slate-100", wide ? "grid" : "hidden sm:grid")}>{wide ? <Minimize2 size={15} /> : <Maximize2 size={15} />}</button>}
@@ -411,7 +456,7 @@ export function HolePanel({ holeKey, tab: tabProp, onTab, models, run, metre, on
           <Fact k="Data quality" v={hole.n_issues ? `${hole.n_issues} ${hole.n_issues === 1 ? "issue" : "issues"}` : "nothing found"} sub={hole.issues[0] ? issueLabel(hole.issues[0].issue) : undefined} />
         </div>
         {hole.lat !== null && <div><H3>Nearby holes</H3><Nearby hole={hole} onOpen={(k) => onOpenHole(k)} onRing={onRing} onCompare={(k) => onCompare?.(k)} /></div>}
-        {hasReport && <div><H3>Original report</H3><OriginalReport report={rq.data} loading={rq.isPending} /></div>}
+        {(dq.isPending || (dq.data && (dq.data.hole_pdfs.length > 0 || dq.data.wamex))) && <div><H3>Documents</H3><HoleDocumentsCard docs={dq.data} loading={dq.isPending} /></div>}
         {modelPicker}
         <div>
           <H3>Down the hole</H3>
