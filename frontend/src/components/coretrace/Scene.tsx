@@ -87,15 +87,20 @@ export function Scene() {
         const { dx, dy, dz } = rel(t); const coloured = main || colourAll;
         const mix = mixOf(t.key);
         const P = coloured ? fine(t.points) : t.points;
-        const C = P.map((p) => mix.colour.get(Math.round(p.m / STEP)) ?? NO);
-        const V: { p: Trace["points"][number]; c: string }[] = coloured ? P.flatMap((p, i) => (i < P.length - 1 ? [{ p, c: C[i] }, { p: P[i + 1], c: C[i] }] : [])) : P.map((p, i) => ({ p, c: C[i] }));
+        // a piece with no colour (not scanned, or nothing read there) is drawn thin and pale, so it is never mistaken for a pale
+        // rock colour such as GSWA's grey for sediments; the coloured line breaks there (Plotly ends a line at a null)
+        const C = P.map((p) => mix.colour.get(Math.round(p.m / STEP)) ?? null);
+        const V: { p: Trace["points"][number]; c: string | null }[] = coloured ? P.flatMap((p, i) => (i < P.length - 1 ? [{ p, c: C[i] }, { p: P[i + 1], c: C[i] }] : [])) : P.map((p, i) => ({ p, c: C[i] }));
+        const scanned = (m: number) => m >= t.depth_min - 0.5 && m <= t.depth_max + 0.5;
+        const at = (v: (typeof V)[number], want: boolean) => (coloured && (v.c !== null) !== want ? null : v.p);
+        const xyz = (want: boolean) => ({ x: V.map((v) => { const p = at(v, want); return p && p.e + dx; }), y: V.map((v) => { const p = at(v, want); return p && p.n + dy; }), z: V.map((v) => { const p = at(v, want); return p && p.u + dz; }) });
+        const hover = { hovertemplate: `${t.name}${main ? "" : ` · ${t.km} km`}<br>%{text}<extra></extra>`,
+          text: V.map((v) => `${v.p.m.toFixed(1)} m${coloured ? `<br>${mix.text.get(Math.round(v.p.m / STEP)) ?? (scanned(v.p.m) ? "no reading" : "not scanned")}` : ""}${!main && t.target ? `<br>drilled for ${t.target}` : ""}${!main && t.n_again ? `<br>look again: ${t.n_again} intervals` : ""}`),
+          customdata: V.map((v) => [t.key, v.p.m]), showlegend: false };
         // this hole wears a dark halo under its colours, so it stands out among coloured neighbours in the wide view
-        if (main) traces.push({ type: "scatter3d", mode: "lines", x: t.points.map((p) => p.e + dx), y: t.points.map((p) => p.n + dy), z: t.points.map((p) => p.u + dz), line: { color: "#0f172a", width: 22 }, opacity: 0.9, hoverinfo: "skip", showlegend: false });
-        traces.push({ type: "scatter3d", mode: "lines", x: V.map((v) => v.p.e + dx), y: V.map((v) => v.p.n + dy), z: V.map((v) => v.p.u + dz),
-          line: coloured ? { color: V.map((v) => v.c), width: main ? 14 : 5 } : { color: NO, width: 3 },
-          hovertemplate: `${t.name}${main ? "" : ` · ${t.km} km`}<br>%{text}<extra></extra>`,
-          text: V.map((v) => `${v.p.m.toFixed(1)} m${coloured ? `<br>${mix.text.get(Math.round(v.p.m / STEP)) ?? "no reading"}` : ""}${!main && t.target ? `<br>drilled for ${t.target}` : ""}${!main && t.n_again ? `<br>look again: ${t.n_again} intervals` : ""}`),
-          customdata: V.map((v) => [t.key, v.p.m]), showlegend: false, opacity: main ? 1 : coloured ? 0.85 : 0.7 });
+        if (main) traces.push({ type: "scatter3d", mode: "lines", ...xyz(true), line: { color: "#0f172a", width: 22 }, opacity: 0.9, hoverinfo: "skip", showlegend: false });
+        if (coloured) traces.push({ type: "scatter3d", mode: "lines", ...xyz(true), line: { color: V.map((v) => v.c ?? NO), width: main ? 14 : 5 }, ...hover, opacity: main ? 1 : 0.85 });
+        traces.push({ type: "scatter3d", mode: "lines", ...xyz(false), line: { color: "#cbd5e1", width: main ? 4 : 2 }, ...hover, opacity: 0.9 });
         // the collar, labelled
         traces.push({ type: "scatter3d", mode: "markers+text", x: [dx], y: [dy], z: [dz], text: [main ? `▶ ${t.name}` : t.name], textposition: "top center", textfont: { size: main ? 14 : 10, color: main ? "#0f172a" : "#475569" },
           marker: { size: main ? 8 : 3, color: main ? "#0f172a" : "#64748b", ...(main ? { line: { color: "#ffffff", width: 2 } } : {}) }, hoverinfo: "skip", showlegend: false });
@@ -192,6 +197,7 @@ export function Scene() {
           </div>
           <div className="flex flex-col gap-1 border-t border-white/75 px-4 py-2 text-xs text-slate-700">
             <span className="flex items-center gap-1.5"><i className="inline-block h-1.5 w-4 rounded-full bg-ink" />this hole, with a dark edge</span>
+            <span className="flex items-center gap-1.5"><i className="inline-block h-1 w-4 rounded-full bg-slate-300" />not scanned, or nothing read there (thin)</span>
             <span className="flex items-center gap-1.5"><i className="inline-block h-1.5 w-4 rounded-full bg-violet-700" />stands out from its surroundings</span>
             <span className="flex items-center gap-1.5"><i className="inline-block h-1.5 w-4 rounded-full" style={{ background: SERIES.orange }} />model disagrees with the log</span>
           </div>
