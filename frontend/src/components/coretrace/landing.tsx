@@ -343,10 +343,10 @@ export function CoreHow() {
 }
 
 const FOUND: [string, string, string][] = [
-  ["Which metres hold gold", "0.75 vs 0.64", "HyFormer's unusualness score ranks the gold-bearing metres with an AUC of 0.75 on 105 assayed holes and 0.77 on 23 unseen ones; the best conventional method stays near 0.64. With no assays to calibrate against, the two tie."],
-  ["Where the rock changes", "0.45 vs 0.39 F1", "HyFormer's domain boundaries fall within a metre of the geologists' logged contacts with an F1 of 0.45; principal components of the raw spectra reach 0.39, TSG scalars and wavelets less. The gap holds statistically (p = 0.002)."],
-  ["Thermal infrared without the sensor", "10 of 10 test sets", "Older scans have no thermal infrared, so their quartz and feldspar were never recorded. HyFormer predicts it from the short-wave infrared alone and beats the best conventional method on all ten test sets, from unseen Western Australian holes to other instruments, petroleum wells and the other States."],
-  ["Rock type from spectra", "58% vs 44%", "Fine-tuned HyFormer names the rock class of a 10 cm interval correctly 58% of the time over 12 classes on 26 unseen holes; always guessing the commonest class gives 44%, TSG scalars with a linear model 31%. Pre-training adds little here: the same network from scratch reaches 56%."],
+  ["Anomaly detection \u00b7 which metres hold gold", "0.75 vs 0.64", "HyFormer's unusualness score ranks the gold-bearing metres with an AUC of 0.75 on 105 assayed holes and 0.77 on 23 unseen ones; the best conventional method stays near 0.64. With no assays to calibrate against, the two tie."],
+  ["Domain boundaries \u00b7 where the rock changes", "0.45 vs 0.39 F1", "HyFormer's domain boundaries fall within a metre of the geologists' logged contacts with an F1 of 0.45; principal components of the raw spectra reach 0.39, TSG scalars and wavelets less. The gap holds statistically (p = 0.002)."],
+  ["TIR completion \u00b7 thermal infrared without the sensor", "10 of 10 test sets", "Older scans have no thermal infrared, so their quartz and feldspar were never recorded. HyFormer predicts it from the short-wave infrared alone and beats the best conventional method on all ten test sets, from unseen Western Australian holes to other instruments, petroleum wells and the other States."],
+  ["Rock classification \u00b7 rock type from spectra", "58% vs 44%", "Fine-tuned HyFormer names the rock class of a 10 cm interval correctly 58% of the time, over 12 classes from ultramafic to regolith, on 26 unseen holes; always guessing the commonest class gives 44%, TSG scalars with a linear model 31%. Pre-training adds little here: the same network from scratch reaches 56%."],
 ];
 
 /** What it found: the four results of the hackathon deck, each against the best conventional method. */
