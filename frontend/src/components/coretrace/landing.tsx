@@ -187,10 +187,10 @@ function TrayPicture({ offset }: { offset: number }) {
 }
 
 const FEATURES: { title: string; body: string; offset: number; tint: string; to: string }[] = [
-  { title: "Every hole, one map", body: "About 6,600 scanned holes from every State's core library, coloured by what each was drilled for or by what the core is made of. Upload a scan, or fetch one by drillhole name from NVCL.", offset: 0.05, tint: "#0d3a4c", to: "map" },
-  { title: "A drillhole report", body: "Domain boundaries, the TIR an older scan never recorded, the intervals that stand out and why, and the metres most worth assaying \u2014 beside the tray photographs and the geologist's log.", offset: 0.3, tint: "#173523", to: "map" },
-  { title: "Core like this one", body: "For any interval or whole hole, the most similar core nearby or across the State, matched metre by metre on the model's reading.", offset: 0.55, tint: "#3b2916", to: "map" },
-  { title: "Ask about the core", body: "An assistant that answers from the same data, finds the reports behind a hole and sums them up, and opens the hole it is talking about.", offset: 0.15, tint: "#2a2446", to: "map" },
+  { title: "All the holes, on one map", body: "About 6,600 scanned holes from every State's core library, coloured by what each was drilled for or by what the core is made of. Open any of them, or upload a scan of your own.", offset: 0.05, tint: "#0d3a4c", to: "map" },
+  { title: "A report you can take away", body: "For any hole, a PDF report with the data-quality problems found in the scan, the intervals that stand out and why, the metres most worth assaying, the rock classification down the hole and the domain boundaries. The data-quality problems can also be downloaded as a CSV file, so the relevant parties can review them.", offset: 0.3, tint: "#173523", to: "map" },
+  { title: "Core like this one", body: "Pick an interval or a whole hole and CoreFlagging finds the core most like it, nearby or across the State. The match is made in HyFormer's representation space, not in the logs: two intervals count as alike when the model represents them alike, regardless of who logged them or what they were called.", offset: 0.55, tint: "#3b2916", to: "map" },
+  { title: "Ask about the core", body: "An assistant that answers questions about a hole from the same data, finds the WAMEX reports and drillhole descriptions behind it, sums them up, and opens the hole or the report it is talking about.", offset: 0.15, tint: "#2a2446", to: "map" },
 ];
 
 /** What you can do: four large picture cards, title at the foot, as on the platform's landing page. */
@@ -238,10 +238,11 @@ export function CoreRun({ rows, caption }: { rows: string[]; caption: string }) 
 }
 
 const NOTES: [string, string][] = [
-  ["A second opinion, not a replacement.", "CoreFlagging points at intervals worth another look. A geologist, the tray photograph and the core decide."],
-  ["Checked in Western Australia.", "Against the logs and the chemistry in GSWA's drillhole database. Holes from other States are read the same way but not yet checked."],
-  ["It is wrong sometimes.", "Some intervals it reads as ultramafic are basalt by their chemistry, and weathering clays hide the rock they came from."],
-  ["Not a grade estimate.", "It points at the metres worth assaying; it gives no grade and replaces no assay."],
+  ["It is a second opinion, not a replacement.", "CoreFlagging points at the intervals worth another look. The decision stays with the geologist, the tray photograph and the core itself."],
+  ["It has been checked in Western Australia only.", "The results above were measured against the logs and the chemistry in GSWA's drillhole database. Holes from other States are read the same way, but nobody has checked those results yet."],
+  ["It is sometimes wrong.", "Some intervals it calls ultramafic turn out to be basalt by their chemistry, and where the core is weathered, the clays hide the rock they came from."],
+  ["It does not estimate grade.", "It points at the metres worth assaying. It gives no grade and replaces no assay."],
+  ["It is a first version, and it will improve.", "The model is still being developed. The numbers above are from its first version: some good enough to be useful, some not yet, and none as good as they can be. Each task has clear room to improve, and we will keep updating the model and these results."],
 ];
 
 /** What to keep in mind, in plain words. */
@@ -314,10 +315,10 @@ export function CoreTeam() {
 }
 
 const STEPS: [string, string][] = [
-  ["Spectra every centimetre", "About every centimetre along the core, the HyLogger records a visible to short-wave infrared spectrum (0.4\u20132.5 \u00b5m: iron oxides, clays, micas, chlorite, carbonates, talc) and a thermal infrared spectrum (6\u201314.5 \u00b5m: quartz, feldspar, pyroxene). Each 10 cm interval averages the readings in it."],
-  ["Cleaned the same way for every hole", "Chip and cuttings scans dropped, bad readings masked, every instrument on one wavelength grid, the good readings averaged per 10 cm."],
-  ["HyFormer, one model trained by filling in blanks", "HyFormer learns from millions of unlabelled 10 cm intervals the way language models learn from text: part of the scan is hidden \u2014 a stretch of depth, a whole sensor, a band of wavelengths \u2014 and the model learns to rebuild it. Logs and assays are never used for training, only for scoring; the rock classes alone are fine-tuned on the training holes' logs."],
-  ["One representation, multiple functions", "The same HyFormer reading of each interval supports every task: rock classification, filling in the thermal infrared for scans made without that sensor, finding the domain boundaries, flagging the metres that stand out, and looking up similar core as neighbours in the representation space."],
+  ["The scanner reads the core every centimetre", "A HyLogger records a spectrum about every centimetre of core. The visible to short-wave infrared (0.4\u20132.5 \u00b5m) picks up iron oxides, clays, micas, chlorite, carbonates and talc; the thermal infrared (6\u201314.5 \u00b5m) picks up quartz and feldspar, which the short-wave infrared cannot see."],
+  ["Every hole is cleaned the same way", "All 1,747 scans in GSWA's core library are downloaded. Scans of drill chips rather than solid core are dropped. Bad readings are masked: the short-wave infrared by TSG's own quality mask, the thermal infrared where it is too dark, broken or above 1, and only 6.5\u201314 \u00b5m is kept. HyLogger 4's thermal infrared is resampled onto HyLogger 3's wavelength grid, and the readings are averaged over 10 cm, which cuts the noise about 3.5 times. That gives 5.38 million intervals in 1,696 holes."],
+  ["HyFormer learns the core by filling in blanks", "HyFormer is trained on millions of 10 cm intervals without labels. In each training example part of the scan is hidden, in one of three ways: a run of depth is blanked out across both sensors (0.5\u20135 m of core), or one whole sensor is blanked out (the thermal infrared, or the short-wave infrared), or a band of wavelengths within one sensor is blanked out. The model has to rebuild the hidden part from what is left, and to do that it learns how minerals go together and how they change down a hole. Logs and assays are kept for scoring only; the rock classifier alone is fine-tuned on the training holes' logs."],
+  ["One foundation model, multiple tasks", "Once trained, HyFormer turns each 10 cm interval into a representation: a vector that summarises what the scan says about that interval. The same representation is reused for several tasks without training a new model: it classifies the rock, fills in the thermal infrared for scans that had no such sensor, finds the domain boundaries, flags the metres that stand out from their surroundings, and finds similar core across the State by nearest neighbours in the representation space."],
 ];
 
 /** How it works: four steps in order, in the notes' quiet card style. */
@@ -326,7 +327,7 @@ export function CoreHow() {
     <section id="how" className="scroll-mt-24 bg-paper pb-16 md:pb-24">
       <div className="container-site">
         <Reveal><h2 className="font-display text-2xl font-medium tracking-tight text-ink md:text-4xl">How it works</h2></Reveal>
-        <ol className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <ol className="mt-8 grid gap-4 sm:grid-cols-2">
           {STEPS.map(([t, b], i) => (
             <Reveal key={t} delay={i * 0.06}>
               <li className="flex h-full flex-col rounded-3xl border border-line bg-white p-6">
@@ -343,10 +344,10 @@ export function CoreHow() {
 }
 
 const FOUND: [string, string, string][] = [
-  ["Which metres hold gold", "0.75 vs 0.64", "On 105 holes with assays, HyFormer's unusualness score ranks the gold-bearing metres with an AUC of 0.75, and 0.77 on 23 holes it never saw; the best conventional method, TSG scalars, stays near 0.64. Without any assays to calibrate against, the two tie."],
-  ["Where the rock changes", "0.45 vs 0.39 F1", "HyFormer's domain boundaries land within a metre of the geologists' logged contacts with an F1 of 0.45. The best conventional method, principal components of the raw spectra, reaches 0.39; TSG scalars and wavelets do worse. The gap holds up statistically (p = 0.002)."],
-  ["Thermal infrared without the sensor", "10 of 10 test sets", "Older scans have no TIR, so their quartz and feldspar were never recorded. HyFormer rebuilds the TIR spectrum from the SWIR alone, and does so better than the best conventional method on all ten test sets: unseen WA holes, far regions, other instruments, petroleum wells and four other States."],
-  ["Rock type from spectra", "58% vs 44%", "Fine-tuned on the training holes' logs, HyFormer names the rock class of a 10 cm interval correctly 58% of the time, over 12 classes on 26 unseen holes. Always guessing the commonest class gives 44%; TSG scalars with a linear model give 31%. Here pre-training adds little: the same network trained from scratch reaches 56%."],
+  ["Finding the metres worth a closer look", "0.75 vs 0.64", "HyFormer gives every metre a score for how different it is from the core around it. Checked against gold assays on 105 holes, the unusual metres were where the gold was: the score picks out gold-bearing metres clearly better than the best conventional method, 0.75 against 0.64 on a scale where 0.5 is a coin toss and 1 is perfect. Example: hole EMSD1138 is about 1,000 m long and, as the assays later showed, 13 of those metres carry gold. Assays are costly, so suppose a geologist can afford only 100 of them. Picking 100 metres at random would turn up about 1 gold metre. Picking the 100 metres the model ranks most unusual turns up 4. Same budget, four times the chance of hitting gold."],
+  ["Finding where the rock changes", "0.45 vs 0.39", "When a geologist logs a hole, they mark the depths where one rock ends and the next begins. HyFormer draws those boundaries from the spectra alone, and they land within a metre of the geologist's more often than any conventional method: 0.45 against 0.39, where 1 would mean every contact found and none invented. The margin is small but consistent across holes. Example: in hole MND001 the geologist logged 41 contacts between 112 and 363 m. The model, which had never seen that log, drew its own boundaries, and 28 of the 41 contacts had one within a metre."],
+  ["Recovering what older scans never measured", "10 of 10 test sets", "The thermal infrared sensor is what sees quartz and feldspar, and older HyLoggers did not have one, so for thousands of metres of scanned core those minerals were never recorded. HyFormer estimates the thermal infrared from the short-wave infrared the scan does have. Example: hole DRDD380 was scanned with both sensors. We hid its thermal infrared and let the model predict it from the short-wave infrared; the predicted spectra for its quartz, plagioclase and amphibole core follow the measured ones. Across ten test sets, including other instruments, petroleum wells and holes from other States, the model's estimates are closer to the real measurements than the best conventional method's every time."],
+  ["Rock classification from the spectrum", "58% vs 44%", "After fine-tuning on logged holes, HyFormer classifies each 10 cm interval into one of 12 rock classes, from ultramafic to regolith. On 26 holes it had never seen it is right 58% of the time. Always guessing the commonest class would score 44%, and the conventional TSG mineral summaries 31%. Example: in hole MND001, the model and the geologist give the same rock class for 55% of the metres. Pre-training did not help this task: the same model trained from scratch on the logged holes alone scores 56%, almost the same. The gain over the conventional methods comes from the labelled data, not from the foundation model."],
 ];
 
 /** What it found: the four results of the hackathon deck, each against the best conventional method. */
