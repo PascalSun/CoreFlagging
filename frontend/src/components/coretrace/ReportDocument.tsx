@@ -60,8 +60,6 @@ function HoleFigure({ hole, mv }: { hole: HoleDetail; mv: ModelView }) {
     </> },
     { label: "Unusual", h: 24, draw: (y, h) => ms.m.map((m) => { const j = idx.get(m); if (j === undefined) return null; const v = Math.min(1, mv.anom_raw[j] / rawTop) * h;
       return <rect key={m} x={x(m)} y={y + h - v} width={bw} height={v} fill={flagged(j) ? SERIES.orange : "#c4c8cf"} />; }) },
-    { label: "Gold likelihood", h: 24, draw: (y, h) => ms.m.map((m) => { const j = idx.get(m); if (j === undefined) return null; const v = mv.gold[j] * h;
-      return <rect key={m} x={x(m)} y={y + h - v} width={bw} height={v} fill={SERIES.blue} />; }) },
     ...(hole.au_m ? [{ label: "Au assay", h: 20, draw: (y: number, h: number) => ms.m.map((m, i) => { const v = ms.au[i]; if (v === null || v <= 0) return null; const hh = Math.max(1, Math.min(1, v / auMax) * h);
       return <rect key={m} x={x(m)} y={y + h - hh} width={Math.max(bw, 1)} height={hh} fill={v >= 0.1 ? INK : "#9ca3af"} />; }) }] : []),
   ];
@@ -183,8 +181,7 @@ export function ReportDocument({ hole, mv, run, models, trays, nodeRef }: {
           ["Core read", `${nf(f.tokens)} bins`, `${nf(f.metres)} m in 10 cm bins`],
           ["Valid samples", pct((f.samples_valid ?? 0) / Math.max(f.samples ?? 1, 1)), `${nf(f.samples_valid)} of ${nf(f.samples)}`],
           ["Unusual metres", res ? nf(res.anomaly.n_flag_m) : "—", res ? `${pct(res.anomaly.share_flag, 1)} of the hole` : ""],
-          hole.au_m ? ["Gold ranking", res?.gold.auc !== null && res?.gold.auc !== undefined ? `AUC ${fmt(res.gold.auc)}` : "—", `${hole.au_m} m assayed, ${hole.au_pos_m} ≥ 0.1 ppm`]
-            : ["Quality issues", nf(hole.n_issues), hole.issues[0] ? issueLabel(hole.issues[0].issue) : "none found"],
+          ["Quality issues", nf(hole.n_issues), hole.issues[0] ? issueLabel(hole.issues[0].issue) : "none found"],
         ].map(([k, v, sub], i) => (
           <div key={k} className={`px-4 py-3 ${i ? "border-l border-slate-200" : "pl-0"}`}>
             <dt className="text-[10.5px] text-slate-500">{k}</dt>
@@ -196,22 +193,18 @@ export function ReportDocument({ hole, mv, run, models, trays, nodeRef }: {
       {training && <p className="mt-3 rounded bg-amber-50 px-3 py-2 text-[11px] text-amber-900">The models saw this hole in training, so the figures in this report look better than they would on core the models have not seen.</p>}
 
       {mv && (
-        <Section n={next()} title="Down the hole" intro={`From the top of the hole (left) to the bottom (right), as read by ${model?.name ?? run}. Each track has its own scale. Unusual compares a metre with the 15 m either side of it; gold likelihood comes from a probe fitted on assayed holes and reads the spectra only.`}>
+        <Section n={next()} title="Down the hole" intro={`From the top of the hole (left) to the bottom (right), as read by ${model?.name ?? run}. Each track has its own scale. Unusual compares a metre with the 15 m either side of it.`}>
           <figure><HoleFigure hole={hole} mv={mv} /><Legend hole={hole} mv={mv} /></figure>
         </Section>
       )}
 
       {mv && (
-        <Section n={next()} title="What stands out" intro={`The intervals the model flags as unusual, strongest first, and the metres it ranks highest for gold. Contrast is how far a metre's reading sits from the core around it; a typical metre in this hole scores ${mv.anomaly.median_raw.toFixed(2)}. Unusual is not the same as mineralised.`}>
-          <div data-keep className="grid grid-cols-2 gap-8">
+        <Section n={next()} title="What stands out" intro={`The intervals the model flags as unusual, strongest first. Contrast is how far a metre's reading sits from the core around it; a typical metre in this hole scores ${mv.anomaly.median_raw.toFixed(2)}. Unusual is not the same as mineralised.`}>
+          <div data-keep>
             <table className="w-full border-collapse">
               <thead><tr><th className={th}>Unusual interval</th><th className={th}>Peak</th><th className={`${th} ${num}`}>Contrast with ±15 m</th></tr></thead>
               <tbody>{mv.anomaly.runs.slice(0, 10).map((r) => <tr key={r.from_m}><td className={td}>{r.from_m}–{r.to_m} m</td><td className={td}>{r.peak_m} m</td><td className={`${td} ${num}`}>{r.raw.toFixed(2)}</td></tr>)}
                 {!mv.anomaly.runs.length && <tr><td className={td} colSpan={3}>Nothing stands out enough to flag.</td></tr>}</tbody>
-            </table>
-            <table className="w-full border-collapse">
-              <thead><tr><th className={th}>Metre</th><th className={`${th} ${num}`}>Gold likelihood</th>{hole.au_m ? <th className={`${th} ${num}`}>Assay (ppm)</th> : null}</tr></thead>
-              <tbody>{mv.gold_summary.top.slice(0, 10).map((g) => <tr key={g.m}><td className={td}>{g.m}–{g.m + 1} m</td><td className={`${td} ${num}`}>{g.p.toFixed(2)}</td>{hole.au_m ? <td className={`${td} ${num}`}>{g.au !== null ? g.au.toFixed(2) : "—"}</td> : null}</tr>)}</tbody>
             </table>
           </div>
         </Section>
@@ -230,14 +223,14 @@ export function ReportDocument({ hole, mv, run, models, trays, nodeRef }: {
 
 {/* the models-side-by-side table is a research view; hidden from the report with the model picker (Oct 2026) */}
 {SHOW_MODEL_TABLE && hole.results.length > 0 && (
-      <Section n={next()} title="The models side by side" intro={`TIR agreement compares the mineral group a model fills in from SWIR alone with the TSG software's reading of the measured TIR.${hole.au_m ? " Gold AUC ranks this hole's assayed metres: 0.5 is chance, 1 is perfect." : ""}`}>
+      <Section n={next()} title="The models side by side" intro={`TIR agreement compares the mineral group a model fills in from SWIR alone with the TSG software's reading of the measured TIR.`}>
         <table data-keep className="w-full border-collapse">
-          <thead><tr><th className={th}>Model</th><th className={`${th} ${num}`}>Auto-log segments</th><th className={`${th} ${num}`}>Unusual metres</th><th className={`${th} ${num}`}>TIR agreement</th>{hole.au_m ? <th className={`${th} ${num}`}>Gold AUC</th> : null}</tr></thead>
+          <thead><tr><th className={th}>Model</th><th className={`${th} ${num}`}>Auto-log segments</th><th className={`${th} ${num}`}>Unusual metres</th><th className={`${th} ${num}`}>TIR agreement</th></tr></thead>
           <tbody>{[...hole.results].sort((a, b) => rank(a.run) - rank(b.run)).map((r) => (
             <tr key={r.run} className={r.run === run ? "bg-slate-50" : ""}>
               <td className={`${td} font-medium`}>{models.find((m) => m.run === r.run)?.name ?? r.run}{r.run === run ? <span className="ml-1.5 text-[10px] font-normal text-slate-500">(this report)</span> : null}</td>
               <td className={`${td} ${num}`}>{r.summary.n_segments}</td><td className={`${td} ${num}`}>{r.anomaly.n_flag_m}</td>
-              <td className={`${td} ${num}`}>{r.tir.measured ? pct(r.tir.acc) : "no TIR"}</td>{hole.au_m ? <td className={`${td} ${num}`}>{fmt(r.gold.auc)}</td> : null}
+              <td className={`${td} ${num}`}>{r.tir.measured ? pct(r.tir.acc) : "no TIR"}</td>
             </tr>))}</tbody>
         </table>
       </Section>
