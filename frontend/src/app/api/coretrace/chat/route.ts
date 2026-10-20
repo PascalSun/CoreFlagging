@@ -1,6 +1,6 @@
 import { convertToModelMessages, stepCountIs, streamText, type UIMessage } from "ai";
 
-import { chatModel } from "@/lib/ai/provider";
+import { chatModel, chatModelId } from "@/lib/ai/provider";
 import { coretracePrompt, coretraceTools } from "@/lib/ai/coretrace-tools";
 
 // The CoreFlagging assistant. Same sign-in rule and usage log as the platform's assistant
@@ -9,7 +9,7 @@ import { coretracePrompt, coretraceTools } from "@/lib/ai/coretrace-tools";
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-const MODEL = process.env.CHAT_MODEL ?? "google/gemini-2.5-flash";
+const MODEL = chatModelId();
 const PLATFORM = (process.env.PLATFORM_API_URL ?? process.env.NEXT_PUBLIC_PLATFORM_URL ?? "http://localhost:8001").replace(/\/$/, "");
 
 function bearer(req: Request): string | null {
