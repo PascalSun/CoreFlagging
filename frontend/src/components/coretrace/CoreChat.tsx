@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ModelPicker, useChatModel } from "@/components/chat/ModelPicker";
+import { ModelPicker, ModelTag, useChatModel } from "@/components/chat/ModelPicker";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, lastAssistantMessageIsCompleteWithToolCalls } from "ai";
 import { Streamdown, type Components } from "streamdown";
@@ -238,6 +238,7 @@ export function CoreChat({ context, onOpen, signedIn, onSignIn }: {
                   }
                   return null;
                 })}
+                {!(busy && m.id === messages[messages.length - 1]?.id) && <ModelTag metadata={m.metadata} />}
               </div>
             )}
           </div>
