@@ -108,12 +108,13 @@ export function CoreChat({ context, onOpen, signedIn, onSignIn }: {
   const [input, setInput] = useState("");
   const endRef = useRef<HTMLDivElement>(null);
 
+  const llm = useChatModel();   // cloud or local model, picked in the input bar
+  const llmRef = llm.ref;
   // built once; its callbacks read the refs when a message is sent, not during render
   // eslint-disable-next-line react-hooks/refs
-  const llm = useChatModel();   // cloud or local model, picked in the input bar
   const transport = useMemo(() => new DefaultChatTransport({
     api: "/api/coretrace/chat",
-    body: () => ({ context: ctxRef.current, llm: llm.ref.current ?? undefined }),
+    body: () => ({ context: ctxRef.current, llm: llmRef.current ?? undefined }),
     fetch: (async (url: RequestInfo | URL, init?: RequestInit) => {
       const go = (t: string | null) => fetch(url, { ...init, headers: { ...(init?.headers as Record<string, string>), Authorization: `Bearer ${t ?? ""}`, "X-Locale": navigator.language } });
       let res = await go(authToken());
