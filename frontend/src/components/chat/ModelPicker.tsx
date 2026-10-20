@@ -58,3 +58,17 @@ export function ModelPicker({ options, choice, onChange, disabled }: {
     </label>
   );
 }
+
+/** Beside an answer: the model that wrote it ("Gemini 3.1 Flash Lite" or "Local · Qwen3 8B").
+ *  Answers from before the label existed carry no model and show nothing. */
+export function ModelTag({ metadata }: { metadata: unknown }) {
+  const m = metadata as { llm?: ChatChoice; model?: string } | undefined;
+  if (!m?.model) return null;
+  const Icon = m.llm === "local" ? Cpu : Cloud;
+  return (
+    <span title={m.llm === "local" ? "Answered by the local model on our own GPU" : "Answered by a cloud model"}
+      className="inline-flex w-fit items-center gap-1 text-[10.5px] leading-none text-slate-400">
+      <Icon size={11} aria-hidden />{m.llm === "local" ? `Local · ${m.model}` : m.model}
+    </span>
+  );
+}

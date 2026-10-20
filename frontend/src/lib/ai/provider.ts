@@ -55,6 +55,11 @@ export function chatChoices(): { default: ChatChoice; options: { id: ChatChoice;
   return { default: providerFor() === "ollama" ? "local" : "cloud", options };
 }
 
+/** What an answer is labelled with in the chat: which side served it and the model's name. */
+export function chatTag(choice?: unknown): { llm: ChatChoice; model: string } {
+  return providerFor(choice) === "ollama" ? { llm: "local", model: modelLabel(localModel()) } : { llm: "cloud", model: modelLabel(cloudModel()) };
+}
+
 const openrouter = createOpenRouter({
   apiKey: process.env.OPENROUTER_API_KEY,
   headers: {

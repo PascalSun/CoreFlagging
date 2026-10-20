@@ -1,6 +1,6 @@
 import { convertToModelMessages, stepCountIs, streamText, type UIMessage } from "ai";
 
-import { chatModel, chatModelId } from "@/lib/ai/provider";
+import { chatModel, chatModelId, chatTag } from "@/lib/ai/provider";
 import { coretracePrompt, coretraceTools } from "@/lib/ai/coretrace-tools";
 
 // The CoreFlagging assistant. Same sign-in rule and usage log as the platform's assistant
@@ -60,6 +60,8 @@ export async function POST(req: Request) {
     },
   });
   return result.toUIMessageStreamResponse({
+    // which model wrote this answer, shown beside it (and kept with the saved conversation)
+    messageMetadata: ({ part }) => (part.type === "start" ? chatTag(body.llm) : undefined),
     onError: (error) => {
       const msg = error instanceof Error ? error.message : String(error);
       return /rate.?limit|quota|credit|402|429|503|unavailable|overloaded|timeout|fetch failed|econn|api key|unauthor/i.test(msg) ? "provider_unavailable" : "error";
