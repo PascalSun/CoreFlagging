@@ -36,26 +36,27 @@ async function log(token: string, row: Record<string, unknown>): Promise<void> {
 export async function POST(req: Request) {
   const token = bearer(req);
   if (!token || !(await verified(token))) return Response.json({ error: "unauthorized" }, { status: 401 });
-  let body: { messages?: UIMessage[]; context?: { hole?: string | null; m?: number | null; model?: string | null } };
+  let body: { messages?: UIMessage[]; llm?: string; context?: { hole?: string | null; m?: number | null; model?: string | null } };
   try { body = await req.json(); } catch { return Response.json({ error: "invalid_json" }, { status: 400 }); }
   const messages = body.messages;
+  const modelId = chatModelId(body.llm);   // cloud or local, as picked in the chat bar
   if (!Array.isArray(messages) || messages.length === 0) return Response.json({ error: "no_messages" }, { status: 400 });
   const last = [...messages].reverse().find((m) => m.role === "user");
   const question = (last?.parts ?? []).filter((p) => p.type === "text").map((p) => (p as { text: string }).text).join("").slice(0, 8000);
   const tools = coretraceTools(token);
   const result = streamText({
-    model: chatModel(),
+    model: chatModel(body.llm),
     system: coretracePrompt(body.context ?? {}, req.headers.get("x-locale") ?? undefined),
     messages: await convertToModelMessages(messages.map((m) => ({ ...m, parts: m.parts.filter((p) => p.type !== "reasoning") })), { tools }),
     tools,
     stopWhen: stepCountIs(12),
     onFinish: async (e) => {
       const u = (e as { totalUsage?: { inputTokens?: number; outputTokens?: number; totalTokens?: number } }).totalUsage ?? {};
-      await log(token, { status: "ok", question, answer: e.text ?? "", input_tokens: u.inputTokens ?? null, output_tokens: u.outputTokens ?? null, total_tokens: u.totalTokens ?? null, finish_reason: e.finishReason ?? "" });
+      await log(token, { model: modelId, status: "ok", question, answer: e.text ?? "", input_tokens: u.inputTokens ?? null, output_tokens: u.outputTokens ?? null, total_tokens: u.totalTokens ?? null, finish_reason: e.finishReason ?? "" });
     },
     onError: async (e) => {
       const er = (e as { error?: unknown }).error ?? e;
-      await log(token, { status: "error", question, answer: "", metadata: { error: er instanceof Error ? er.message : String(er) } });
+      await log(token, { model: modelId, status: "error", question, answer: "", metadata: { error: er instanceof Error ? er.message : String(er) } });
     },
   });
   return result.toUIMessageStreamResponse({

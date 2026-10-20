@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { ModelPicker, useChatModel } from "@/components/chat/ModelPicker";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, lastAssistantMessageIsCompleteWithToolCalls } from "ai";
 import { Streamdown, type Components } from "streamdown";
@@ -107,18 +108,19 @@ export function CoreChat({ context, onOpen, signedIn, onSignIn }: {
   const [input, setInput] = useState("");
   const endRef = useRef<HTMLDivElement>(null);
 
+  const { options: llmOptions, choice: llmChoice, setChoice: setLlm, ref: llmRef } = useChatModel();   // cloud or local model, picked in the input bar
   // built once; its callbacks read the refs when a message is sent, not during render
   // eslint-disable-next-line react-hooks/refs
   const transport = useMemo(() => new DefaultChatTransport({
     api: "/api/coretrace/chat",
-    body: () => ({ context: ctxRef.current }),
+    body: () => ({ context: ctxRef.current, llm: llmRef.current ?? undefined }),
     fetch: (async (url: RequestInfo | URL, init?: RequestInit) => {
       const go = (t: string | null) => fetch(url, { ...init, headers: { ...(init?.headers as Record<string, string>), Authorization: `Bearer ${t ?? ""}`, "X-Locale": navigator.language } });
       let res = await go(authToken());
       if (res.status === 401 && refreshToken()) { const n = await refreshAccessToken(); if (n) res = await go(n); }
       return res;
     }) as typeof fetch,
-  }), []);
+  }), [llmRef]);
 
   const { messages, sendMessage, status, setMessages, addToolOutput, error, stop } = useChat({
     transport,
@@ -249,6 +251,7 @@ export function CoreChat({ context, onOpen, signedIn, onSignIn }: {
           <textarea value={input} onChange={(e) => setInput(e.target.value)} rows={1} placeholder={context.hole ? `Ask about ${context.hole}…` : "Ask about the core…"} aria-label="Message"
             onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(input); } }}
             className="max-h-[96px] min-h-[24px] flex-1 resize-none overflow-y-auto bg-transparent text-base leading-[22px] text-slate-700 outline-none placeholder:text-slate-400 sm:text-sm" />
+          <ModelPicker options={llmOptions} choice={llmChoice} onChange={setLlm} disabled={busy} />
           <button type="submit" disabled={busy || !input.trim()} aria-label="Send" className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-slate-900 text-white transition-opacity disabled:opacity-40">{busy ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}</button>
         </div>
       </form>
