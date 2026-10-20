@@ -10,6 +10,7 @@
     "test": "bun test src"
   },
   "dependencies": {
+    "@ai-sdk/openai-compatible": "3.0.2",
     "@ai-sdk/react": "^4.0.10",
     "@mapbox/mapbox-gl-draw": "^1.5.1",
     "@ntlp/geodata-web": "github:PascalSun/ntlp-geodata-web#v0.4.0",
