@@ -11,6 +11,7 @@ name: deploy
 on:
   push:
     branches: [main]
+    paths-ignore: ['**/*.md', 'docs/**']   # docs-only changes do not redeploy
   workflow_dispatch: {}
 
 concurrency:
