@@ -48,10 +48,23 @@ export function modelLabel(id: string): string {
   return name.split("-").map((w) => (/^\d+(\.\d+)?[bm]$/i.test(w) ? w.toUpperCase() : w.charAt(0).toUpperCase() + w.slice(1))).join(" ");
 }
 
-/** What the chat bar offers: the cloud model always, the local one when Ollama is configured. */
-export function chatChoices(): { default: ChatChoice; options: { id: ChatChoice; label: string; model: string }[] } {
-  const options: { id: ChatChoice; label: string; model: string }[] = [{ id: "cloud", label: "Cloud", model: modelLabel(cloudModel()) }];
-  if (ollamaReady()) options.push({ id: "local", label: "Local", model: modelLabel(localModel()) });
+// The LLM gateway in front of our GPUs (gateway.ai4wa.com, PascalSun/LLMGateway) queues the calls to them and says how
+// long a new one would wait (/queue?model=…, open to any page): the chat bar shows it beside the local model.
+const GATEWAYS = (process.env.LLM_GATEWAYS || "https://gateway.ai4wa.com,https://llm.nlp-tlp.org").split(",").map((g) => g.trim().replace(/\/$/, "")).filter(Boolean);
+
+/** The gateway's queue for the local model, when the local model is reached through the gateway (else undefined). */
+function localQueue(): string | undefined {
+  const base = (process.env.OLLAMA_BASE_URL || OLLAMA_BASE_URL).replace(/\/$/, "");
+  const root = GATEWAYS.find((g) => base === g || base.startsWith(g + "/"));
+  return root ? `${root}/queue?model=${encodeURIComponent(localModel())}` : undefined;
+}
+
+type Choice = { id: ChatChoice; label: string; model: string; queue?: string };
+
+/** What the chat bar offers: the cloud model always, the local one when Ollama is configured (with its queue). */
+export function chatChoices(): { default: ChatChoice; options: Choice[] } {
+  const options: Choice[] = [{ id: "cloud", label: "Cloud", model: modelLabel(cloudModel()) }];
+  if (ollamaReady()) options.push({ id: "local", label: "Local", model: modelLabel(localModel()), queue: localQueue() });
   return { default: providerFor() === "ollama" ? "local" : "cloud", options };
 }
 
@@ -74,6 +87,7 @@ export function chatModel(choice?: unknown): LanguageModel {
       name: "ollama",
       baseURL: process.env.OLLAMA_BASE_URL || OLLAMA_BASE_URL,
       apiKey: process.env.OLLAMA_API_KEY || undefined,
+      headers: { "X-Priority": "interactive" },               // a person waits on a chat: the gateway puts it first
     });
     return ollama(localModel());
   }
