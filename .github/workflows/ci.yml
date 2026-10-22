@@ -1,19 +1,29 @@
 name: ci
 on:
-  pull_request: {}
-  push:
-    branches: [main]
+  # PRs only: the merge to main is rebuilt by deploy.yml on the server, so CI on main ran each change
+  # twice. Drafts wait until ready; a newer push cancels the older run.
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  workflow_dispatch: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   test:
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
       - run: uv sync --frozen
       - run: uv run pytest -q
   frontend:
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     defaults: { run: { working-directory: frontend } }
     steps:
       - uses: actions/checkout@v4
