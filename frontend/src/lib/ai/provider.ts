@@ -42,10 +42,15 @@ export function chatModelId(choice?: unknown): string {
   return providerFor(choice) === "ollama" ? `ollama/${localModel()}` : cloudModel();
 }
 
-/** "google/gemini-3.1-flash-lite" → "Gemini 3.1 Flash Lite", "qwen3-8b-32k" → "Qwen3 8B". */
+/** "google/gemini-3.1-flash-lite" → "Gemini 3.1 Flash Lite", "qwen3-8b-32k" → "Qwen3 8B",
+ *  "qwen3-6-35b-a3b-32k" → "Qwen3.6 35B A3B" (a bare number after a versioned name is its minor version). */
 export function modelLabel(id: string): string {
   const name = (id.split("/").pop() ?? id).replace(/:.*$/, "").replace(/-\d+k$/i, "");
-  return name.split("-").map((w) => (/^\d+(\.\d+)?[bm]$/i.test(w) ? w.toUpperCase() : w.charAt(0).toUpperCase() + w.slice(1))).join(" ");
+  const parts = name.split("-").reduce<string[]>((out, w) => {
+    if (/^\d+$/.test(w) && /\d$/.test(out.at(-1) ?? "")) out[out.length - 1] += `.${w}`; else out.push(w);
+    return out;
+  }, []);
+  return parts.map((w) => (/^a?\d+(\.\d+)?[bm]$/i.test(w) ? w.toUpperCase() : w.charAt(0).toUpperCase() + w.slice(1))).join(" ");
 }
 
 // The LLM gateway in front of our GPUs (gateway.ai4wa.com, PascalSun/LLMGateway) queues the calls to them and says how
