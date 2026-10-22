@@ -55,7 +55,7 @@ export function useChatModel() {
   return { options, choice, setChoice, ref };
 }
 
-/** A small pill before the send button: "Cloud" or "Local" (and, our GPU busy, "Local · 3 ahead"); the model's name,
+/** A small pill before the send button: "Cloud" or "Local" (and, our GPU busy, "Local · 3 ahead" or "Local · next"); the model's name,
  *  the GPU's state and the wait are in its tooltip, and the list names both models. */
 export function ModelPicker({ options, choice, onChange, disabled }: {
   options: Option[]; choice: ChatChoice | null; onChange: (c: ChatChoice) => void; disabled?: boolean;
@@ -66,13 +66,15 @@ export function ModelPicker({ options, choice, onChange, disabled }: {
   const Icon = cur.id === "local" ? Cpu : Cloud;
   // on the local model: our GPU free (green), or busy: how many are ahead and about how long (amber)
   const ahead = q?.ahead?.interactive ?? 0, eta = q?.eta_s?.interactive ?? 0, busy = !!q && (ahead > 0 || eta >= 10);
-  const gpu = q ? (!q.available ? "our GPU is not answering" : busy ? `${ahead} ahead on our GPU, ${wait(eta)}` : "our GPU is free") : "";
+  // "ahead": people's calls before this one (a batch run waits behind it); none ahead but every slot taken: it is next
+  const gpu = q ? (!q.available ? "our GPU is not answering" : !busy ? "our GPU is free"
+    : ahead ? `${ahead} ahead on our GPU, ${wait(eta)}` : `our GPU is full; yours is next, ${wait(eta)}`) : "";
   return (
     <label title={`Model: ${cur.label} · ${cur.model}${gpu ? ` · ${gpu}` : ""}`}
       className="relative flex h-7 max-w-[10rem] shrink-0 items-center gap-1 rounded-lg border border-slate-200 bg-white/80 pl-2 pr-1.5 text-xs text-slate-600 hover:border-slate-300 hover:text-slate-800">
       <Icon size={13} className="shrink-0" aria-hidden />
       {q && <span aria-hidden className={`size-1.5 shrink-0 rounded-full ${!q.available ? "bg-rose-500" : busy ? "bg-amber-500" : "bg-emerald-500"}`} />}
-      <span className="truncate"><span className="font-medium">{cur.label}</span>{cur.id === "local" && busy && <span className="text-amber-700"> · {ahead} ahead</span>}</span>
+      <span className="truncate"><span className="font-medium">{cur.label}</span>{cur.id === "local" && busy && <span className="text-amber-700"> · {ahead ? `${ahead} ahead` : "next"}</span>}</span>
       <ChevronDown size={12} className="shrink-0 text-slate-400" aria-hidden />
       <select aria-label="Model" value={cur.id} disabled={disabled} onChange={(e) => onChange(e.target.value as ChatChoice)}
         className="absolute inset-0 cursor-pointer opacity-0 disabled:cursor-not-allowed">
