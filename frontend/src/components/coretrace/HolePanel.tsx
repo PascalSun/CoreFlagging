@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, ArrowRight, Box, Check, ChevronLeft, ChevronRight, Download, ExternalLink, FileDown, FileText, Link2, Loader2, Maximize2, Minimize2, Trash2, X } from "lucide-react";
+import { AlertTriangle, ArrowRight, Box, Check, ChevronLeft, ChevronRight, Download, ExternalLink, FileDown, FileText, HelpCircle, Link2, Loader2, Maximize2, Minimize2, Trash2, X } from "lucide-react";
 import { downloadReportPdf } from "@/components/coretrace/pdf";
 import { PAGE_W, ReportDocument } from "@/components/coretrace/ReportDocument";
 import { ACTIVE, inferred, TARGET_SOURCE_LABEL, abstractParts, commodityName, coreScan, readDate, sourceLabel, surveyOf, type SimilarScope, type CoreModelInfo, type HoleDetail, type HoleDocuments, type MetreView, type ModelView, type Tray } from "@/lib/coreScan";
@@ -180,7 +180,7 @@ function TrayStrip({ holeKey, trays, at, onOpen }: { holeKey: string; trays: Tra
   const hot = at !== null ? trays.find((x) => x.from_m <= at + 0.5 && at + 0.5 <= x.to_m + 0.05) ?? null : null;
   const lo = trays[0].from_m, hi = trays[trays.length - 1].to_m;
   return (
-    <figure className="m-0 -mx-4 -mt-4 bg-slate-950">
+    <figure data-tour="trays" className="m-0 -mx-4 -mt-4 bg-slate-950">
       <div className="relative">
         <div ref={strip} onScroll={edges} className="flex snap-x gap-1 overflow-x-auto px-1 py-1 [scrollbar-width:thin]" role="list" aria-label="Tray photographs, top of the hole to the bottom">
           {trays.map((t, i) => <TrayThumb key={t.id} holeKey={holeKey} t={t} hot={t === hot} onOpen={() => setZoom(i)} />)}
@@ -331,13 +331,15 @@ function Report({ hole, models, mvw, run, trays }: { hole: HoleDetail; models: C
   );
 }
 
-export function HolePanel({ holeKey, tab: tabProp, onTab, models, run, metre, onMetre, wide, onWide, onClose, onOpenHole, onDeleted, onRing, win = null, onWindow, onCompare }: {
+export function HolePanel({ holeKey, tab: tabProp, onTab, models, run, metre, onMetre, wide, onWide, onClose, onOpenHole, onDeleted, onTour, onRing, win = null, onWindow, onCompare }: {
   holeKey: string; tab: string; onTab: (t: Tab) => void; models: CoreModelInfo[]; run: string; metre: number | null; onMetre: (m: number | null) => void;
   wide: boolean; onWide: (w: boolean) => void; onClose: () => void; onOpenHole: (key: string, m?: number) => void; onDeleted: () => void;
   /** draw (or clear) a ring of this many km around the hole on the map */
   onRing?: (km: number | null) => void;
   /** set this hole beside another (by key) in the comparison panel; `wins` opens both logs on the matched stretches */
   onCompare?: (key: string, wins?: { a: [number, number]; b: [number, number] }) => void;
+  /** replays this view's tour (the summary's or the full log's) */
+  onTour?: () => void;
   /** the depth window the reader has zoomed to, and how to change it */
   win?: Window | null; onWindow?: (w: Window | null) => void;
 }) {
@@ -416,6 +418,7 @@ export function HolePanel({ holeKey, tab: tabProp, onTab, models, run, metre, on
       <div className="flex flex-none items-center gap-1">
         {hole && <button type="button" onClick={copyLink} aria-label="Copy the link to this hole" title={copied ? "Link copied" : "Copy the link to this hole"} className={cn("grid h-8 w-8 place-items-center rounded-lg hover:bg-slate-100", copied ? "text-emerald-700" : "text-slate-500 hover:text-slate-900")}>{copied ? <Check size={15} /> : <Link2 size={15} />}</button>}
         {hole && hole.lat !== null && <a href={`/scene?hole=${encodeURIComponent(hole.key)}`} aria-label="See this hole and its neighbours in 3D" title="See this hole and its neighbours in 3D" className="grid h-8 w-8 place-items-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-900"><Box size={15} /></a>}
+        {ready && onTour && <button type="button" onClick={onTour} aria-label="How this view works" title="How this view works" className="grid h-8 w-8 place-items-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-900"><HelpCircle size={15} /></button>}
         {hole?.mine && <button type="button" onClick={del} aria-label="Delete this scan" title="Delete this scan" className="grid h-8 w-8 place-items-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-red-600"><Trash2 size={15} /></button>}
         {ready && <button type="button" onClick={() => onWide(!wide)} aria-label={wide ? "Back to the summary" : "Open the full log"} title={wide ? "Back to the summary" : "Open the full log"} className={cn("h-8 w-8 place-items-center rounded-lg text-slate-500 hover:bg-slate-100", wide ? "grid" : "hidden sm:grid")}>{wide ? <Minimize2 size={15} /> : <Maximize2 size={15} />}</button>}
         <button type="button" onClick={onClose} aria-label="Close" className="grid h-8 w-8 place-items-center rounded-lg text-slate-500 hover:bg-slate-100"><X size={16} /></button>
@@ -463,7 +466,7 @@ export function HolePanel({ holeKey, tab: tabProp, onTab, models, run, metre, on
           <Fact k="Data quality" v={hole.n_issues ? `${hole.n_issues} ${hole.n_issues === 1 ? "issue" : "issues"}` : "nothing found"} sub={hole.issues[0] ? issueLabel(hole.issues[0].issue) : undefined} />
         </div>
         {hole.lat !== null && <div><H3>Nearby holes</H3><Nearby hole={hole} onOpen={(k) => onOpenHole(k)} onRing={onRing} onCompare={(k) => onCompare?.(k)} /></div>}
-        {(dq.isPending || (dq.data && (dq.data.hole_pdfs.length > 0 || dq.data.wamex))) && <div><H3>Documents</H3><HoleDocumentsCard docs={dq.data} loading={dq.isPending} /></div>}
+        {(dq.isPending || (dq.data && (dq.data.hole_pdfs.length > 0 || dq.data.wamex))) && <div data-tour="hole-docs"><H3>Documents</H3><HoleDocumentsCard docs={dq.data} loading={dq.isPending} /></div>}
         {modelPicker}
         <div>
           <H3>Down the hole</H3>
@@ -472,7 +475,7 @@ export function HolePanel({ holeKey, tab: tabProp, onTab, models, run, metre, on
           {tops.length > 0 && <ul className="flex flex-col gap-1 pt-2 text-xs text-slate-700">{tops.map(([n, s]) => <li key={n} className="flex items-center gap-2"><i className="inline-block h-2.5 w-2.5 flex-none rounded-[2px]" style={{ background: coreTypeBg(n) }} /><span className="flex-1 truncate">{n}</span><span className="font-mono text-slate-500">{pct(s)}</span></li>)}</ul>}
         </div>
         {res && (
-          <div>
+          <div data-tour="found">
             <H3>What the model found</H3>
             <ul className="flex flex-col gap-1.5 text-xs leading-relaxed text-slate-700">
               {hole.has_lith && (() => { const n = res.summary.again?.n ?? 0; return <li><b className="font-semibold text-slate-900">{n ? `${n} ${n === 1 ? "interval" : "intervals"}` : "No interval"}</b> where the model&rsquo;s reading disagrees with the log, by the ultramafic rule.{n ? <> <button type="button" className="font-medium text-slate-900 underline decoration-slate-300 underline-offset-2 hover:decoration-slate-900" onClick={() => { setTab("again"); onWide(true); }}>See them under Unusual</button></> : null}</li>; })()}
@@ -482,7 +485,7 @@ export function HolePanel({ holeKey, tab: tabProp, onTab, models, run, metre, on
             </ul>
           </div>
         )}
-        <button type="button" onClick={() => onWide(true)} className="group flex items-center justify-between rounded-xl bg-slate-900 px-4 py-3 text-sm font-medium text-white hover:bg-slate-800">
+        <button type="button" data-tour="full-log" onClick={() => onWide(true)} className="group flex items-center justify-between rounded-xl bg-slate-900 px-4 py-3 text-sm font-medium text-white hover:bg-slate-800">
           Open the full log<ArrowRight size={16} className="transition-transform group-hover:translate-x-1" />
         </button>
         <p className="text-[11px] leading-relaxed text-slate-500">{displayOnly
@@ -495,7 +498,7 @@ export function HolePanel({ holeKey, tab: tabProp, onTab, models, run, metre, on
       // a wide screen keeps the log and the reading side by side, each scrolling on its own; a phone scrolls the whole
       // page as one, with the log a fixed height at the top and the tabs held at the top of the screen as you read
       <div className="flex flex-col lg:min-h-0 lg:flex-1 lg:flex-row">
-        <div className="flex h-[min(380px,52vh)] flex-none flex-col items-center border-b border-slate-200/70 p-3 lg:h-auto lg:min-h-0 lg:items-stretch lg:border-r lg:border-b-0 lg:px-5 lg:py-4">
+        <div data-tour="strip" className="flex h-[min(380px,52vh)] flex-none flex-col items-center border-b border-slate-200/70 p-3 lg:h-auto lg:min-h-0 lg:items-stretch lg:border-r lg:border-b-0 lg:px-5 lg:py-4">
           <StripLog range={win ?? undefined} onRange={onWindow} metres={hole.metres} model={mvw} spectral={slq.data} spectralFine={fineWin ? slf.data : undefined} tokens={fineWin ? tkq.data : undefined} cursor={metre} onCursor={(m) => {
             // a click on the log selects the metre; on the Window tab (above 1 m) and on the pages that do not read the
             // log, it opens the metre at 1 m
@@ -518,7 +521,7 @@ export function HolePanel({ holeKey, tab: tabProp, onTab, models, run, metre, on
             {modelPicker && <div className="max-lg:hidden">{modelPicker}</div>}
             <div className="flex gap-1 max-lg:flex-wrap max-lg:gap-1.5 max-lg:pb-3 lg:overflow-x-auto lg:[scrollbar-width:none]" role="tablist">
               {TABS.filter((t) => !displayOnly || t.id === "window" || t.id === "quality" || t.id === "report").map((t) => (
-                <button key={t.id} role="tab" aria-selected={tab === t.id} type="button" onClick={() => setTab(t.id)}
+                <button key={t.id} role="tab" data-tour={`tab-${t.id}`} aria-selected={tab === t.id} type="button" onClick={() => setTab(t.id)}
                   className={cn("flex-none text-xs font-medium lg:border-b-2 lg:px-2.5 lg:py-2 max-lg:rounded-full max-lg:px-3 max-lg:py-1.5 max-lg:ring-1",
                     tab === t.id ? "lg:border-slate-900 text-slate-900 max-lg:bg-slate-900 max-lg:text-white max-lg:ring-slate-900" : "lg:border-transparent text-slate-500 hover:text-slate-800 max-lg:bg-white max-lg:ring-slate-200")}>
                   {t.label}{t.id === "quality" && hole.n_issues ? <span className={cn("ml-1 rounded-full px-1.5 text-[10px]", tab === t.id ? "bg-white/20 lg:bg-slate-100 lg:text-slate-600" : "bg-slate-100 text-slate-600")}>{hole.n_issues}</span> : null}

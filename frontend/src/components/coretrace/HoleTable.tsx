@@ -66,14 +66,14 @@ export function HoleTable({ holes, q, onQ, look, typeName, onOpen, onAsk, loadin
   return (
     <div className="flex h-full flex-col">
       <div className="flex flex-wrap items-center gap-3 border-b border-slate-200/70 px-4 py-3">
-        <label className="flex min-w-0 flex-1 basis-[240px] items-center gap-2 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 focus-within:ring-2 focus-within:ring-cyan">
+        <label data-tour="table-search" className="flex min-w-0 flex-1 basis-[240px] items-center gap-2 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 focus-within:ring-2 focus-within:ring-cyan">
           <Search size={14} className="text-slate-400" />
           <input autoFocus={typeof window !== "undefined" && window.matchMedia("(pointer: fine)").matches} value={q} onChange={(e) => { onQ(e.target.value); setShown(PAGE); }} placeholder="Find a hole, company, project or region" aria-label="Search holes"
             onKeyDown={(e) => { if (e.key === "Enter" && rows[0]) onOpen(rows[0].key); }} className="w-full bg-transparent text-sm outline-none placeholder:text-slate-400" />
           {q && <button type="button" onClick={() => onQ("")} aria-label="Clear the search" className="text-slate-400 hover:text-slate-700"><X size={14} /></button>}
         </label>
         <span className="text-xs text-slate-500">{loading ? "Loading holes…" : `${rows.length.toLocaleString()} holes`}{!loading && againHoles > 0 && <span className="text-slate-400"> · {againHoles.toLocaleString()} worth a second look</span>}</span>
-        {againHoles > 0 && <button type="button" onClick={exportSheet} disabled={exporting} title="Every interval where the model disagrees with the log, for the holes shown, as a CSV" className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-800 hover:bg-slate-50 disabled:opacity-60">{exporting ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />}Export the second-look sheet</button>}
+        {againHoles > 0 && <button type="button" data-tour="table-export" onClick={exportSheet} disabled={exporting} title="Every interval where the model disagrees with the log, for the holes shown, as a CSV" className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-800 hover:bg-slate-50 disabled:opacity-60">{exporting ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />}Export the second-look sheet</button>}
         {onAsk && <button type="button" onClick={onAsk} className="ml-auto flex items-center gap-1.5 text-xs font-medium text-slate-600 hover:text-slate-900"><MessageCircle size={13} />Or ask: &ldquo;holes with gold in NSW&rdquo;</button>}
       </div>
       <div className="min-h-0 flex-1 overflow-auto">
@@ -99,7 +99,7 @@ export function HoleTable({ holes, q, onQ, look, typeName, onOpen, onAsk, loadin
           })}
         </ul>
         <table className="hidden w-full border-collapse text-left text-xs sm:table">
-          <thead className="text-[11px] text-slate-500">
+          <thead data-tour="table-head" className="text-[11px] text-slate-500">
             <tr className="border-b border-slate-200">
               {head("name", "Hole")}{head("state", "State", "w-16")}
               <th scope="col" className="sticky top-0 z-10 bg-white/95 px-3 py-2 font-medium backdrop-blur">Company · project · region</th>
