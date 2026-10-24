@@ -11,7 +11,9 @@ export type TourStep = { target?: string; title: string; body: string; optional?
    *  the page (the view loaded), and an optional one still missing then is stepped over. */
   later?: string;
   /** "hole": run the page's demo (open a real hole) when this step is first reached. */
-  act?: "hole" };
+  act?: "hole";
+  /** Click this data-tour element when the step is first reached (the tour opens the full log itself). */
+  click?: string };
 
 /** The map's tour, and one for each view of the data (a hole's summary, its full log, the table, two holes compared,
  *  the 3D scene): each is shown once per browser, the first time that view is open on a wide screen. */
@@ -59,9 +61,11 @@ export function Tour({ steps: all, id = "map", onClose, onDemo }: { steps: TourS
   const dir = useRef(1);
   const setI = (n: number | ((n: number) => number)) => setI0((cur) => { const v = typeof n === "function" ? n(cur) : n; dir.current = v >= cur ? 1 : -1; return v; });
   // the demo runs once, when its step is first reached; the hole it opens is then the next steps' subject
-  const demoed = useRef(false);
+  const demoed = useRef(false), clicked = useRef(new Set<string>());
   useEffect(() => {
     if (steps[i]?.act === "hole" && !demoed.current && onDemo) { demoed.current = true; markSeen("hole"); markSeen("log"); onDemo(); }
+    const c = steps[i]?.click;
+    if (c && !clicked.current.has(c)) { clicked.current.add(c); document.querySelector<HTMLElement>(`[data-tour="${c}"]`)?.click(); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [i]);
   useEffect(() => { showing = true; shownThisVisit = true; return () => { showing = false; }; }, []);
