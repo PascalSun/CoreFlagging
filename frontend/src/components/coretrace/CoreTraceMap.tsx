@@ -177,14 +177,25 @@ export function CoreTraceMap() {
   // the "?" in the top bar replays the tour of what is on screen, the map's when nothing else is open
   const here: Exclude<TourId, "map"> | null = comparing ? "compare" : holeKey ? (wide ? "log" : "hole") : view === "holes" ? "table" : null;
   useViewTour(mobile ? null : here, here ? TOUR_READY[here] : undefined, setTouring);
+  // the tour's demo: open a gold hole with core worth a second look (the most gold logged), as a click on it would
+  const demoHole = () => {
+    const ready = holes.filter((h) => h.status === "ready" && h.lat !== null);
+    const pick = ready.filter((h) => h.n_again > 0).sort((a, b) => b.au_pos_m - a.au_pos_m)[0] ?? ready[0];
+    if (pick) set({ hole: pick.key, m: null, full: null, view: null });
+  };
   const tour: TourStep[] = [
     { title: "Welcome to CoreFlagging", body: `Every HyLogger-scanned drillhole in Australia's core libraries, ${holes.length ? holes.length.toLocaleString() + " of them, " : ""}read metre by metre by a model trained on scanned drill core. A few quick steps.` },
     { target: "legend", title: "Each point is a drillhole", body: "Colour is what the hole was drilled for \u2014 gold, copper, nickel\u2026 from the survey's record of the hole in WA, SA and Victoria, from its exploration report or the nearest known deposit elsewhere (a hatched fill). A square is a scan the models could not read. Hover a row in the key to show only those holes or hide them, by rock class, commodity, source or model reading; every count follows what is shown." },
     { target: "tabs", title: "Map, or every hole as a table", body: "The Table tab lists every hole: search by name, company or region and sort by depth or gold. The map key on the left decides which holes the map draws." },
-    { target: chatOpen && !mobile ? "chat" : undefined, title: "Ask in plain words", body: "\u201cHoles with gold in NSW\u201d, \u201cwhat is unusual in MND036?\u201d. The assistant is a language model with this site's own tools: it queries the same holes, reads their logs and the exploration reports behind them, and opens the holes it talks about on the map." },
+    // the tour opens a real hole rather than describing one: a gold hole with core worth a second look
+    { title: "Open any hole", body: "Click a point for its strip log, its tray photographs and what the model reads at each metre. Next opens one for you: a gold hole with core worth a second look." },
+    { target: "trays", optional: true, later: "full-log", act: "hole", title: "The core, tray by tray", body: "Every core tray photographed, top to bottom. The lit tray holds the metre the model finds most unusual; click any tray to see it full screen." },
+    { target: "found", optional: true, later: "full-log", title: "Where to look again", body: "Where the model's reading disagrees with the company's log, and the metres that stand out from the core around them." },
+    { target: "hole-docs", optional: true, later: "full-log", title: "Read the hole's reports", body: "The hole's HyLogger PDFs, and the exploration report it was logged in, with its abstract." },
+    { target: "full-log", later: "full-log", title: "Go metre by metre", body: "The full log zooms from the whole hole down to 10 cm, finds similar core across the State, and prints a report." },
+    { target: chatOpen && !mobile ? "chat" : undefined, title: "Ask in plain words", body: "\u201cWhat is unusual between 120 and 140 m?\u201d about the hole you are on, or \u201choles with gold in NSW\u201d. The assistant is a language model with this site's own tools: it queries the same holes, reads their logs and the exploration reports behind them, and opens the holes it talks about on the map." },
     { target: chatOpen && !mobile ? "model" : undefined, title: "Cloud or Local", body: "Cloud is the default: a fast hosted model (Gemini), best at long answers with many tool calls. Local runs an open model (Qwen) on our own GPU, so your questions never leave our servers; it is slower, and the pill shows how many are ahead of you. Switch in the chat bar at any time; every answer is labelled with the model that wrote it." },
     { target: "upload", title: "Bring your own scan", body: "Upload a TSG package from a HyLogger: it gets the same checks, log and model reading as the library holes, and stays private to you." },
-    { title: "Open any hole", body: "Click a point. You get its strip log, its tray photographs, and what the model reads at each metre. Zoom the log from the whole hole down to 10 cm, open \u201cUnusual\u201d for where the scan is worth a second look, and \u201cSimilar core\u201d for core like it anywhere in the State." },
   ];
   // colour is always the target commodity; shape is whether the models read the hole
   const colour = useMemo(() => (h: (typeof holes)[number]) => {
@@ -277,7 +288,7 @@ export function CoreTraceMap() {
 
       {/* one bubble for every [data-keytip] on the page: the map key, the full log's column heads and key */}
       <KeyTips />
-      {touring && <Tour key={touring} id={touring} steps={touring === "map" ? tour : viewTour(touring, { chatOpen })} onClose={() => setTouring(null)} />}
+      {touring && <Tour key={touring} id={touring} steps={touring === "map" ? tour : viewTour(touring, { chatOpen })} onClose={() => setTouring(null)} onDemo={touring === "map" ? demoHole : undefined} />}
 
       {/* top bar: brand left, session right */}
       <div className="pointer-events-none absolute top-0 left-0 z-20 flex items-start justify-between gap-2 p-3 sm:gap-3" style={{ right: chatW }}>

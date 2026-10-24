@@ -6,7 +6,12 @@ import { X } from "lucide-react";
 
 /** A step points at the element carrying data-tour={target}; without one (or if it is not on screen) it sits in the middle.
  *  An optional step is dropped when its element is not on the page as the tour opens (a hole with no trays, no documents). */
-export type TourStep = { target?: string; title: string; body: string; optional?: boolean };
+export type TourStep = { target?: string; title: string; body: string; optional?: boolean;
+  /** The element only comes once the tour has acted (the demo hole): it is waited for until the element named here is on
+   *  the page (the view loaded), and an optional one still missing then is stepped over. */
+  later?: string;
+  /** "hole": run the page's demo (open a real hole) when this step is first reached. */
+  act?: "hole" };
 
 /** The map's tour, and one for each view of the data (a hole's summary, its full log, the table, two holes compared,
  *  the 3D scene): each is shown once per browser, the first time that view is open on a wide screen. */
@@ -46,10 +51,19 @@ export function useViewTour(id: TourId | null, ready: string | undefined, open: 
 }
 
 /** A short guided tour: the element in question is lit, everything else dimmed, with a card beside it. */
-export function Tour({ steps: all, id = "map", onClose }: { steps: TourStep[]; id?: TourId; onClose: () => void }) {
+export function Tour({ steps: all, id = "map", onClose, onDemo }: { steps: TourStep[]; id?: TourId; onClose: () => void; /** open a hole, for a step with act "hole" */ onDemo?: () => void }) {
   // the steps as the tour opens: an optional step whose element is not there is left out, and they hold still after
-  const [steps] = useState(() => all.filter((s) => !s.optional || !s.target || document.querySelector(`[data-tour="${s.target}"]`)));
-  const [i, setI] = useState(0);
+  // (a step waiting on the demo is kept, its element not there yet; without a demo the demo's steps go)
+  const [steps] = useState(() => all.filter((s) => s.later ? !!onDemo : !s.optional || !s.target || document.querySelector(`[data-tour="${s.target}"]`)));
+  const [i, setI0] = useState(0);
+  const dir = useRef(1);
+  const setI = (n: number | ((n: number) => number)) => setI0((cur) => { const v = typeof n === "function" ? n(cur) : n; dir.current = v >= cur ? 1 : -1; return v; });
+  // the demo runs once, when its step is first reached; the hole it opens is then the next steps' subject
+  const demoed = useRef(false);
+  useEffect(() => {
+    if (steps[i]?.act === "hole" && !demoed.current && onDemo) { demoed.current = true; markSeen("hole"); markSeen("log"); onDemo(); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [i]);
   useEffect(() => { showing = true; shownThisVisit = true; return () => { showing = false; }; }, []);
   const [rect, setRect] = useState<DOMRect | null>(null);
   const step = steps[i] ?? steps[0];
@@ -59,13 +73,28 @@ export function Tour({ steps: all, id = "map", onClose }: { steps: TourStep[]; i
   useLayoutEffect(() => { setCardH(card.current?.offsetHeight ?? 0); }, [i, rect]);
 
   useLayoutEffect(() => {
+    let wait = 0, tries = 0, settled = 0;
+    const get = (t?: string) => (t ? document.querySelector<HTMLElement>(`[data-tour="${t}"]`) : null);
     const measure = () => {
-      const el = step.target ? document.querySelector<HTMLElement>(`[data-tour="${step.target}"]`) : null;
-      const r = el?.getBoundingClientRect();
+      const r = get(step.target)?.getBoundingClientRect();
       setRect(r && r.width > 0 && r.height > 0 ? r : null);
     };
-    measure(); window.addEventListener("resize", measure);
-    return () => window.removeEventListener("resize", measure);
+    const look = () => {
+      // the demo hole is on its way: wait (up to ~15 s) for its view, then ~2.5 s more for its parts that load after
+      // it (the model's findings); only then is a missing optional part stepped over
+      if (step.later && !get(step.target)) {
+        if (get(step.later)) settled++;
+        if ((!get(step.later) || settled < 12) && tries++ < 90) { measure(); wait = window.setTimeout(look, 200); return; }
+        if (step.optional) { setI((n) => Math.min(Math.max(n + dir.current, 0), steps.length - 1)); return; }
+      }
+      const el = get(step.target);
+      if (el) el.scrollIntoView({ block: "nearest", behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth" });
+      measure(); wait = window.setTimeout(measure, 400);   // a panel still sliding in lands a moment later
+    };
+    // a panel scrolling the element into view moves it: follow it
+    look(); window.addEventListener("resize", measure); window.addEventListener("scroll", measure, true);
+    return () => { clearTimeout(wait); window.removeEventListener("resize", measure); window.removeEventListener("scroll", measure, true); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step]);
 
   const close = () => { markSeen(id); onClose(); };
