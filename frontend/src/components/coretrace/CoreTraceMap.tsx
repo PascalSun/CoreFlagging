@@ -19,7 +19,8 @@ import { ComparePanel } from "@/components/coretrace/Compare";
 import { KeyTips, MapKey, MapKeyBody, NO_HIDDEN, PANEL_W, facet, filtering, passes, type Facet, type Hidden } from "@/components/coretrace/MapKey";
 import { HoleTable } from "@/components/coretrace/HoleTable";
 import { holeCard } from "@/components/coretrace/mapCard";
-import { Tour, tourSeen, type TourStep } from "@/components/coretrace/Tour";
+import { Tour, tourSeen, useViewTour, type TourId, type TourStep } from "@/components/coretrace/Tour";
+import { TOUR_READY, viewTour } from "@/components/coretrace/tours";
 import { LegendSheet } from "@/components/coretrace/LegendSheet";
 import { HoleSheet } from "@/components/coretrace/HoleSheet";
 import { coretraceBase } from "@/lib/sites";
@@ -169,9 +170,13 @@ export function CoreTraceMap() {
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { try { if (localStorage.getItem("coretrace.basemap") === "map") setBasemap("map"); } catch { /* storage blocked */ } }, []);
   const pickBasemap = (b: Basemap) => { setBasemap(b); try { localStorage.setItem("coretrace.basemap", b); } catch { /* storage blocked */ } };
-  const [touring, setTouring] = useState(false);
+  const [touring, setTouring] = useState<TourId | null>(null);
   // eslint-disable-next-line react-hooks/set-state-in-effect
-  useEffect(() => { if (!mobile && !holeKey && hq.data && !tourSeen()) setTouring(true); }, [hq.data]);   // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (!mobile && !holeKey && hq.data && !tourSeen()) setTouring("map"); }, [hq.data]);   // eslint-disable-line react-hooks/exhaustive-deps
+  // the view in use, whose own tour opens the first time it is used (a hole, its full log, the table, two holes compared);
+  // the "?" in the top bar replays the tour of what is on screen, the map's when nothing else is open
+  const here: Exclude<TourId, "map"> | null = comparing ? "compare" : holeKey ? (wide ? "log" : "hole") : view === "holes" ? "table" : null;
+  useViewTour(mobile ? null : here, here ? TOUR_READY[here] : undefined, setTouring);
   const tour: TourStep[] = [
     { title: "Welcome to CoreFlagging", body: `Every HyLogger-scanned drillhole in Australia's core libraries, ${holes.length ? holes.length.toLocaleString() + " of them, " : ""}read metre by metre by a model trained on scanned drill core. A few quick steps.` },
     { target: "legend", title: "Each point is a drillhole", body: "Colour is what the hole was drilled for \u2014 gold, copper, nickel\u2026 from the survey's record of the hole in WA, SA and Victoria, from its exploration report or the nearest known deposit elsewhere (a hatched fill). A square is a scan the models could not read. Hover a row in the key to show only those holes or hide them, by rock class, commodity, source or model reading; every count follows what is shown." },
@@ -272,7 +277,7 @@ export function CoreTraceMap() {
 
       {/* one bubble for every [data-keytip] on the page: the map key, the full log's column heads and key */}
       <KeyTips />
-      {touring && <Tour steps={tour} onClose={() => setTouring(false)} />}
+      {touring && <Tour key={touring} id={touring} steps={touring === "map" ? tour : viewTour(touring, { chatOpen })} onClose={() => setTouring(null)} />}
 
       {/* top bar: brand left, session right */}
       <div className="pointer-events-none absolute top-0 left-0 z-20 flex items-start justify-between gap-2 p-3 sm:gap-3" style={{ right: chatW }}>
@@ -315,7 +320,7 @@ export function CoreTraceMap() {
           {/* "worth a second look": one switch for the map and the table, beside the tabs, so it holds across both. At rest
               it is the magnifier alone; hovering slides out its name and count; switched on it stays open, in ink */}
           {againN > 0 && !mobile && (
-            <button type="button" role="switch" aria-checked={again} onClick={() => setAgain((a) => !a)} aria-label="Worth a second look"
+            <button type="button" role="switch" data-tour="second-look" aria-checked={again} onClick={() => setAgain((a) => !a)} aria-label="Worth a second look"
               className={cn("group flex h-11 items-center rounded-full border px-[13px] text-sm font-semibold whitespace-nowrap shadow-glass backdrop-blur-xl transition-colors duration-300",
                 again ? "border-ink bg-ink text-white" : "border-white/60 bg-white/80 text-slate-700 hover:bg-white hover:text-slate-900")}>
               <ScanSearch size={16} className={cn("flex-none transition-colors", again ? "text-cyan" : "text-slate-600 group-hover:text-slate-900")} />
@@ -353,8 +358,8 @@ export function CoreTraceMap() {
           </div>
         )}
         <div className={cn("pointer-events-auto flex items-center gap-2", mobile && "hidden")}>
-          {!mobile && <button type="button" onClick={() => { set({ view: null, hole: null }); setTouring(true); }} aria-label="Show the guided tour" title="Show the guided tour" className={cn(glass, "grid size-11 place-items-center rounded-full text-slate-600 hover:bg-white hover:text-slate-900")}><HelpCircle size={18} /></button>}
-          {!chatOpen && <button type="button" onClick={() => setChatOpen(true)} aria-label="Ask about the core" className={cn(glass, "flex h-11 items-center gap-2 rounded-full px-3.5 text-sm font-semibold text-slate-800 hover:bg-white sm:px-4")}><MessageCircle size={15} /><span className="hidden sm:inline">Ask</span></button>}
+          {!mobile && <button type="button" onClick={() => setTouring(here ?? "map")} aria-label="Show the guided tour" title="Show the guided tour" className={cn(glass, "grid size-11 place-items-center rounded-full text-slate-600 hover:bg-white hover:text-slate-900")}><HelpCircle size={18} /></button>}
+          {!chatOpen && <button type="button" data-tour="ask" onClick={() => setChatOpen(true)} aria-label="Ask about the core" className={cn(glass, "flex h-11 items-center gap-2 rounded-full px-3.5 text-sm font-semibold text-slate-800 hover:bg-white sm:px-4")}><MessageCircle size={15} /><span className="hidden sm:inline">Ask</span></button>}
           <button type="button" data-tour="upload" onClick={openUpload} aria-label="Upload a scan" className={cn(glass, "flex h-11 items-center gap-2 whitespace-nowrap rounded-full px-3.5 text-sm font-semibold text-slate-800 hover:bg-white hover:text-slate-900 sm:px-4")}><Upload size={15} />{!mobile && <span>{barW >= 1120 ? "Upload a scan" : "Upload"}</span>}</button>
           {authed ? <div className={cn(glass, "grid h-11 place-items-center rounded-full px-1.5")}><AccountMenu /></div>
             : <button type="button" onClick={toSignIn} className={cn(glass, "h-11 whitespace-nowrap rounded-full px-3 text-sm font-medium text-slate-700 hover:bg-white sm:px-4")}>Sign in</button>}
@@ -375,7 +380,7 @@ export function CoreTraceMap() {
           <HolePanel key={holeKey} holeKey={holeKey} tab={tab} onTab={(t) => set({ tab: t === "window" ? null : t })} models={models} run={run} metre={metre} onMetre={(m) => set({ m: m === null ? null : String(m) })}
             wide={wide} onWide={(w) => set({ full: w ? "1" : null })} onClose={() => set({ hole: null, m: null, full: null, tab: null, w: null, cmp: null, wa: null, wb: null })} win={win} onWindow={(r) => set(r ? { w: `${r[0]}-${r[1]}`, full: "1", tab: "window" } : { w: null, tab: null })}
             onOpenHole={(k, m) => set({ hole: k, m: m === undefined ? null : String(m), full: "1" })}
-            onDeleted={() => set({ hole: null, m: null, full: null })} onRing={setRingKm} onCompare={(k, w) => set({ cmp: k, wa: w ? `${w.a[0]}-${w.a[1]}` : null, wb: w ? `${w.b[0]}-${w.b[1]}` : null })} />
+            onDeleted={() => set({ hole: null, m: null, full: null })} onTour={mobile ? undefined : () => setTouring(wide ? "log" : "hole")} onRing={setRingKm} onCompare={(k, w) => set({ cmp: k, wa: w ? `${w.a[0]}-${w.a[1]}` : null, wb: w ? `${w.b[0]}-${w.b[1]}` : null })} />
         </aside>
       )}
       {holeKey && mobile && (
@@ -383,7 +388,7 @@ export function CoreTraceMap() {
           <HolePanel key={holeKey} holeKey={holeKey} tab={tab} onTab={(t) => set({ tab: t === "window" ? null : t })} models={models} run={run} metre={metre} onMetre={(m) => set({ m: m === null ? null : String(m) })}
             wide={wide} onWide={(w) => set({ full: w ? "1" : null })} onClose={() => set({ hole: null, m: null, full: null, tab: null, w: null, cmp: null, wa: null, wb: null })} win={win} onWindow={(r) => set(r ? { w: `${r[0]}-${r[1]}`, full: "1", tab: "window" } : { w: null, tab: null })}
             onOpenHole={(k, m) => set({ hole: k, m: m === undefined ? null : String(m), full: "1" })}
-            onDeleted={() => set({ hole: null, m: null, full: null })} onRing={setRingKm} onCompare={(k, w) => set({ cmp: k, wa: w ? `${w.a[0]}-${w.a[1]}` : null, wb: w ? `${w.b[0]}-${w.b[1]}` : null })} />
+            onDeleted={() => set({ hole: null, m: null, full: null })} onTour={mobile ? undefined : () => setTouring(wide ? "log" : "hole")} onRing={setRingKm} onCompare={(k, w) => set({ cmp: k, wa: w ? `${w.a[0]}-${w.a[1]}` : null, wb: w ? `${w.b[0]}-${w.b[1]}` : null })} />
         </HoleSheet>
       )}
 

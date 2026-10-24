@@ -4,13 +4,16 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useQueries, useQuery } from "@tanstack/react-query";
-import { ArrowLeft, ChevronDown, Compass, Ruler } from "lucide-react";
+import { ArrowLeft, ChevronDown, Compass, HelpCircle, Ruler } from "lucide-react";
 import { coreScan, type Trace, type TraceView } from "@/lib/coreScan";
 import { groupColor, groupName, lithColor, SERIES } from "@/components/coretrace/palette";
 import { fine, logged, mixed, pieces, STEP, type Mix } from "@/components/coretrace/sceneColour";
 import { Section, dipBearing } from "@/components/coretrace/Section";
 import { BearingDial } from "@/components/coretrace/BearingDial";
 import { KeyTips } from "@/components/coretrace/MapKey";
+import { Tour, useViewTour, type TourId } from "@/components/coretrace/Tour";
+import { TOUR_READY, viewTour } from "@/components/coretrace/tours";
+import { useIsMobile } from "@/lib/useIsMobile";
 import { cn } from "@/lib/utils";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -56,7 +59,11 @@ export function Scene() {
   // on a phone the key folds to its title bar, so it does not cover the view
   const [keyOpen, setKeyOpen] = useState(false);     // null: the logged rock when the hole has one, else SWIR
   const [view, setView] = useState<"3d" | "section">(sp.get("view") === "section" ? "section" : "3d");
-  const [azimuth, setAzimuth] = useState<number | null>(null);   // the section line's bearing, null = the hole's own dip direction
+  const [azimuth, setAzimuth] = useState<number | null>(null);
+  // the scene's tour, once per browser on a wide screen once the holes are drawn; the "?" in the top bar replays it
+  const mobile = useIsMobile();
+  const [touring, setTouring] = useState<TourId | null>(null);
+  useViewTour(mobile ? null : "scene", TOUR_READY.scene, setTouring);   // the section line's bearing, null = the hole's own dip direction
   const [corridor, setCorridor] = useState<number>(250);         // the section takes holes within this many metres of its line
   const q = useQuery({ queryKey: ["core-trace", key, km], queryFn: () => coreScan.trace(key as string, km), enabled: !!key, staleTime: 10 * 60_000 });
   const host = useRef<HTMLDivElement>(null);
@@ -210,17 +217,17 @@ export function Scene() {
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/brand/coretrace-mark.svg" alt="" className="size-8 rounded-full" />CoreFlagging
         </Link>
-        <Link href={key ? `/map?hole=${encodeURIComponent(key)}` : "/map"} aria-label="Back to the map" className={cn(glass, "pointer-events-auto flex h-11 flex-none items-center gap-1.5 rounded-full px-3.5 text-sm font-semibold text-slate-700 hover:bg-white hover:text-slate-900 max-sm:w-11 max-sm:justify-center max-sm:px-0")}><ArrowLeft size={15} /><span className="max-sm:hidden">Map</span></Link>
-        <div className={cn(glass, "pointer-events-auto flex h-11 min-w-0 items-center gap-2 rounded-full px-4 max-sm:flex-1 max-sm:flex-col max-sm:items-start max-sm:justify-center max-sm:gap-0 max-sm:leading-tight")}>
+        <Link href={key ? `/map?hole=${encodeURIComponent(key)}` : "/map"} data-tour="scene-back" aria-label="Back to the map" className={cn(glass, "pointer-events-auto flex h-11 flex-none items-center gap-1.5 rounded-full px-3.5 text-sm font-semibold text-slate-700 hover:bg-white hover:text-slate-900 max-sm:w-11 max-sm:justify-center max-sm:px-0")}><ArrowLeft size={15} /><span className="max-sm:hidden">Map</span></Link>
+        <div data-tour={d ? "scene-title" : undefined} className={cn(glass, "pointer-events-auto flex h-11 min-w-0 items-center gap-2 rounded-full px-4 max-sm:flex-1 max-sm:flex-col max-sm:items-start max-sm:justify-center max-sm:gap-0 max-sm:leading-tight")}>
           <h1 className="font-display text-sm font-bold tracking-tight text-ink">{d ? d.hole.name : key ?? "A hole"}</h1>
           {d && <span className="truncate text-[11px] text-slate-500 sm:hidden">{d.nearby.length} {d.nearby.length === 1 ? "hole" : "holes"} within {km} km</span>}
           {d && <span className="hidden truncate text-xs text-slate-500 md:inline">{d.hole.source === "survey" ? `${d.hole.stations} survey stations` : d.hole.source === "header" ? "straight, from the scan header" : "no survey, drawn vertical"} · {d.nearby.length} holes within {km} km</span>}
           {q.isPending && <span className="text-xs text-slate-500">Loading…</span>}
           {q.isError && <span className="text-xs text-rose-700">no collar position</span>}
         </div>
-        <div className="pointer-events-auto"><Pill value={view} onChange={setView} items={[["3d", "3D", "The holes as lines in space, to turn and zoom"], ["section", "Section", "A vertical slice through this collar: the nearby holes projected onto one plane, as a geologist draws a cross-section"]] as const} label="View" /></div>
+        <div data-tour="scene-view" className="pointer-events-auto"><Pill value={view} onChange={setView} items={[["3d", "3D", "The holes as lines in space, to turn and zoom"], ["section", "Section", "A vertical slice through this collar: the nearby holes projected onto one plane, as a geologist draws a cross-section"]] as const} label="View" /></div>
         <div className="pointer-events-auto max-sm:hidden"><Pill value={km} onChange={setKm} items={RINGS.map((r) => [r, `${r} km`, `Draw the scanned holes within ${r} km of this collar`] as const)} label="Neighbours within" /></div>
-        <div className="pointer-events-auto max-sm:hidden"><Pill value={paint} onChange={setChosen} items={[
+        <div data-tour="scene-paint" className="pointer-events-auto max-sm:hidden"><Pill value={paint} onChange={setChosen} items={[
           ...(hasRock ? [["rock", "Logged rock", "Colour by the rock type the company geologist logged, in GSWA's map colours: the way a drillhole is usually drawn"] as const] : []),
           ["swir", "SWIR minerals", "Colour each 10 cm by the SWIR group TSG read most of there: clays, micas, chlorite, carbonate (the alteration minerals), in TSG's colours"], ["tir", "TIR minerals", "Colour each 10 cm by the TIR group TSG read most of there: quartz, feldspars, pyroxene, garnet (the rock-forming minerals), in TSG's colours"]] as const} label="Coloured by" /></div>
         {view === "section" && (
@@ -230,6 +237,8 @@ export function Scene() {
           </>
         )}
       </div>
+      {!mobile && d && <button type="button" onClick={() => setTouring("scene")} aria-label="How this view works" title="How this view works" className={cn(glass, "absolute top-3 right-3 z-20 grid size-11 place-items-center rounded-full text-slate-600 hover:bg-white hover:text-slate-900")}><HelpCircle size={18} /></button>}
+      {touring && <Tour id={touring} steps={viewTour("scene", { chatOpen: false })} onClose={() => setTouring(null)} />}
       <KeyTips />
       {/* the key, as on the map: the groups this hole shows, the marks, and what the view is */}
       {d && (

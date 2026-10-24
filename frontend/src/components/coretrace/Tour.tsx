@@ -4,19 +4,55 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 
-/** A step points at the element carrying data-tour={target}; without one (or if it is not on screen) it sits in the middle. */
-export type TourStep = { target?: string; title: string; body: string };
+/** A step points at the element carrying data-tour={target}; without one (or if it is not on screen) it sits in the middle.
+ *  An optional step is dropped when its element is not on the page as the tour opens (a hole with no trays, no documents). */
+export type TourStep = { target?: string; title: string; body: string; optional?: boolean };
 
-// v2 (2026-10-24): the assistant and its model picker got their own steps, so everyone sees the tour once more
-const KEY = "coretrace.tour.v2";
-export const tourSeen = () => { try { return localStorage.getItem(KEY) === "1"; } catch { return true; } };
-const markSeen = () => { try { localStorage.setItem(KEY, "1"); } catch { /* private window: the tour just shows again */ } };
+/** The map's tour, and one for each view of the data (a hole's summary, its full log, the table, two holes compared,
+ *  the 3D scene): each is shown once per browser, the first time that view is open on a wide screen. */
+export type TourId = "map" | "hole" | "log" | "table" | "compare" | "scene";
+// v2 (2026-10-24): the assistant and its model picker got their own steps, so everyone sees the map tour once more
+const KEYS: Record<TourId, string> = {
+  map: "coretrace.tour.v2", hole: "coretrace.tour.hole.v1", log: "coretrace.tour.log.v1",
+  table: "coretrace.tour.table.v1", compare: "coretrace.tour.compare.v1", scene: "coretrace.tour.scene.v1",
+};
+export const tourSeen = (id: TourId = "map") => { try { return localStorage.getItem(KEYS[id]) === "1"; } catch { return true; } };
+const markSeen = (id: TourId) => { try { localStorage.setItem(KEYS[id], "1"); } catch { /* private window: the tour just shows again */ } };
+
+// One tour at a time, and only one opens by itself in a visit: a view's tour that would follow another (the map's, say)
+// waits for the next time its view is opened. None opens in the middle of a drag or a zoom.
+let showing = false, shownThisVisit = false, pressed = false;
+if (typeof window !== "undefined") {
+  window.addEventListener("pointerdown", () => { pressed = true; }, true);
+  for (const e of ["pointerup", "pointercancel"]) window.addEventListener(e, () => { pressed = false; }, true);
+}
+const tourFree = () => !showing && !shownThisVisit && !pressed;
+
+/** Opens a view's tour by itself, once per browser: once `id`'s view is in use and its `ready` element has been on the
+ *  page for about 0.8 s (the view drawn with its data), and no other tour is showing or has been this visit. */
+export function useViewTour(id: TourId | null, ready: string | undefined, open: (id: TourId) => void) {
+  const openRef = useRef(open);
+  useEffect(() => { openRef.current = open; });
+  useEffect(() => {
+    if (!id || !ready || tourSeen(id)) return;
+    let since = 0, n = 0;
+    const t = setInterval(() => {
+      if (++n > 75) { clearInterval(t); return; }                    // ~30 s: the view never finished, try another time
+      since = document.querySelector(`[data-tour="${ready}"]`) ? since + 1 : 0;
+      if (since >= 2 && tourFree()) { clearInterval(t); openRef.current(id); }
+    }, 400);
+    return () => clearInterval(t);
+  }, [id, ready]);
+}
 
 /** A short guided tour: the element in question is lit, everything else dimmed, with a card beside it. */
-export function Tour({ steps, onClose }: { steps: TourStep[]; onClose: () => void }) {
+export function Tour({ steps: all, id = "map", onClose }: { steps: TourStep[]; id?: TourId; onClose: () => void }) {
+  // the steps as the tour opens: an optional step whose element is not there is left out, and they hold still after
+  const [steps] = useState(() => all.filter((s) => !s.optional || !s.target || document.querySelector(`[data-tour="${s.target}"]`)));
   const [i, setI] = useState(0);
+  useEffect(() => { showing = true; shownThisVisit = true; return () => { showing = false; }; }, []);
   const [rect, setRect] = useState<DOMRect | null>(null);
-  const step = steps[i];
+  const step = steps[i] ?? steps[0];
   // the card's own height, measured once it is drawn: long steps are taller than a guess, and were cut off at the bottom
   const card = useRef<HTMLDivElement>(null);
   const [cardH, setCardH] = useState(0);
@@ -32,7 +68,7 @@ export function Tour({ steps, onClose }: { steps: TourStep[]; onClose: () => voi
     return () => window.removeEventListener("resize", measure);
   }, [step]);
 
-  const close = () => { markSeen(); onClose(); };
+  const close = () => { markSeen(id); onClose(); };
   useEffect(() => {
     const f = (e: KeyboardEvent) => {
       if (e.key === "Escape") close();
@@ -59,9 +95,9 @@ export function Tour({ steps, onClose }: { steps: TourStep[]; onClose: () => voi
   return createPortal(
     <div className="fixed inset-0 z-[95]" role="dialog" aria-modal aria-label="Guided tour">
       {/* the dim, with a hole cut for the element: one big shadow around a box that matches it */}
-      {rect ? <div className="pointer-events-none fixed rounded-2xl ring-2 ring-cyan transition-all duration-300" style={{ left: rect.left - 6, top: rect.top - 6, width: rect.width + 12, height: rect.height + 12, boxShadow: "0 0 0 9999px rgba(15,23,42,0.55)" }} />
+      {rect ? <div className="pointer-events-none fixed rounded-2xl ring-2 ring-cyan transition-all duration-300 motion-reduce:transition-none" style={{ left: rect.left - 6, top: rect.top - 6, width: rect.width + 12, height: rect.height + 12, boxShadow: "0 0 0 9999px rgba(15,23,42,0.55)" }} />
         : <div className="fixed inset-0 bg-slate-900/55" />}
-      <div ref={card} className="fixed max-h-[calc(100vh-24px)] w-[320px] max-w-[calc(100vw-24px)] overflow-y-auto rounded-2xl bg-white p-4 shadow-2xl transition-all duration-300" style={pos}>
+      <div ref={card} className="fixed max-h-[calc(100vh-24px)] w-[320px] max-w-[calc(100vw-24px)] overflow-y-auto rounded-2xl bg-white p-4 shadow-2xl transition-all duration-300 motion-reduce:transition-none" style={pos}>
         <div className="flex items-start justify-between gap-3">
           <p className="font-display text-[15px] font-semibold leading-snug text-slate-900">{step.title}</p>
           <button type="button" onClick={close} aria-label="Close the tour" className="-mr-1 -mt-1 grid size-7 flex-none place-items-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700"><X size={15} /></button>
@@ -69,7 +105,7 @@ export function Tour({ steps, onClose }: { steps: TourStep[]; onClose: () => voi
         <p className="mt-1.5 text-[13px] leading-relaxed text-slate-600">{step.body}</p>
         <div className="mt-4 flex items-center justify-between">
           <span className="flex gap-1" aria-label={`Step ${i + 1} of ${steps.length}`}>
-            {steps.map((_, k) => <i key={k} className={`inline-block h-1.5 rounded-full transition-all ${k === i ? "w-4 bg-slate-900" : "w-1.5 bg-slate-300"}`} />)}
+            {steps.map((_, k) => <i key={k} className={`inline-block h-1.5 rounded-full transition-all motion-reduce:transition-none ${k === i ? "w-4 bg-slate-900" : "w-1.5 bg-slate-300"}`} />)}
           </span>
           <span className="flex items-center gap-1.5">
             {i > 0 && <button type="button" onClick={() => setI(i - 1)} className="h-8 rounded-full px-3 text-xs font-medium text-slate-600 hover:bg-slate-100">Back</button>}

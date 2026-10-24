@@ -19,18 +19,20 @@ function useHole(key: string | null) {
 }
 
 /** One hole's column: who and what it is, and its log. */
-function Column({ hole, mv, spectral, cursor, onCursor, onOpen, missing, win, onWin, mirror }: {
+function Column({ hole, mv, spectral, cursor, onCursor, onOpen, missing, win, onWin, mirror, tour }: {
   hole: HoleDetail | undefined; mv: ModelView | undefined; spectral?: SpectralLog; cursor: number | null; onCursor: (m: number) => void; onOpen: (key: string) => void; missing: string;
   /** this log's depth window (null: the whole hole), chosen with its own Scale column and levels */
   win: [number, number] | null; onWin: (w: [number, number] | null) => void;
   /** the right hole: its columns in the left one's mirror order, the Scale column at the outer edge */
   mirror?: boolean;
+  /** the column's mark for the tour */
+  tour?: string;
 }) {
   if (!hole) return <div className="flex min-h-[40vh] items-center justify-center p-6 text-sm text-slate-500">{missing}</div>;
   const again = mv?.summary.again?.intervals ?? [];
   const tops = (mv?.summary.main_types ?? []).slice(0, 2);
   return (
-    <div className="flex min-h-0 min-w-0 flex-col">
+    <div data-tour={tour} className="flex min-h-0 min-w-0 flex-col">
       <div className="px-1 pb-2">
         <div className="flex items-center gap-2">
           <button type="button" onClick={() => onOpen(hole.key)} title={`Open ${hole.name}`} className="truncate text-base font-semibold text-slate-900 hover:underline">{hole.name}</button>
@@ -107,15 +109,15 @@ export function ComparePanel({ a: aKey, b: bKey, winA = null, winB = null, onClo
         <button type="button" onClick={onClose} aria-label="Close the comparison" className="grid h-8 w-8 flex-none place-items-center rounded-lg text-slate-500 hover:bg-slate-100"><X size={16} /></button>
       </div>
       <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 overflow-y-auto p-4 max-lg:auto-rows-max lg:grid-cols-[minmax(0,1fr)_minmax(300px,440px)_minmax(0,1fr)] lg:overflow-hidden">
-        <Column hole={a.hole} mv={a.mv} spectral={a.spectral} cursor={ca} onCursor={pickA} onOpen={onOpenHole} missing={missing(a, "A")} win={wa} onWin={setWa} />
-        <div className="flex min-h-[420px] flex-col max-lg:h-[75vh]">
+        <Column hole={a.hole} mv={a.mv} spectral={a.spectral} cursor={ca} onCursor={pickA} onOpen={onOpenHole} missing={missing(a, "A")} win={wa} onWin={setWa} tour="compare-a" />
+        <div data-tour="compare-mid" className="flex min-h-[420px] flex-col max-lg:h-[75vh]">
           {corr ? (
             <>
               <div className="flex items-baseline justify-center gap-4 pb-1 font-display text-2xl font-semibold text-[#b45f3c]">
                 <span className="flex items-center gap-1" data-keytip={CORR_TIP.score}>{corr.score.toFixed(2)}<Info size={12} className="text-slate-400" /></span>
                 <span className="flex items-center gap-1" data-keytip={CORR_TIP.rho}>ρ = {corr.rho.toFixed(2)}<Info size={12} className="text-slate-400" /></span>
               </div>
-              <div className="flex justify-center pb-2" role="group" aria-label="Column beside RC">
+              <div data-tour="compare-show" className="flex justify-center pb-2" role="group" aria-label="Column beside RC">
                 <div className="flex overflow-hidden rounded-md border border-slate-200 text-[11px]">
                   {CORR_SHOW.map((c) => <button key={c.id} type="button" aria-pressed={show === c.id} onClick={() => setShow(c.id)} className={cn("px-2 py-0.5 pointer-coarse:px-3 pointer-coarse:py-1.5", show === c.id ? "bg-slate-900 text-white" : "bg-white text-slate-600 hover:bg-slate-50")}>{c.label}</button>)}
                 </div>
