@@ -27,7 +27,8 @@ function useQueue(url?: string): Queue | null {
 
 const wait = (s: number) => (s < 90 ? `~${Math.max(5, Math.round(s / 5) * 5)} s` : `~${Math.round(s / 60)} min`);
 
-const KEY = "chat.llm";
+// v2 (2026-10-24): Cloud is everyone's default again, so picks saved under "chat.llm" are left behind once
+const KEY = "chat.llm.v2";
 
 /** The person's pick, the options, and a ref the chat transport reads when a message is sent. */
 export function useChatModel() {
@@ -71,7 +72,7 @@ export function ModelPicker({ options, choice, onChange, disabled }: {
   const gpu = q ? (!q.available ? "our GPU is not answering" : disabled ? "your message is with our GPU" : !busy ? "our GPU is free"
     : ahead ? `${ahead} ahead on our GPU, ${wait(eta)}` : `our GPU is full; yours is next, ${wait(eta)}`) : "";
   return (
-    <label title={`Model: ${cur.label} · ${cur.model}${gpu ? ` · ${gpu}` : ""}`}
+    <label data-tour="model" title={`Model: ${cur.label} · ${cur.model}${gpu ? ` · ${gpu}` : ""}`}
       className="relative flex h-7 max-w-[10rem] shrink-0 items-center gap-1 rounded-lg border border-slate-200 bg-white/80 pl-2 pr-1.5 text-xs text-slate-600 hover:border-slate-300 hover:text-slate-800">
       <Icon size={13} className="shrink-0" aria-hidden />
       {q && <span aria-hidden className={`size-1.5 shrink-0 rounded-full ${!q.available ? "bg-rose-500" : disabled ? "animate-pulse bg-sky-500" : busy ? "bg-amber-500" : "bg-emerald-500"}`} />}
