@@ -7,7 +7,8 @@ import { X } from "lucide-react";
 /** A step points at the element carrying data-tour={target}; without one (or if it is not on screen) it sits in the middle. */
 export type TourStep = { target?: string; title: string; body: string };
 
-const KEY = "coretrace.tour.v1";
+// v2 (2026-10-24): the assistant and its model picker got their own steps, so everyone sees the tour once more
+const KEY = "coretrace.tour.v2";
 export const tourSeen = () => { try { return localStorage.getItem(KEY) === "1"; } catch { return true; } };
 const markSeen = () => { try { localStorage.setItem(KEY, "1"); } catch { /* private window: the tour just shows again */ } };
 
