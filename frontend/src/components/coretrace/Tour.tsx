@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 
@@ -17,6 +17,10 @@ export function Tour({ steps, onClose }: { steps: TourStep[]; onClose: () => voi
   const [i, setI] = useState(0);
   const [rect, setRect] = useState<DOMRect | null>(null);
   const step = steps[i];
+  // the card's own height, measured once it is drawn: long steps are taller than a guess, and were cut off at the bottom
+  const card = useRef<HTMLDivElement>(null);
+  const [cardH, setCardH] = useState(0);
+  useLayoutEffect(() => { setCardH(card.current?.offsetHeight ?? 0); }, [i, rect]);
 
   useLayoutEffect(() => {
     const measure = () => {
@@ -39,14 +43,17 @@ export function Tour({ steps, onClose }: { steps: TourStep[]; onClose: () => voi
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [steps.length]);
 
-  // the card goes beside the lit element, on whichever side has room
-  const W = 320, pad = 14, vw = typeof window !== "undefined" ? window.innerWidth : 1440, vh = typeof window !== "undefined" ? window.innerHeight : 900;
+  // the card goes beside the lit element, on whichever side has room, kept whole on screen by its measured height
+  const W = 320, pad = 14, m = 12, vw = typeof window !== "undefined" ? window.innerWidth : 1440, vh = typeof window !== "undefined" ? window.innerHeight : 900;
+  const h = Math.min(cardH || 220, vh - 2 * m);
   let pos: React.CSSProperties = { left: "50%", top: "50%", transform: "translate(-50%, -50%)" };
   if (rect) {
-    const below = rect.bottom + pad + 180 < vh, right = rect.right + pad + W < vw;
-    pos = below ? { left: Math.min(Math.max(rect.left, 12), vw - W - 12), top: rect.bottom + pad }
-      : right ? { left: rect.right + pad, top: Math.min(Math.max(rect.top, 12), vh - 220) }
-      : { left: Math.min(Math.max(rect.left, 12), vw - W - 12), top: Math.max(12, rect.top - pad - 190) };
+    const fitTop = (top: number) => Math.min(Math.max(top, m), vh - h - m);
+    const fitLeft = (left: number) => Math.min(Math.max(left, m), vw - W - m);
+    pos = rect.bottom + pad + h < vh - m ? { left: fitLeft(rect.left), top: rect.bottom + pad }
+      : rect.right + pad + W < vw - m ? { left: rect.right + pad, top: fitTop(rect.top) }
+      : rect.left - pad - W > m ? { left: rect.left - pad - W, top: fitTop(rect.top) }
+      : { left: fitLeft(rect.left), top: fitTop(rect.top - pad - h) };
   }
   const last = i === steps.length - 1;
   return createPortal(
@@ -54,7 +61,7 @@ export function Tour({ steps, onClose }: { steps: TourStep[]; onClose: () => voi
       {/* the dim, with a hole cut for the element: one big shadow around a box that matches it */}
       {rect ? <div className="pointer-events-none fixed rounded-2xl ring-2 ring-cyan transition-all duration-300" style={{ left: rect.left - 6, top: rect.top - 6, width: rect.width + 12, height: rect.height + 12, boxShadow: "0 0 0 9999px rgba(15,23,42,0.55)" }} />
         : <div className="fixed inset-0 bg-slate-900/55" />}
-      <div className="fixed w-[320px] max-w-[calc(100vw-24px)] rounded-2xl bg-white p-4 shadow-2xl transition-all duration-300" style={pos}>
+      <div ref={card} className="fixed max-h-[calc(100vh-24px)] w-[320px] max-w-[calc(100vw-24px)] overflow-y-auto rounded-2xl bg-white p-4 shadow-2xl transition-all duration-300" style={pos}>
         <div className="flex items-start justify-between gap-3">
           <p className="font-display text-[15px] font-semibold leading-snug text-slate-900">{step.title}</p>
           <button type="button" onClick={close} aria-label="Close the tour" className="-mr-1 -mt-1 grid size-7 flex-none place-items-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700"><X size={15} /></button>
