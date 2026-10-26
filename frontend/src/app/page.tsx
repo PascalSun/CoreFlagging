@@ -26,7 +26,7 @@ export default function CoreTraceHome() {
         <CoreHow />
         <CoreFound />
         <CoreFeatures />
-        <CoreRun rows={["/coretrace/07THD002-0058-r2.jpg", "/coretrace/07THD002-0058-r3.jpg", "/coretrace/07THD002-0058-r4.jpg"]} caption="Hole 07THD002, 365.6 to 368.3 m. Geological Survey of Western Australia, NVCL." />
+        <CoreRun rows={["/coretrace/07THD002-0058-r2.webp", "/coretrace/07THD002-0058-r3.webp", "/coretrace/07THD002-0058-r4.webp"]} caption="Hole 07THD002, 365.6 to 368.3 m. Geological Survey of Western Australia, NVCL." />
         <CoreNotes />
         <CoreClosing />
         <CoreTeam />

@@ -18,6 +18,8 @@ type RevealProps = {
   direction?: keyof typeof directions;
   once?: boolean;
   amount?: number;
+  /** "li" when it is the list item itself (an <ol>/<ul> takes no wrapper between it and its items) */
+  as?: "div" | "li";
 };
 
 export function Reveal({
@@ -27,10 +29,12 @@ export function Reveal({
   direction = "up",
   once = true,
   amount = 0.25,
+  as = "div",
 }: RevealProps) {
   const offset = directions[direction];
+  const Tag = as === "li" ? motion.li : motion.div;
   return (
-    <motion.div
+    <Tag
       className={cn(className)}
       initial={{ opacity: 0, ...offset }}
       whileInView={{ opacity: 1, x: 0, y: 0 }}
@@ -38,7 +42,7 @@ export function Reveal({
       transition={{ duration: 0.7, delay, ease: [0.22, 1, 0.36, 1] }}
     >
       {children}
-    </motion.div>
+    </Tag>
   );
 }
 
