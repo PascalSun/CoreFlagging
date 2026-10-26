@@ -19,14 +19,24 @@ export const PAGES: [string, "daily" | "weekly" | "monthly", number][] = [
   ["/map", "weekly", 0.9],
 ];
 
-/** Canonical, Open Graph and Twitter tags for one public page. Open Graph is replaced, not merged, per segment. */
+/** The 1200×630 share image (a capture of the landing page's hero), for link previews on LinkedIn, WeChat, Slack, X. */
+export const SHARE_IMAGE = {
+  url: "/og-image.jpg",
+  width: 1200,
+  height: 630,
+  type: "image/jpeg",
+  alt: "CoreFlagging: a second opinion on every metre of core. The landing page over a HyLogger-scanned drill core tray, with the mineral the scan reads under each row.",
+};
+
+/** Canonical, Open Graph and Twitter tags for one public page. Open Graph is replaced, not merged, per segment,
+ *  so every page carries the share image itself. */
 export function pageMeta(path: string, title: string, description: string): Metadata {
   return {
     title,
     description,
     alternates: { canonical: path },
-    openGraph: { type: "website", siteName: SITE_NAME, locale: "en_AU", url: path, title, description },
-    twitter: { card: "summary", title, description },
+    openGraph: { type: "website", siteName: SITE_NAME, locale: "en_AU", url: path, title, description, images: [SHARE_IMAGE] },
+    twitter: { card: "summary_large_image", title, description, images: [SHARE_IMAGE] },
   };
 }
 
