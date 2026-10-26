@@ -5,6 +5,7 @@ import "mapbox-gl/dist/mapbox-gl.css";
 import "@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css";
 import { Providers } from "./providers";
 import { GoogleAnalytics } from "@/components/GoogleAnalytics";
+import { KEYWORDS, SITE_NAME, SITE_URL } from "@/lib/seo";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
@@ -13,6 +14,9 @@ const manrope = Manrope({ variable: "--font-manrope", subsets: ["latin"] });
 const jakarta = Plus_Jakarta_Sans({ variable: "--font-jakarta", subsets: ["latin"] });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(SITE_URL), // canonicals and Open Graph URLs resolve against the public host
+  applicationName: SITE_NAME,
+  keywords: KEYWORDS,
   title: "CoreFlagging — Australia's scanned drill core, read metre by metre",
   description: "Every HyLogger-scanned drillhole in Australia's core libraries, read by a core-spectra model.",
 };

@@ -1,11 +1,13 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
 import { CoreTraceMap } from "@/components/coretrace/CoreTraceMap";
+import { pageMeta } from "@/lib/seo";
 
 export const metadata: Metadata = {
   icons: { icon: "/brand/coretrace-mark.svg", apple: "/brand/coretrace-mark.svg" },
-  title: "CoreFlagging — Map of scanned drill core",
-  description: "Every HyLogger-scanned drillhole in Australia's core libraries, read metre by metre by a core-spectra model. Upload your own scan.",
+  // canonical without the query: ?hole=&m= views are the same page with a different hole open
+  ...pageMeta("/map", "CoreFlagging — Map of scanned drill core",
+    "Every HyLogger-scanned drillhole in Australia's core libraries, read metre by metre by a core-spectra model. Upload your own scan."),
 };
 
 export default function CoreTraceMapPage() {

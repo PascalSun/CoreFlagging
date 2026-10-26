@@ -1,0 +1,43 @@
+# CoreFlagging
+
+> CoreFlagging is a second opinion on every metre of drill core. It reads every HyLogger-scanned drillhole in Australia's core libraries (about 6,600 holes in the National Virtual Core Library) the same way, with a core-spectra foundation model called HyFormer, and sets its reading beside the geologist's log, so the intervals where the core and the log disagree get another look. Its results have been checked against the logs and the chemistry in the Geological Survey of Western Australia's drillhole database; holes from other States are read the same way but have not been checked yet. It is built by the UWA Centre for Natural and Technical Language Processing.
+
+## Pages
+
+- [Home](https://coreflagging.nlp-tlp.org/): what CoreFlagging is, how it works, what it found, and what to keep in mind when reading it.
+- [Map](https://coreflagging.nlp-tlp.org/map): every scanned hole on one map; open any hole for its readings, trays, findings, reports and full log, or upload a scan of your own.
+
+## What it does
+
+- Reads HyLogger scans (visible to short-wave infrared and thermal infrared spectra) every 10 cm and classifies the rock into one of 12 rock classes.
+- Flags the metres that stand out from the core around them, the metres most worth assaying. It gives no grade and replaces no assay.
+- Draws domain boundaries where the rock changes, from the spectra alone.
+- Estimates the thermal infrared for older scans that only measured the short-wave infrared.
+- Finds core like a chosen interval or hole, nearby or across the State, by similarity in HyFormer's representation space rather than in the logs.
+- Produces a PDF report per hole (data-quality problems, intervals that stand out and why, metres most worth assaying, rock classification, domain boundaries); data-quality problems also download as CSV.
+- An assistant answers questions about a hole from the same data and finds the WAMEX reports and drillhole descriptions behind it.
+
+## Who it is for
+
+Geologists and exploration teams who log drill core, and anyone reviewing scanned core in Australia's core libraries. It is a second opinion, not a replacement: the decision stays with the geologist, the tray photograph and the core itself.
+
+## How to use it
+
+- Open the [map](https://coreflagging.nlp-tlp.org/map) in a browser; browsing holes needs no account.
+- Signing in (through the Geo Research Platform) is needed to upload your own scan and to use the assistant.
+- The data CoreFlagging shows comes from the Geo Research Platform's public API: https://platform.nlp-tlp.org/api/docs/
+
+## Data
+
+- HyLogger scans from the National Virtual Core Library. Tray photographs from the Geological Survey of Western Australia are published under CC BY 4.0.
+- Read with care: the model is a first version, it is sometimes wrong, and it has been checked in Western Australia only.
+
+## Who runs it
+
+- UWA Centre for Natural and Technical Language Processing (NLP-TLP), The University of Western Australia: https://nlp-tlp.org/
+- With the ARC Training Centre in Critical Resources for the Future and the Geological Survey of Western Australia.
+- Related: [Geo Research Platform](https://geo.nlp-tlp.org)
+
+## Contact
+
+- pascal.sun@uwa.edu.au

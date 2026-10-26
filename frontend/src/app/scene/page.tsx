@@ -6,6 +6,7 @@ export const metadata: Metadata = {
   icons: { icon: "/brand/coretrace-mark.svg", apple: "/brand/coretrace-mark.svg" },
   title: "CoreFlagging — A hole in space",
   description: "A scanned drillhole and its neighbours as lines in space, coloured by what the model read, with the intervals worth a second look.",
+  robots: { index: false, follow: true }, // a view of one hole (?hole=), opened from the map; the map is the page to index
 };
 
 export default function ScenePage() {
