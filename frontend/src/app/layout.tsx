@@ -5,7 +5,7 @@ import "mapbox-gl/dist/mapbox-gl.css";
 import "@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css";
 import { Providers } from "./providers";
 import { GoogleAnalytics } from "@/components/GoogleAnalytics";
-import { KEYWORDS, SITE_NAME, SITE_URL } from "@/lib/seo";
+import { KEYWORDS, SHARE_IMAGE, SITE_NAME, SITE_URL } from "@/lib/seo";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
@@ -19,6 +19,9 @@ export const metadata: Metadata = {
   keywords: KEYWORDS,
   title: "CoreFlagging — Australia's scanned drill core, read metre by metre",
   description: "Every HyLogger-scanned drillhole in Australia's core libraries, read by a core-spectra model.",
+  // the share image for pages that don't set their own Open Graph (public pages use pageMeta, which carries it too)
+  openGraph: { type: "website", siteName: SITE_NAME, locale: "en_AU", images: [SHARE_IMAGE] },
+  twitter: { card: "summary_large_image", images: [SHARE_IMAGE] },
 };
 
 export const viewport: Viewport = {
