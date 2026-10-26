@@ -174,10 +174,7 @@ export function Navbar({ chrome = groundworkChrome }: { chrome?: Chrome }) {
                 <UnderlineLink
                   href={link.href}
                   label={link.label}
-                  current={
-                    pathname === link.href || pathname.startsWith(`${link.href}/`) ||
-                    (link.href.startsWith("/research") && pathname.startsWith("/research"))
-                  }
+                  current={pathname === link.href || pathname.startsWith(`${link.href}/`)}
                 />
               </li>
             ))}

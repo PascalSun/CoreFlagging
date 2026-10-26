@@ -21,7 +21,6 @@ export const site = {
 export const navLinks = [
   { label: "Home", href: "/" },
   { label: "Gold Run", href: "/game" },
-  { label: "Research", href: "/research/minetrace" },
 ] as const;
 
 export const footerSitemap = [
