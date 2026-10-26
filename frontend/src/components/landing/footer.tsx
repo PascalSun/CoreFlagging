@@ -1,3 +1,6 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { FitWordmark } from "@/components/landing/fit-wordmark";
@@ -50,6 +53,31 @@ function LinkColumn({
 }
 
 /**
+ * The scene behind the glass. The footer is fixed, so anything in it paints at load (hidden under
+ * <main>) and its picture used to be the page's slowest, largest paint. It loads only once the
+ * spacer comes within a screen of the viewport; until then the pane sits on the plain page colour.
+ */
+function FooterScene() {
+  const [near, setNear] = useState(false);
+  useEffect(() => {
+    // FooterSpacer (below); a page without one watches <body>, which is in view at once
+    const target = document.querySelector("[data-footer-spacer]") ?? document.body;
+    const io = new IntersectionObserver(([e]) => { if (e.isIntersecting) { setNear(true); io.disconnect(); } }, { rootMargin: "0px 0px 100% 0px" });
+    io.observe(target);
+    return () => io.disconnect();
+  }, []);
+  if (!near) return null;
+  return (
+    <div aria-hidden className="absolute inset-0">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={`${HERO_IMG_BASE}/hero_terrain_light.webp`} alt="" width={960} height={1282} decoding="async" fetchPriority="low" className="h-full w-full scale-105 object-cover" />
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={`${HERO_IMG_BASE}/hero_heat_Au.webp`} alt="" width={640} height={854} decoding="async" fetchPriority="low" className="absolute inset-0 h-full w-full scale-105 object-cover opacity-80" />
+    </div>
+  );
+}
+
+/**
  * Template reveal footer: fixed to the viewport bottom BEHIND the page (z-0);
  * <main> carries z-10 and a bg, and FooterSpacer reserves matching scroll
  * room at the end of the page so the footer is progressively revealed as the
@@ -65,12 +93,7 @@ export function Footer({ chrome = groundworkChrome }: { chrome?: Chrome }) {
     >
       {/* the scene BEHIND the glass: the real WA survey chart + Au surface.
           Frost is only frost when there is something textured to blur. */}
-      <div aria-hidden className="absolute inset-0">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={`${HERO_IMG_BASE}/hero_terrain_light.jpg`} alt="" className="h-full w-full scale-105 object-cover" />
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={`${HERO_IMG_BASE}/hero_heat_Au.png`} alt="" className="absolute inset-0 h-full w-full scale-105 object-cover opacity-80" />
-      </div>
+      <FooterScene />
       {/* the frosted pane, keeping the cyan hue */}
       <div aria-hidden className="absolute inset-0 bg-cyan/35 backdrop-blur-2xl backdrop-saturate-150" />
       <div className="container-site relative flex flex-1 flex-col pt-14 md:pt-20">
@@ -133,5 +156,5 @@ export function Footer({ chrome = groundworkChrome }: { chrome?: Chrome }) {
 
 /** Scroll room for the fixed footer — keep at the very end of the page. */
 export function FooterSpacer() {
-  return <div aria-hidden className={FOOTER_HEIGHT_CLASS} />;
+  return <div aria-hidden data-footer-spacer className={FOOTER_HEIGHT_CLASS} />;
 }

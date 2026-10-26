@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ArrowRight, ArrowUpRight } from "lucide-react";
@@ -26,12 +27,35 @@ const T = HERO_TRAY;
 /** A row photograph is 3200 x 172 px; the depth tag takes its left 4.7 % and the tray rail its lower third. */
 const ROW = { w: 3200, h: 172, left: 0.047, keep: 0.66 };
 
-/** A window onto one row of core: `from`..`to` are fractions of the row's length (after the depth tag). */
-function RowStrip({ src, from = 0, to = 1, className, label }: { src: string; from?: number; to?: number; className?: string; label?: string }) {
+/** A row photograph as a background: phones get the 2000 px cut (`-sm.webp`), md and up the full 3200 px.
+ * Only the one the breakpoint picks is downloaded. */
+const ROW_BG = "bg-(image:--row-sm) md:bg-(image:--row)";
+function rowBg(src: string) {
+  return { "--row": `url(${src})`, "--row-sm": `url(${src.replace(/\.webp$/, "-sm.webp")})` } as CSSProperties;
+}
+
+/** True once `ref` comes within a screen of the viewport (never during the server render or first paint),
+ * so pictures load after the page is up, and those below the fold only on the way down. */
+function useNear<T extends Element>() {
+  const ref = useRef<T>(null);
+  const [near, setNear] = useState(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const io = new IntersectionObserver(([e]) => { if (e.isIntersecting) { setNear(true); io.disconnect(); } }, { rootMargin: "100% 0px" });
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+  return [ref, near] as const;
+}
+
+/** A window onto one row of core: `from`..`to` are fractions of the row's length (after the depth tag).
+ * Until `load`, the strip keeps its size with no picture (the ink behind it shows). */
+function RowStrip({ src, from = 0, to = 1, className, label, load = true }: { src: string; from?: number; to?: number; className?: string; label?: string; load?: boolean }) {
   const span = (1 - ROW.left) * (to - from), start = ROW.left + (1 - ROW.left) * from;
   return (
-    <div role={label ? "img" : undefined} aria-label={label} aria-hidden={label ? undefined : true} className={cn("w-full bg-no-repeat", className)}
-      style={{ backgroundImage: `url(${src})`, backgroundSize: `${100 / span}% auto`, backgroundPosition: `${span >= 1 ? 0 : (start / (1 - span)) * 100}% 0`,
+    <div role={label ? "img" : undefined} aria-label={label} aria-hidden={label ? undefined : true} className={cn("w-full bg-no-repeat", load && ROW_BG, className)}
+      style={{ ...(load ? rowBg(src) : {}), backgroundSize: `${100 / span}% auto`, backgroundPosition: `${span >= 1 ? 0 : (start / (1 - span)) * 100}% 0`,
         aspectRatio: `${ROW.w * span} / ${ROW.h * ROW.keep}` }} />
   );
 }
@@ -56,25 +80,30 @@ const GROUPS = [...new Set(T.rows.flatMap((r) => r.bins.map((b) => b[1] as strin
 export function CoreHero() {
   const { base } = useChrome();
   const still = useReducedMotion();
+  // the rows are requested once the page is up, so the headline paints first instead of queueing behind ~300 KB of core
+  const [trayRef, near] = useNear<HTMLDivElement>();
   return (
     // the navbar's glass sits on paper, as on the platform's landing; the core table fills the rest of the screen
     <section id="top" aria-label="CoreFlagging" className="bg-paper pt-[72px] md:pt-[80px]">
-    <div className="relative h-[calc(100dvh-72px)] min-h-[560px] overflow-hidden bg-ink text-white md:h-[calc(100dvh-80px)]">
+    <div ref={trayRef} className="relative h-[calc(100dvh-72px)] min-h-[560px] overflow-hidden bg-ink text-white md:h-[calc(100dvh-80px)]">
       <style>{`@keyframes ct-reveal{from{clip-path:inset(0 100% 0 0)}to{clip-path:inset(0 0 0 0)}}.ct-reveal{animation:ct-reveal 2.8s cubic-bezier(.4,0,.2,1) .6s both}@media (prefers-reduced-motion:reduce){.ct-reveal{animation:none}}`}</style>
       {/* the tray: wider than the screen, so the core reads large; drifts very slowly sideways */}
       <motion.div aria-hidden className="absolute inset-x-0 top-3 flex flex-col gap-3 md:top-4 md:gap-4"
         initial={{ x: 0 }} animate={still ? undefined : { x: "-6vw" }} transition={{ duration: 40, ease: "linear" }}>
         {[...T.rows, ...T.rows].map((r, i) => (
           <div key={i} className="w-[260vw] md:w-[150vw]">
-            <RowStrip src={r.img} />
+            <RowStrip src={r.img} load={near} />
             <Readings row={r} className="ct-reveal mt-1.5" />
           </div>
         ))}
       </motion.div>
       {!still && (
-        <motion.div aria-hidden className="pointer-events-none absolute inset-y-0 w-px bg-cyan shadow-[0_0_22px_5px_rgba(0,196,245,0.55)]"
-          initial={{ left: "0%", opacity: 1 }} animate={{ left: "100%", opacity: 0 }}
-          transition={{ left: { duration: 2.8, delay: 0.6, ease: [0.4, 0, 0.2, 1] }, opacity: { duration: 0.4, delay: 3.2 } }} />
+        // a full-width carrier slid by transform (a moving `left` would count as layout shift), the line at its left edge
+        <motion.div aria-hidden className="pointer-events-none absolute inset-0"
+          initial={{ x: "0%", opacity: 1 }} animate={{ x: "100%", opacity: 0 }}
+          transition={{ x: { duration: 2.8, delay: 0.6, ease: [0.4, 0, 0.2, 1] }, opacity: { duration: 0.4, delay: 3.2 } }}>
+          <div className="absolute inset-y-0 left-0 w-px bg-cyan shadow-[0_0_22px_5px_rgba(0,196,245,0.55)]" />
+        </motion.div>
       )}
       {/* shade for the lockup */}
       <div aria-hidden className="absolute inset-0 bg-linear-to-t from-ink via-ink/75 via-45% to-ink/10" />
@@ -103,15 +132,15 @@ export function CoreHero() {
             <div className="hidden items-center gap-3 md:flex">
               <a href="https://nlp-tlp.org/" target="_blank" rel="noopener noreferrer" aria-label="UWA Centre for Natural and Technical Language Processing">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src="/ntlp-logo.png" alt="" className="size-14 rounded-full ring-1 ring-white/20" />
+                <img src="/ntlp-logo.png" alt="" width={56} height={56} loading="lazy" decoding="async" className="size-14 rounded-full ring-1 ring-white/20" />
               </a>
               <a href="https://criticalresources.org.au/" target="_blank" rel="noopener noreferrer" aria-label="ARC Training Centre in Critical Resources for the Future" className="flex h-14 items-center rounded-lg bg-white px-3 ring-1 ring-white/20">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src="/critical-resources-logo.svg" alt="" className="h-9 w-auto" />
+                <img src="/critical-resources-logo.svg" alt="" width={146} height={36} loading="lazy" decoding="async" className="h-9 w-auto" />
               </a>
               <a href="https://www.dmirs.wa.gov.au/gswa" target="_blank" rel="noopener noreferrer" aria-label="Geological Survey of Western Australia, Department of Mines, Petroleum and Exploration" className="flex h-14 items-center gap-2.5 rounded-lg bg-white px-3 ring-1 ring-white/20">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src="/gswa-logo.png" alt="" className="h-11 w-11" />
+                <img src="/gswa-logo.png" alt="" width={44} height={44} loading="lazy" decoding="async" className="h-11 w-11" />
                 <span className="text-[11px] font-semibold leading-tight text-slate-800">Geological Survey of<br />Western Australia</span>
               </a>
             </div>
@@ -170,14 +199,14 @@ export function CoreIntro() {
 }
 
 /** A card's picture: the tray's rows stacked, each a window onto a different stretch of core. */
-function TrayPicture({ offset }: { offset: number }) {
+function TrayPicture({ offset, load }: { offset: number; load: boolean }) {
   return (
     <div aria-hidden className="absolute inset-x-0 top-0 flex flex-col gap-2 bg-ink pt-4">
       {T.rows.map((r, i) => {
         const a = ((offset + i * 0.13) % 0.7);
         return (
           <div key={r.from}>
-            <RowStrip src={r.img} from={a} to={a + 0.3} />
+            <RowStrip src={r.img} from={a} to={a + 0.3} load={load} />
             <Readings row={r} from={a} to={a + 0.3} className="mt-1" />
           </div>
         );
@@ -196,8 +225,9 @@ const FEATURES: { title: string; body: string; offset: number; tint: string; to:
 /** What you can do: four large picture cards, title at the foot, as on the platform's landing page. */
 export function CoreFeatures() {
   const { base } = useChrome();
+  const [ref, near] = useNear<HTMLElement>();
   return (
-    <section id="what" className="scroll-mt-24 bg-paper pb-16 md:pb-24">
+    <section ref={ref} id="what" className="scroll-mt-24 bg-paper pb-16 md:pb-24">
       <div className="container-site">
         <Reveal>
           <h2 className="max-w-4xl font-display text-2xl font-medium tracking-tight text-balance text-ink md:text-4xl">What you can do with it.</h2>
@@ -210,7 +240,7 @@ export function CoreFeatures() {
                 from sm up, the words sit on a solid panel in the card's colour, which fades up into the core */}
             <Link href={`${base}/${f.to}`} style={{ background: f.tint }} className="group relative block overflow-hidden rounded-3xl focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-blue max-sm:flex max-sm:flex-col sm:aspect-[4/5]">
               <div className="relative h-44 overflow-hidden sm:absolute sm:inset-0 sm:h-auto">
-                <div className="absolute inset-0 transition-transform duration-700 ease-out group-hover:scale-[1.03]"><TrayPicture offset={f.offset} /></div>
+                <div className="absolute inset-0 transition-transform duration-700 ease-out group-hover:scale-[1.03]"><TrayPicture offset={f.offset} load={near} /></div>
                 <div aria-hidden className="absolute inset-x-0 bottom-0 h-16 sm:hidden" style={{ background: `linear-gradient(to top, ${f.tint}, ${f.tint}00)` }} />
               </div>
               <div aria-hidden className="absolute inset-0 max-sm:hidden" style={{ background: `linear-gradient(to top, ${f.tint} 0%, ${f.tint} 44%, ${f.tint}00 64%)` }} />
@@ -228,12 +258,14 @@ export function CoreFeatures() {
 
 /** A full-bleed band of real core between sections: consecutive rows of one tray. */
 export function CoreRun({ rows, caption }: { rows: string[]; caption: string }) {
+  // well below the fold: the rows load as it nears the screen; until then the band is its ink colour, at full size
+  const [ref, near] = useNear<HTMLElement>();
   return (
-    <figure className="m-0 bg-ink">
+    <figure ref={ref} className="m-0 bg-ink">
       <div className="flex flex-col gap-[3px] py-[3px]">
         {rows.map((src) => (
-          <div key={src} role="img" aria-label={`Drill core, ${caption}`} className="w-full bg-no-repeat"
-            style={{ backgroundImage: `url(${src})`, backgroundSize: `${100 / (1 - 0.057)}% auto`, backgroundPosition: "100% 0", aspectRatio: `${3200 * (1 - 0.057)} / ${172 * 0.62}` }} />
+          <div key={src} role="img" aria-label={`Drill core, ${caption}`} className={cn("w-full bg-no-repeat", near && ROW_BG)}
+            style={{ ...(near ? rowBg(src) : {}), backgroundSize: `${100 / (1 - 0.057)}% auto`, backgroundPosition: "100% 0", aspectRatio: `${3200 * (1 - 0.057)} / ${172 * 0.62}` }} />
         ))}
       </div>
       <figcaption className="container-site py-2 text-xs text-white/60">{caption}</figcaption>
@@ -283,16 +315,16 @@ export function CoreTeam() {
           <div className="flex flex-wrap items-center gap-x-8 gap-y-4">
             <a href="https://nlp-tlp.org/" target="_blank" rel="noopener noreferrer" className="flex items-center gap-3">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/ntlp-logo.png" alt="" className="size-12 rounded-full" />
+              <img src="/ntlp-logo.png" alt="" width={48} height={48} loading="lazy" decoding="async" className="size-12 rounded-full" />
               <span className="max-w-[17rem] text-[15px] leading-snug text-ink-soft">UWA Centre for Natural and Technical Language Processing</span>
             </a>
             <a href="https://criticalresources.org.au/" target="_blank" rel="noopener noreferrer" aria-label="ARC Training Centre in Critical Resources for the Future">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/critical-resources-logo.svg" alt="" className="h-10 w-auto" />
+              <img src="/critical-resources-logo.svg" alt="" width={162} height={40} loading="lazy" decoding="async" className="h-10 w-auto" />
             </a>
             <a href="https://www.dmirs.wa.gov.au/gswa" target="_blank" rel="noopener noreferrer" aria-label="Geological Survey of Western Australia, Department of Mines, Petroleum and Exploration" className="flex h-12 items-center gap-2.5">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/gswa-logo.png" alt="" className="h-10 w-10" />
+              <img src="/gswa-logo.png" alt="" width={40} height={40} loading="lazy" decoding="async" className="h-10 w-10" />
               <span className="text-[11px] font-semibold leading-tight text-slate-800">Geological Survey of<br />Western Australia</span>
             </a>
           </div>
@@ -301,7 +333,7 @@ export function CoreTeam() {
           {CORE_TEAM.map((m) => (
             <li key={m.name} className="flex w-[300px] shrink-0 snap-start flex-col rounded-3xl border border-line bg-white p-6 md:w-auto">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={m.img} alt={m.name} className="size-20 rounded-full object-cover" />
+              <img src={m.img} alt={m.name} width={80} height={80} loading="lazy" decoding="async" className="size-20 rounded-full object-cover" />
               <div className="mt-4 flex flex-wrap items-center gap-2">
                 <span className="font-display text-lg font-semibold text-ink">{m.name}</span>
                 {m.leader && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-700">{t("team.leader")}</span>}
@@ -333,12 +365,10 @@ export function CoreHow() {
         <Reveal><h2 className="font-display text-2xl font-medium tracking-tight text-ink md:text-4xl">How it works</h2></Reveal>
         <ol className="mt-8 grid gap-4 sm:grid-cols-2">
           {STEPS.map(([t, b], i) => (
-            <Reveal key={t} delay={i * 0.06}>
-              <li className="flex h-full flex-col rounded-3xl border border-line bg-white p-6">
-                <span className="font-display text-sm font-semibold text-ink-soft tabular-nums">{i + 1}</span>
-                <p className="mt-3 font-display text-xl font-semibold text-ink">{t}</p>
-                <p className="mt-2 text-[15px] leading-relaxed text-ink-soft">{b}</p>
-              </li>
+            <Reveal as="li" key={t} delay={i * 0.06} className="flex h-full flex-col rounded-3xl border border-line bg-white p-6">
+              <span className="font-display text-sm font-semibold text-ink-soft tabular-nums">{i + 1}</span>
+              <p className="mt-3 font-display text-xl font-semibold text-ink">{t}</p>
+              <p className="mt-2 text-[15px] leading-relaxed text-ink-soft">{b}</p>
             </Reveal>
           ))}
         </ol>
@@ -364,11 +394,9 @@ export function CoreFound() {
         </div>
         <dl className="mt-8 grid gap-x-10 sm:grid-cols-2">
           {FOUND.map(([t, n, b]) => (
-            <Reveal key={t}>
-              <div className="border-t border-line py-6">
-                <dt><span className="block text-[13px] font-medium uppercase tracking-wide text-ink-soft">{t}</span><span className="mt-1 block font-display text-3xl font-semibold tracking-tight text-ink tabular-nums md:text-4xl">{n}</span></dt>
-                <dd className="mt-3 max-w-[52ch] text-[15px] leading-relaxed text-ink-soft">{b}</dd>
-              </div>
+            <Reveal key={t} className="border-t border-line py-6">
+              <dt><span className="block text-[13px] font-medium uppercase tracking-wide text-ink-soft">{t}</span><span className="mt-1 block font-display text-3xl font-semibold tracking-tight text-ink tabular-nums md:text-4xl">{n}</span></dt>
+              <dd className="mt-3 max-w-[52ch] text-[15px] leading-relaxed text-ink-soft">{b}</dd>
             </Reveal>
           ))}
         </dl>
