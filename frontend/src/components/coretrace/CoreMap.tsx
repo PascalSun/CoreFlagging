@@ -132,6 +132,21 @@ export function CoreMap({ holes, colour, card, selected, onSelect, padRight, pad
       map.once("remove", () => ro?.disconnect());
       const corner = map.getContainer().querySelector(".mapboxgl-ctrl-bottom-left") as HTMLElement | null;
       if (corner) corner.style.left = `${padLeftRef.current}px`;
+      // A deep link from another app (the Geo Data Platform's "Explore in CoreFlagging"): ?lon&lat(&r km)(&bbox=w,s,e,n).
+      // The map opens on that place, marked (and its radius drawn), close enough to click the holes around it.
+      const q = new URLSearchParams(window.location.search);
+      const aLon = Number(q.get("lon")), aLat = Number(q.get("lat")), aKm = Number(q.get("r"));
+      const bbox = q.get("bbox")?.split(",").map(Number);
+      const arrived = q.has("lon") && q.has("lat") && Number.isFinite(aLon) && Number.isFinite(aLat);
+      const arrival: any = { type: "FeatureCollection", features: arrived ? [
+        { type: "Feature", geometry: { type: "Point", coordinates: [aLon, aLat] }, properties: {} },
+        ...(aKm > 0 ? ring(aLon, aLat, aKm).features : []),
+      ] : [] };
+      const arrive = () => {
+        if (bbox && bbox.length === 4 && bbox.every(Number.isFinite)) fit(map, [[bbox[0], bbox[1]], [bbox[2], bbox[3]]], { maxZoom: 12, duration: 0,
+          padding: map.getContainer().clientWidth > 900 ? { top: 60, bottom: 60, left: padLeftRef.current + 40, right: padRight + 40 } : 24 });
+        else if (arrived) map.jumpTo({ center: [aLon, aLat], zoom: Number(q.get("z")) || 10 });
+      };
       const tip = new mapboxgl.Popup({ closeButton: false, closeOnClick: false, className: "ct-popup", offset: 12, maxWidth: "none" });
       // the holes' layers go on whichever basemap is showing: a change of basemap replaces the whole style, so they
       // are added again each time a style has loaded (the click and hover handlers, bound by layer id, carry over)
@@ -150,6 +165,11 @@ export function CoreMap({ holes, colour, card, selected, onSelect, padRight, pad
         map.addSource("ring", { type: "geojson", data: ringRef.current });
         map.addLayer({ id: "ring-fill", type: "fill", source: "ring", paint: { "fill-color": "#00c4f5", "fill-opacity": 0.08 } });
         map.addLayer({ id: "ring-line", type: "line", source: "ring", paint: { "line-color": "#00c4f5", "line-width": 1.5, "line-dasharray": [2, 2] } });
+        // where a deep link arrived: the place and its radius, under the holes so the holes around it stay clickable
+        map.addSource("arrival", { type: "geojson", data: arrival });
+        map.addLayer({ id: "arrival-area", type: "line", source: "arrival", filter: ["==", ["geometry-type"], "Polygon"], paint: { "line-color": "#D9772B", "line-width": 1.5, "line-dasharray": [2, 2] } });
+        map.addLayer({ id: "arrival-pt", type: "circle", source: "arrival", filter: ["==", ["geometry-type"], "Point"], paint: {
+          "circle-radius": 6, "circle-color": "#D9772B", "circle-stroke-width": 2.5, "circle-stroke-color": "#ffffff" } });
         // holes still waiting are faint pinpricks underneath; every processed hole is a coloured mark with a fine
         // white edge, lifted off the imagery by a soft dark halo, that grows under the pointer
         map.addLayer({ id: "holes-wait", type: "circle", source: "holes-waiting", paint: {
@@ -208,6 +228,7 @@ export function CoreMap({ holes, colour, card, selected, onSelect, padRight, pad
         });
         map.on("mouseleave", LAYERS, () => { map.getCanvas().style.cursor = ""; tip.remove(); hover(null); });
         readyRef.current = true;
+        arrive();
         // the list may have arrived between the style loading (when the source was made) and now, when the effect
         // below still saw the map as not ready: bring the source up to date
         map.getSource("holes")?.setData(features(holesRef.current, colourRef.current)); map.getSource("holes-waiting")?.setData(waiting(holesRef.current));
@@ -237,19 +258,6 @@ export function CoreMap({ holes, colour, card, selected, onSelect, padRight, pad
     if (readyRef.current) apply(); else map.once("load", apply);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fitTo]);
-
-  // A deep link from another app (the Geo Data Platform's "Explore in CoreFlagging"): ?bbox=w,s,e,n
-  // fits that box, else ?lon&lat(&z) flies there. Applied once, after the first view.
-  useEffect(() => {
-    const map = mapRef.current; if (!map) return;
-    const q = new URLSearchParams(window.location.search);
-    const bbox = q.get("bbox")?.split(",").map(Number); const lon = Number(q.get("lon")), lat = Number(q.get("lat"));
-    const go = () => {
-      if (bbox && bbox.length === 4 && bbox.every(Number.isFinite)) fit(map, [[bbox[0], bbox[1]], [bbox[2], bbox[3]]], { padding: 40, maxZoom: 11, duration: 0 });
-      else if (Number.isFinite(lon) && Number.isFinite(lat) && q.has("lon")) map.jumpTo({ center: [lon, lat], zoom: Number(q.get("z")) || 9 });
-    };
-    if (readyRef.current) go(); else map.once("load", go);
-  }, []);
 
   const key = selected?.key ?? null; const lon = selected?.lon ?? null; const lat = selected?.lat ?? null;
   useEffect(() => {
