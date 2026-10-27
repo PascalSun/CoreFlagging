@@ -6,6 +6,7 @@
 
 - [Home](https://coreflagging.nlp-tlp.org/): what CoreFlagging is, how it works, what it found, and what to keep in mind when reading it.
 - [Map](https://coreflagging.nlp-tlp.org/map): every scanned hole on one map; open any hole for its readings, trays, findings, reports and full log, or upload a scan of your own.
+- [FAQ](https://coreflagging.nlp-tlp.org/faq): short answers on what CoreFlagging reads, how HyFormer works, accuracy and limits, uploading a scan, reports, licences and who built it.
 
 ## What it does
 

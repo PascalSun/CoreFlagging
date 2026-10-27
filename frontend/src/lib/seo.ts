@@ -17,6 +17,7 @@ export const KEYWORDS = [
 export const PAGES: [string, "daily" | "weekly" | "monthly", number][] = [
   ["/", "weekly", 1],
   ["/map", "weekly", 0.9],
+  ["/faq", "monthly", 0.7],
 ];
 
 /** The 1200×630 share image (a capture of the landing page's hero), for link previews on LinkedIn, WeChat, Slack, X. */
