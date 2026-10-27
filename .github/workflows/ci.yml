@@ -32,5 +32,6 @@ jobs:
       - run: bun install --frozen-lockfile
       - run: bunx tsc --noEmit -p .
       - run: bunx eslint src
+      - run: bun run test
       - run: bun run build
         env: { NEXT_PUBLIC_PLATFORM_URL: https://platform.nlp-tlp.org, NEXT_PUBLIC_BUILD_ID: ci }
