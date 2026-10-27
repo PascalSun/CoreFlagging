@@ -15,10 +15,11 @@ const row = (i: number, o: Partial<IndexRow> = {}): IndexRow => ({
 const many = (n: number, o: Partial<IndexRow> = {}) => Array.from({ length: n }, (_, i) => row(i, o));
 
 describe("config", () => {
-  test("only WA is published by default, and the check ignores case", () => {
-    expect(ENABLED_STATES).toEqual(["WA"]);
+  test("every State is published by default, and the check ignores case", () => {
+    expect(ENABLED_STATES).toEqual(["WA", "SA", "NSW", "NT", "QLD", "TAS", "VIC", "CSIRO"]);
     expect(stateEnabled("wa")).toBe(true);
-    expect(stateEnabled("SA")).toBe(false);
+    expect(stateEnabled("sa")).toBe(true);
+    expect(stateEnabled("XX")).toBe(false);
   });
 });
 
