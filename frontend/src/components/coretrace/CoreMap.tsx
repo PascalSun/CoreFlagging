@@ -167,7 +167,11 @@ export function CoreMap({ holes, colour, card, selected, onSelect, padRight, pad
         map.addLayer({ id: "ring-line", type: "line", source: "ring", paint: { "line-color": "#00c4f5", "line-width": 1.5, "line-dasharray": [2, 2] } });
         // where a deep link arrived: the place and its radius, under the holes so the holes around it stay clickable
         map.addSource("arrival", { type: "geojson", data: arrival });
-        map.addLayer({ id: "arrival-area", type: "line", source: "arrival", filter: ["==", ["geometry-type"], "Polygon"], paint: { "line-color": "#D9772B", "line-width": 1.5, "line-dasharray": [2, 2] } });
+        // the platform's circle (a tinted fill, a solid orange edge), with a white casing so it reads on red ground
+        const AREA = ["==", ["geometry-type"], "Polygon"];
+        map.addLayer({ id: "arrival-fill", type: "fill", source: "arrival", filter: AREA, paint: { "fill-color": "#D9772B", "fill-opacity": 0.14 } });
+        map.addLayer({ id: "arrival-casing", type: "line", source: "arrival", filter: AREA, paint: { "line-color": "#ffffff", "line-width": 5, "line-opacity": 0.85 } });
+        map.addLayer({ id: "arrival-area", type: "line", source: "arrival", filter: AREA, paint: { "line-color": "#D9772B", "line-width": 2.5 } });
         map.addLayer({ id: "arrival-pt", type: "circle", source: "arrival", filter: ["==", ["geometry-type"], "Point"], paint: {
           "circle-radius": 6, "circle-color": "#D9772B", "circle-stroke-width": 2.5, "circle-stroke-color": "#ffffff" } });
         // holes still waiting are faint pinpricks underneath; every processed hole is a coloured mark with a fine
