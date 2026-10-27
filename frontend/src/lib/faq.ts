@@ -38,12 +38,12 @@ export const FAQ: Faq[] = [
   {
     id: "accuracy",
     q: "How accurate is CoreFlagging?",
-    a: "Checked against gold assays on 105 holes, its unusual-metre score picks out gold-bearing metres better than the best conventional method: 0.75 against 0.64, where 0.5 is a coin toss. Fine-tuned on logged holes, its rock classification is right 58% of the time on 26 holes it had never seen, against 44% for always guessing the commonest class. Its domain boundaries land within a metre of the geologist's more often than any conventional method (0.45 against 0.39), and its thermal-infrared estimates beat the best conventional method on all 10 test sets. These numbers are from the model's first version.",
+    a: "Checked against gold assays, its unusual-metre score does about as well as the best conventional method, not better: 0.64 against 0.63, where 0.5 is a coin toss. Fine-tuned on logged holes, its rock classification is right 56% of the time on 26 holes it had never seen, against 44% for always guessing the commonest class. Its domain boundaries land within a metre of the geologist's more often than any conventional method (0.43 against 0.39), and its thermal-infrared estimates beat the best conventional method on all 10 test sets, though they are weak on the New South Wales holes. These numbers are from the hackathon evaluation of the model's first version.",
   },
   {
     id: "gold-and-grade",
     q: "Can CoreFlagging find gold or estimate grade?",
-    a: "It points at the metres worth assaying; it gives no grade and replaces no assay. In hole EMSD1138, about 1,000 m long with 13 gold-bearing metres, 100 metres picked at random would turn up about one gold metre, while the 100 metres the model ranks most unusual turn up four. Same assay budget, four times the chance of hitting gold.",
+    a: "No. It points at metres worth a second look; it does not rank gold, gives no grade and replaces no assay. Without assays its unusual-metre score finds gold-bearing metres about as well as conventional methods, not better. In hole EMSD1138, about 1,000 m long with 13 gold-bearing metres, 4 of them fell in the 10% of metres the model ranked highest, about three times what picking at random would find.",
   },
   {
     id: "limits",
