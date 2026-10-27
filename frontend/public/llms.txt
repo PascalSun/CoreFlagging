@@ -7,6 +7,9 @@
 - [Home](https://coreflagging.nlp-tlp.org/): what CoreFlagging is, how it works, what it found, and what to keep in mind when reading it.
 - [Map](https://coreflagging.nlp-tlp.org/map): every scanned hole on one map; open any hole for its readings, trays, findings, reports and full log, or upload a scan of your own.
 - [FAQ](https://coreflagging.nlp-tlp.org/faq): short answers on what CoreFlagging reads, how HyFormer works, accuracy and limits, uploading a scan, reports, licences and who built it.
+- [Drillholes in Western Australia](https://coreflagging.nlp-tlp.org/states/wa): every scanned WA drillhole with a page here, with links by tectonic region and by commodity.
+- Drillhole pages, one per scanned hole, at https://coreflagging.nlp-tlp.org/holes/{state}/{hole} (for example [CD16056](https://coreflagging.nlp-tlp.org/holes/wa/cd16056)): the State survey's record of the hole (collar, year, operator, depth, target), HyFormer's reading of its scan (rock classes, segments, flagged metres, "look again" intervals; model output, never a grade), how it compares with its region, its tray photographs, HyLogger PDFs and WAMEX reports, and nearby holes. Each figure names its source and licence.
+- Hubs: https://coreflagging.nlp-tlp.org/regions/{region} (Western Australian tectonic regions, for example [Eastern Goldfields Superterrane](https://coreflagging.nlp-tlp.org/regions/eastern-goldfields-superterrane)) and https://coreflagging.nlp-tlp.org/commodities/{commodity} (for example [gold](https://coreflagging.nlp-tlp.org/commodities/gold)), listing the holes in each. Every hole page is in the sitemaps listed in robots.txt.
 
 ## What it does
 
