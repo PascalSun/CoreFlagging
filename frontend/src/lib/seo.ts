@@ -53,7 +53,9 @@ export const ORG = {
 
 const DESCRIPTION = "CoreFlagging reads every HyLogger-scanned drillhole the same way and sets its reading beside the geologist's log, so the intervals where they disagree get another look. Checked against logs and chemistry in Western Australia.";
 
-/** Structured data for the landing page: the site, the app, the readings as a Dataset, and who runs it. */
+/** Structured data for the landing page: the site, the app, its readings, and who runs it. The readings are a
+ *  CreativeWork, not a Dataset: no licence for them is published (the site states one only for GSWA's tray photographs,
+ *  CC BY 4.0), and a Dataset without one is flagged by Google. Name a licence here once one is published, and retype. */
 export const JSON_LD = {
   "@context": "https://schema.org",
   "@graph": [
@@ -69,9 +71,9 @@ export const JSON_LD = {
         "An assistant that answers questions about a hole and finds the WAMEX reports behind it",
         "Upload your own scan",
       ] },
-    { "@type": "Dataset", "@id": `${SITE_URL}/#readings`, name: "CoreFlagging readings of Australia's scanned drill core", url: `${SITE_URL}/map`,
+    { "@type": "CreativeWork", "@id": `${SITE_URL}/#readings`, name: "CoreFlagging readings of Australia's scanned drill core", url: `${SITE_URL}/map`,
       description: "HyFormer's reading of the HyLogger-scanned drillholes in the National Virtual Core Library, about 6,600 holes from every State's core library: the mineral the scan reads every 10 cm, rock classification, domain boundaries, the metres that stand out from the core around them, and data-quality problems in the scan.",
       keywords: KEYWORDS, inLanguage: "en", creator: { "@id": ORG["@id"] },
-      spatialCoverage: { "@type": "Place", name: "Australia" } },
+      spatialCoverage: { "@type": "Place", name: "Australia" }, isBasedOn: "https://www.auscope.org.au/nvcl" },
   ],
 };
