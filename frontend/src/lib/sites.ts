@@ -40,8 +40,7 @@ export function coretraceChrome(base: string): Chrome {
       { label: "What it does", href: `${home}#what` },
       { label: "Read with care", href: `${home}#notes` },
       { label: "Team", href: `${home}#team` },
-      { label: "FAQ", href: `${base}/faq` },
-    ],
+    ],                                                  // the FAQ: in the footer's site map
     cta: { label: "Map", href: `${base}/map` },
     footerCta: { label: "Open the Map", href: `${base}/map` },
     sitemap: [
