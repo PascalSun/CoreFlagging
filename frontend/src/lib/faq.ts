@@ -13,17 +13,17 @@ export const FAQ: Faq[] = [
   {
     id: "what-is-coreflagging",
     q: "What is CoreFlagging?",
-    a: "CoreFlagging is a second opinion on every metre of drill core. It reads every HyLogger-scanned drillhole in Australia's core libraries, about 6,600 holes in the National Virtual Core Library, the same way, with a core-spectra foundation model called HyFormer. It sets that reading beside the geologist's log, so the intervals where the core and the log disagree get another look. Every hole is on the [map](/map).",
+    a: "CoreFlagging is a second opinion on every metre of drill core. It reads HyLogger-scanned drillholes from Australia's core libraries, more than 6,600 holes in the National Virtual Core Library, the same way, with a core-spectra foundation model called HyFormer. It sets that reading beside the geologist's log, so the intervals where the core and the log disagree get another look. Browse the holes on the [map](/map).",
   },
   {
     id: "what-data",
     q: "What data does CoreFlagging use?",
-    a: "HyLogger scans from the National Virtual Core Library. A HyLogger records a spectrum about every centimetre of core: the visible to short-wave infrared (0.4–2.5 µm) picks up iron oxides, clays, micas, chlorite, carbonates and talc, and the thermal infrared (6–14.5 µm) picks up quartz and feldspar. The scans are cleaned the same way for every hole and averaged over 10 cm intervals. The tray photographs from the Geological Survey of Western Australia are shown beside them.",
+    a: "HyLogger scans from the National Virtual Core Library. A HyLogger records a spectrum about every centimetre of core: the visible to short-wave infrared (0.4–2.5 µm) picks up iron oxides, clays, micas, chlorite, carbonates and talc, and the thermal infrared (6–14.5 µm) picks up quartz and feldspar. The scans are cleaned the same way for every hole and averaged over 10 cm intervals. Where a hole has tray photographs, they are shown beside the scan.",
   },
   {
     id: "coverage",
     q: "Which drillholes and States does CoreFlagging cover?",
-    a: "Every State's core library in the National Virtual Core Library, about 6,600 holes in all: 1,898 in Western Australia, 1,833 in South Australia, 1,269 in New South Wales, 562 in the Northern Territory, 540 in Queensland, 496 in Tasmania, 29 in Victoria and 5 from CSIRO. Every hole is read the same way, but the results have been checked against logs and chemistry in Western Australia only.",
+    a: "Every State's core library in the National Virtual Core Library, more than 6,600 holes in all. In October 2026 that was 1,898 in Western Australia, 1,833 in South Australia, 1,269 in New South Wales, 562 in the Northern Territory, 540 in Queensland, 496 in Tasmania, 29 in Victoria and 5 from CSIRO. Holes from other States are read the same way, but the results have been checked against logs and chemistry in Western Australia only.",
   },
   {
     id: "how-does-hyformer-work",
@@ -33,12 +33,12 @@ export const FAQ: Faq[] = [
   {
     id: "what-does-it-find",
     q: "What does CoreFlagging tell me about a drillhole?",
-    a: "For every hole it classifies each 10 cm into one of 12 rock classes, from ultramafic to regolith, and flags the metres that stand out from the core around them, the metres most worth assaying. It draws domain boundaries where the rock changes, from the spectra alone, and estimates the thermal infrared for older scans that only measured the short-wave infrared. It also finds core like a chosen interval or hole, nearby or across the State, by similarity in HyFormer's representation rather than in the logs.",
+    a: "For each hole the model has read, it sorts each 10 cm into one of 12 rock classes, groups of minerals such as quartz + chlorite or carbonate, and flags the metres that stand out from the core around them, the metres most worth assaying. It draws domain boundaries where the rock changes, from the spectra alone, and estimates the thermal infrared for older scans that only measured the short-wave infrared. It also finds core like a chosen interval or hole, nearby or across the State, by similarity in HyFormer's representation rather than in the logs.",
   },
   {
     id: "accuracy",
     q: "How accurate is CoreFlagging?",
-    a: "Checked against gold assays on 105 holes, its unusual-metre score picks out gold-bearing metres better than the best conventional method: 0.75 against 0.64, where 0.5 is a coin toss. Its rock classification is right 58% of the time on 26 holes it had never seen, against 44% for always guessing the commonest class. Its domain boundaries land within a metre of the geologist's more often than any conventional method (0.45 against 0.39), and its thermal-infrared estimates beat the best conventional method on all 10 test sets. These numbers are from the model's first version, measured in Western Australia.",
+    a: "Checked against gold assays on 105 holes, its unusual-metre score picks out gold-bearing metres better than the best conventional method: 0.75 against 0.64, where 0.5 is a coin toss. Fine-tuned on logged holes, its rock classification is right 58% of the time on 26 holes it had never seen, against 44% for always guessing the commonest class. Its domain boundaries land within a metre of the geologist's more often than any conventional method (0.45 against 0.39), and its thermal-infrared estimates beat the best conventional method on all 10 test sets. These numbers are from the model's first version.",
   },
   {
     id: "gold-and-grade",
@@ -63,7 +63,7 @@ export const FAQ: Faq[] = [
   {
     id: "report",
     q: "Can I download a report for a drillhole?",
-    a: "Yes. Every hole has a PDF report with the data-quality problems found in the scan, the intervals that stand out and why, the metres most worth assaying, the rock classification down the hole and the domain boundaries. The data-quality problems also download as a CSV file, so the relevant parties can review them. Open any hole on the [map](/map) to get its report.",
+    a: "Yes. Open a hole on the [map](/map) and its Report tab makes a PDF report. For a hole the model has read, it covers the data-quality problems found in the scan, the intervals that stand out and why, the metres most worth assaying, the rock classification down the hole and the domain boundaries. The data-quality problems also download as a CSV file, so the relevant parties can review them.",
   },
   {
     id: "licence",
