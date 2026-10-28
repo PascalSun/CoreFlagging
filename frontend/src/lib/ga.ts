@@ -1,7 +1,7 @@
 // Google Analytics 4. The measurement ID is public (it ships in every page), so it is committed here, the one place
 // it is set. NEXT_PUBLIC_GA_ID overrides it at build time; set it to an empty value to build without analytics.
 
-export const GA_MEASUREMENT_ID = "G-BQK1R4CS7C";
+export const GA_MEASUREMENT_ID = "G-ZCGVJ94FVV";
 
 const ID_FORMAT = /^G-[A-Z0-9]+$/;
 
