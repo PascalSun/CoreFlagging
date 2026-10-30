@@ -364,7 +364,7 @@ export function CoreHow() {
       <div className="container-site">
         <Reveal><h2 className="font-display text-2xl font-medium tracking-tight text-ink md:text-4xl">How it works</h2></Reveal>
         {/* the whole of it in six minutes: how a scan becomes a reading (original data, our cleaning, our model), then a real session on this site */}
-        <figure className="mx-auto mt-8 max-w-3xl">
+        <figure className="mx-auto mt-8 max-w-5xl">
           <video src="/video/coreflagging-demo.mp4" poster="/video/coreflagging-demo.jpg" controls playsInline preload="none"
             className="aspect-[16/10] w-full rounded-3xl bg-ink ring-1 ring-line" aria-label="CoreFlagging demo: how the scanner reads the core, how every hole is cleaned, how HyFormer learns by filling in blanks and what it reads, then the map, a hole's log, similar core, compare, the report, 3D and the assistant" />
           <figcaption className="mt-3 text-center text-[13.5px] text-ink-soft">How it works, then a real session on this site: the scanner&rsquo;s original data, our cleaning and our model, kept apart; then the map, one hole metre by metre, similar core, compare, the report, 3D and the assistant.</figcaption>
