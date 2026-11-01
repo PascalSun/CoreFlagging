@@ -39,6 +39,9 @@ services:
         NEXT_PUBLIC_BUILD_ID: ${NEXT_PUBLIC_BUILD_ID:-manual}
     image: coretrace-web
     container_name: geo-coretrace-web
+    # a ceiling, so a leak restarts this container, never the server (2 Nov 2026: 15 GB under Bun)
+    mem_limit: 3g
+    memswap_limit: 3g
     env_file: .env                   # OPENROUTER_API_KEY, PLATFORM_API_TOKEN, PLATFORM_API_URL for the assistant's route
     environment:
       PLATFORM_API_URL: ${PLATFORM_API_URL:-http://platform:8000}
