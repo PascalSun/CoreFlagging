@@ -16,17 +16,72 @@
   --shadow-glass: 0 8px 40px rgba(15, 23, 42, 0.12);
   --shadow-glass-sm: 0 6px 24px rgba(15, 23, 42, 0.12);
 
-  /* landing-page (template) tokens — additive; used only by the home page
-     chrome under src/components/landing/ */
-  --color-ink: #111111;
-  --color-ink-soft: #404040;
-  --color-paper: #f4f4f4;
-  --color-line: #e5e5e5;
   --color-blue: #0099ff;
   --color-blue-deep: #0099cc;
   --color-cyan: #00c4f5;
   --color-orange: #ff6b35;
   --font-display: var(--font-manrope);
+}
+
+/* landing-page (template) tokens, used by the landing chrome under src/components/landing/ and the home page. Not
+   inline: the utilities read them through var(), so a scope can re-tone a whole page (.core-night below). */
+@theme {
+  --color-ink: #111111;
+  --color-ink-soft: #404040;
+  --color-paper: #f4f4f4;
+  --color-line: #e5e5e5;
+  --color-card: #ffffff;        /* a card on the paper */
+  --color-night: #111111;       /* always dark: the tray behind the core, the video frame */
+  --color-note: #fef3c7;        /* a caution (model output, outside WA) */
+  --color-note-ink: #78350f;
+}
+
+/* The home page by day and by night. Day is the template above. Night is the colour of a core shed: a near-black
+   slate ground with a cold blue-green cast (the tray photographs' own shadows), cards a step lighter, ink turned
+   to chalk. Night applies when the device asks for it and no choice was saved, or when night was chosen
+   (html[data-theme], set before paint by lib/theme.ts). Everything inside reads the same tokens; the browser's
+   own bar and the rubber-band overscroll take the same ground (theme-color, html background below). The core
+   photographs and the mineral colours are never re-toned in either mode. */
+.core-theme { color-scheme: light; }
+html[data-theme="dark"] .core-theme {
+  color-scheme: dark;
+  --color-paper: #0b1215;
+  --color-card: #121c20;
+  --color-ink: #e7eef0;
+  --color-ink-soft: #98a9ae;
+  --color-line: #1f2d32;
+  --color-night: #060a0c;
+  --color-note: rgb(245 158 11 / 0.14);
+  --color-note-ink: #fcd34d;
+}
+@media (prefers-color-scheme: dark) {
+  html:not([data-theme="light"]) .core-theme {
+    color-scheme: dark;
+    --color-paper: #0b1215;
+    --color-card: #121c20;
+    --color-ink: #e7eef0;
+    --color-ink-soft: #98a9ae;
+    --color-line: #1f2d32;
+    --color-night: #060a0c;
+    --color-note: rgb(245 158 11 / 0.14);
+    --color-note-ink: #fcd34d;
+  }
+}
+/* a pane that keeps the light template inside the dark page (the cyan menu overlay) */
+.core-light {
+  color-scheme: light;
+  --color-note: #fef3c7;
+  --color-note-ink: #78350f;
+  --color-paper: #f4f4f4;
+  --color-card: #ffffff;
+  --color-ink: #111111;
+  --color-ink-soft: #404040;
+  --color-line: #e5e5e5;
+}
+html:has(.core-theme), html:has(.core-theme) body { background: #f4f4f4; }
+html[data-theme="dark"]:has(.core-theme), html[data-theme="dark"]:has(.core-theme) body { background: #0b1215; }
+@media (prefers-color-scheme: dark) {
+  html:not([data-theme="light"]):has(.core-theme), html:not([data-theme="light"]):has(.core-theme) body { background: #0b1215; }
 }
 
 /* landing-page utilities (template) */
@@ -39,6 +94,17 @@
   }
   .label-caps {
     @apply font-display text-xs font-semibold tracking-[0.12em] uppercase;
+  }
+  /* keep a bar's content clear of the notch and the rounded corners in landscape (viewport-fit=cover) */
+  .safe-x {
+    padding-left: max(1.25rem, env(safe-area-inset-left));
+    padding-right: max(1.25rem, env(safe-area-inset-right));
+  }
+  @media (min-width: 768px) {
+    .safe-x {
+      padding-left: max(2.5%, env(safe-area-inset-left));
+      padding-right: max(2.5%, env(safe-area-inset-right));
+    }
   }
 }
 

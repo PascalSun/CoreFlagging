@@ -87,7 +87,8 @@ export function Footer({ chrome = groundworkChrome }: { chrome?: Chrome }) {
   return (
     <footer
       className={cn(
-        "fixed inset-x-0 bottom-0 z-0 flex flex-col justify-between overflow-hidden",
+        // the frosted cyan pane keeps the day template's dark ink in both modes (chalk on cyan would not read)
+        "core-light fixed inset-x-0 bottom-0 z-0 flex flex-col justify-between overflow-hidden",
         FOOTER_HEIGHT_CLASS
       )}
     >
@@ -108,7 +109,7 @@ export function Footer({ chrome = groundworkChrome }: { chrome?: Chrome }) {
                   twin swaps in from the left, both with the rhythmic easing
                   (which also plays in reverse on mouse leave). */}
               <span className="relative flex h-10 w-[72px] items-center justify-center overflow-hidden rounded-full bg-ink">
-                <ArrowRight className="size-6 text-white transition-transform duration-700 ease-[cubic-bezier(0.87,0,0.13,1)] group-hover:translate-x-12" />
+                <ArrowRight className="size-6 text-paper transition-transform duration-700 ease-[cubic-bezier(0.87,0,0.13,1)] group-hover:translate-x-12" />
                 <ArrowRight className="absolute size-6 -translate-x-12 text-cyan transition-transform duration-700 ease-[cubic-bezier(0.87,0,0.13,1)] group-hover:translate-x-0" />
               </span>
             </Link>
@@ -125,7 +126,7 @@ export function Footer({ chrome = groundworkChrome }: { chrome?: Chrome }) {
         {/* Push the legal row down, but cap the gap so the middle of the
             footer doesn't feel empty. */}
         <div className="min-h-10 max-h-28 flex-1" />
-        <div className="label-caps flex flex-col justify-between gap-2 pb-10 text-ink/80 md:flex-row">
+        <div className="label-caps flex flex-col justify-between gap-2 pb-[calc(2.5rem+env(safe-area-inset-bottom))] text-ink/80 md:flex-row">
           <p>Copyright 2026 {site.name}. All rights reserved.</p>
           <p className="flex items-center gap-2">
             <Link href="https://geo.nlp-tlp.org/privacy" className="hover:text-ink">

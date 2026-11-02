@@ -13,7 +13,7 @@ export function DataPage({ crumbs, title, lede, ld, children }: {
   crumbs: { name: string; path?: string }[]; title: string; lede?: ReactNode; ld: unknown[]; children: ReactNode;
 }) {
   return (
-    <div className="bg-paper text-ink [font-family:var(--font-jakarta),system-ui,sans-serif]">
+    <div className="core-theme bg-paper text-ink [font-family:var(--font-jakarta),system-ui,sans-serif]">
       {ld.map((x, i) => <script key={i} type="application/ld+json" dangerouslySetInnerHTML={{ __html: ldJson(x) }} />)}
       <CoreNavbar />
       <main className="relative z-10 bg-paper pt-28 pb-20 md:pt-36 md:pb-28">
@@ -50,7 +50,7 @@ export function Section({ id, title, model, sources, children }: { id: string; t
     <section id={id} aria-labelledby={`${id}-h`} className="scroll-mt-28 border-t border-line py-8 lg:grid lg:grid-cols-[minmax(0,2fr)_minmax(0,5fr)] lg:gap-12">
       <div>
         <h2 id={`${id}-h`} className="font-display text-xl font-semibold text-ink md:text-2xl">{title}</h2>
-        {model && <p className="mt-2 inline-block rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-900">Model output</p>}
+        {model && <p className="mt-2 inline-block rounded-full bg-note px-2.5 py-0.5 text-xs font-semibold text-note-ink">Model output</p>}
       </div>
       <div className="mt-3 max-w-[68ch] text-[15px] leading-relaxed text-ink-soft lg:mt-0">
         {children}

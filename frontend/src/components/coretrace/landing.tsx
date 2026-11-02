@@ -20,7 +20,7 @@ import { cn } from "@/lib/utils";
 // The picture here is the thing itself: a real tray of core, with what the scan read under each row.
 
 function useChrome() { const base = coretraceBase(usePathname()); return { base, chrome: coretraceChrome(base) }; }
-export function CoreNavbar() { return <Navbar chrome={useChrome().chrome} />; }
+export function CoreNavbar() { return <Navbar chrome={useChrome().chrome} themeToggle />; }
 export function CoreFooter() { return <Footer chrome={useChrome().chrome} />; }
 
 const T = HERO_TRAY;
@@ -84,8 +84,8 @@ export function CoreHero() {
   const [trayRef, near] = useNear<HTMLDivElement>();
   return (
     // the navbar's glass sits on paper, as on the platform's landing; the core table fills the rest of the screen
-    <section id="top" aria-label="CoreFlagging" className="bg-paper pt-[72px] md:pt-[80px]">
-    <div ref={trayRef} className="relative h-[calc(100dvh-72px)] min-h-[560px] overflow-hidden bg-ink text-white md:h-[calc(100dvh-80px)]">
+    <section id="top" aria-label="CoreFlagging" className="bg-paper pt-[calc(72px+env(safe-area-inset-top))] md:pt-[calc(80px+env(safe-area-inset-top))]">
+    <div ref={trayRef} className="relative h-[calc(100dvh-72px-env(safe-area-inset-top))] min-h-[560px] overflow-hidden bg-night text-white md:h-[calc(100dvh-80px-env(safe-area-inset-top))]">
       <style>{`@keyframes ct-reveal{from{clip-path:inset(0 100% 0 0)}to{clip-path:inset(0 0 0 0)}}.ct-reveal{animation:ct-reveal 2.8s cubic-bezier(.4,0,.2,1) .6s both}@media (prefers-reduced-motion:reduce){.ct-reveal{animation:none}}`}</style>
       {/* the tray: wider than the screen, so the core reads large; drifts very slowly sideways */}
       <motion.div aria-hidden className="absolute inset-x-0 top-3 flex flex-col gap-3 md:top-4 md:gap-4"
@@ -106,10 +106,10 @@ export function CoreHero() {
         </motion.div>
       )}
       {/* shade for the lockup */}
-      <div aria-hidden className="absolute inset-0 bg-linear-to-t from-ink via-ink/75 via-45% to-ink/10" />
+      <div aria-hidden className="absolute inset-0 bg-linear-to-t from-night via-night/75 via-45% to-night/10" />
 
       <div className="absolute inset-x-0 bottom-0">
-        <div className="container-site flex flex-col gap-5 pb-6 md:flex-row md:items-end md:justify-between md:gap-8 md:pb-12">
+        <div className="container-site safe-x flex flex-col gap-5 pb-[calc(1.5rem+env(safe-area-inset-bottom))] md:flex-row md:items-end md:justify-between md:gap-8 md:pb-12">
           <div className="max-w-4xl">
             <p className="font-display text-lg font-semibold tracking-tight text-white md:text-xl">CoreFlagging</p>
             <h1 className="mt-1.5 font-display text-[34px] font-semibold leading-[1.1] tracking-tight md:mt-2.5 md:text-6xl md:leading-tight">
@@ -117,11 +117,11 @@ export function CoreHero() {
             </h1>
             <p className="mt-2 max-w-3xl font-display text-base font-medium text-white/75 md:mt-3 md:text-2xl">CoreFlagging reads HyLogger scans the same way for every hole, and shows where the core and the geologist&rsquo;s log tell different stories.</p>
             <div className="mt-5 flex flex-wrap items-center gap-2.5 md:mt-7 md:gap-3">
-              <Link href={`${base}/map`} className="flex h-11 items-center gap-2 rounded-full bg-white px-5 font-display text-[15px] font-bold md:h-12 md:px-6 text-ink transition-colors hover:bg-cyan focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan">
+              <Link href={`${base}/map`} className="flex h-11 items-center gap-2 rounded-full bg-white px-5 font-display text-[15px] font-bold md:h-12 md:px-6 text-night transition-colors hover:bg-cyan focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan">
                 Open the map<ArrowRight className="size-4" />
               </Link>
             </div>
-            <Link href={`${base}/map?upload=1`} className="mt-3 inline-block text-sm text-white/60 underline-offset-4 hover:text-white hover:underline md:mt-4">Or upload your own scan</Link>
+            <Link href={`${base}/map?upload=1`} className="mt-1 inline-flex min-h-11 items-center text-sm text-white/60 underline-offset-4 hover:text-white hover:underline md:mt-2">Or upload your own scan</Link>
           </div>
           <div className="flex flex-col items-start gap-3 md:items-end">
             <div className="flex max-w-sm flex-wrap gap-x-3 gap-y-1 text-[11px] text-white/70 md:justify-end md:gap-y-1.5 md:text-xs">
@@ -201,7 +201,7 @@ export function CoreIntro() {
 /** A card's picture: the tray's rows stacked, each a window onto a different stretch of core. */
 function TrayPicture({ offset, load }: { offset: number; load: boolean }) {
   return (
-    <div aria-hidden className="absolute inset-x-0 top-0 flex flex-col gap-2 bg-ink pt-4">
+    <div aria-hidden className="absolute inset-x-0 top-0 flex flex-col gap-2 bg-night pt-4">
       {T.rows.map((r, i) => {
         const a = ((offset + i * 0.13) % 0.7);
         return (
@@ -261,7 +261,7 @@ export function CoreRun({ rows, caption }: { rows: string[]; caption: string }) 
   // well below the fold: the rows load as it nears the screen; until then the band is its ink colour, at full size
   const [ref, near] = useNear<HTMLElement>();
   return (
-    <figure ref={ref} className="m-0 bg-ink">
+    <figure ref={ref} className="m-0 bg-night">
       <div className="flex flex-col gap-[3px] py-[3px]">
         {rows.map((src) => (
           <div key={src} role="img" aria-label={`Drill core, ${caption}`} className={cn("w-full bg-no-repeat", near && ROW_BG)}
@@ -325,18 +325,18 @@ export function CoreTeam() {
             <a href="https://www.dmirs.wa.gov.au/gswa" target="_blank" rel="noopener noreferrer" aria-label="Geological Survey of Western Australia, Department of Mines, Petroleum and Exploration" className="flex h-12 items-center gap-2.5">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src="/gswa-logo.png" alt="" width={40} height={40} loading="lazy" decoding="async" className="h-10 w-10" />
-              <span className="text-[11px] font-semibold leading-tight text-slate-800">Geological Survey of<br />Western Australia</span>
+              <span className="text-[11px] font-semibold leading-tight text-ink">Geological Survey of<br />Western Australia</span>
             </a>
           </div>
         </div>
         <ul className="-mx-5 flex snap-x gap-4 overflow-x-auto px-5 pb-2 md:mx-0 md:grid md:grid-cols-3 md:overflow-visible md:px-0 xl:grid-cols-5">
           {CORE_TEAM.map((m) => (
-            <li key={m.name} className="flex w-[300px] shrink-0 snap-start flex-col rounded-3xl border border-line bg-white p-6 md:w-auto">
+            <li key={m.name} className="flex w-[300px] shrink-0 snap-start flex-col rounded-3xl border border-line bg-card p-6 md:w-auto">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={m.img} alt={m.name} width={80} height={80} loading="lazy" decoding="async" className="size-20 rounded-full object-cover" />
               <div className="mt-4 flex flex-wrap items-center gap-2">
                 <span className="font-display text-lg font-semibold text-ink">{m.name}</span>
-                {m.leader && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-700">{t("team.leader")}</span>}
+                {m.leader && <span className="rounded-full bg-amber-400/15 px-2 py-0.5 text-[11px] font-semibold text-amber-500">{t("team.leader")}</span>}
               </div>
               <p className="mt-2 text-[15px] leading-relaxed text-ink-soft">{t(m.blurb)}</p>
               <a href={m.href} target="_blank" rel="noopener noreferrer" className="mt-auto inline-flex items-center gap-1 pt-4 text-sm font-semibold text-ink underline-offset-4 hover:underline">
@@ -366,12 +366,12 @@ export function CoreHow() {
         {/* the whole of it in six minutes: how a scan becomes a reading (original data, our cleaning, our model), then a real session on this site */}
         <figure className="mx-auto mt-8 max-w-5xl">
           <video src="/video/coreflagging-demo.mp4" poster="/video/coreflagging-demo.jpg" controls playsInline preload="none"
-            className="aspect-[16/10] w-full rounded-3xl bg-ink ring-1 ring-line" aria-label="CoreFlagging demo: how the scanner reads the core, how every hole is cleaned, how HyFormer learns by filling in blanks and what it reads, then the map, a hole's log, similar core, compare, the report, 3D and the assistant" />
+            className="aspect-[16/10] w-full rounded-3xl bg-night ring-1 ring-line" aria-label="CoreFlagging demo: how the scanner reads the core, how every hole is cleaned, how HyFormer learns by filling in blanks and what it reads, then the map, a hole's log, similar core, compare, the report, 3D and the assistant" />
           <figcaption className="mt-3 text-center text-[13.5px] text-ink-soft">How it works, then a real session on this site: the scanner&rsquo;s original data, our cleaning and our model, kept apart; then the map, one hole metre by metre, similar core, compare, the report, 3D and the assistant.</figcaption>
         </figure>
         <ol className="mt-8 grid gap-4 sm:grid-cols-2">
           {STEPS.map(([t, b], i) => (
-            <Reveal as="li" key={t} delay={i * 0.06} className="flex h-full flex-col rounded-3xl border border-line bg-white p-6">
+            <Reveal as="li" key={t} delay={i * 0.06} className="flex h-full flex-col rounded-3xl border border-line bg-card p-6">
               <span className="font-display text-sm font-semibold text-ink-soft tabular-nums">{i + 1}</span>
               <p className="mt-3 font-display text-xl font-semibold text-ink">{t}</p>
               <p className="mt-2 text-[15px] leading-relaxed text-ink-soft">{b}</p>

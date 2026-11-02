@@ -8,6 +8,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { ArrowRight, ChevronDown } from "lucide-react";
 import { StatusDot } from "@/components/landing/status-dot";
 import { FeedbackButton } from "@/components/FeedbackButton";
+import { ThemeToggle } from "@/components/landing/theme-toggle";
 import { LOCALES, useLocale } from "@/lib/i18n";
 import { groundworkChrome, type Chrome } from "@/lib/sites";
 import { cn } from "@/lib/utils";
@@ -39,7 +40,7 @@ function LangMenu({ up = false }: { up?: boolean }) {
           <span className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
           <span
             className={cn(
-              "absolute right-0 z-50 flex w-32 flex-col overflow-hidden rounded-xl border border-line bg-white py-1.5 shadow-glass-sm",
+              "absolute right-0 z-50 flex w-32 flex-col overflow-hidden rounded-xl border border-line bg-card py-1.5 shadow-glass-sm",
               up ? "bottom-[calc(100%+14px)]" : "top-[calc(100%+14px)]"
             )}
           >
@@ -72,7 +73,7 @@ function MapCta({ cta, className }: { cta: Chrome["cta"]; className?: string }) 
     <Link
       href={cta.href}
       className={cn(
-        "group flex h-12 items-center rounded-full bg-ink px-7 font-display text-sm font-bold tracking-wide text-white uppercase",
+        "group flex h-12 items-center whitespace-nowrap rounded-full bg-ink px-7 font-display text-sm font-bold tracking-wide text-paper uppercase",
         className
       )}
     >
@@ -94,10 +95,10 @@ function BrandLockup({ chrome }: { chrome: Chrome }) {
   return (
     <Link
       href={chrome.home}
-      className="flex items-center gap-3 font-display text-lg leading-[1.05] font-bold tracking-tight text-ink md:text-2xl"
+      className="flex min-h-11 shrink-0 items-center gap-3 font-display text-lg leading-[1.05] font-bold tracking-tight text-ink md:text-2xl lg:text-xl xl:text-2xl"
     >
       <Image src={chrome.mark} alt="" width={36} height={36} priority className="size-9 shrink-0 rounded-[9px] md:size-10" />
-      <span>{chrome.brand[0]}<br className="md:hidden" /> {chrome.brand[1]}</span>
+      <span className="whitespace-nowrap">{chrome.brand[0]}<br className="md:hidden" /> {chrome.brand[1]}</span>
     </Link>
   );
 }
@@ -118,7 +119,8 @@ function UnderlineLink({
       href={href}
       aria-current={current ? "page" : undefined}
       className={cn(
-        "group relative py-1 font-display text-lg font-semibold text-ink",
+        // the hit area reaches 44 px tall (a touch target on an iPad) without moving the underline
+        "group relative whitespace-nowrap py-1 font-display text-lg font-semibold text-ink before:absolute before:inset-x-0 before:-inset-y-1.5 before:content-['']",
         className
       )}
     >
@@ -131,7 +133,8 @@ function UnderlineLink({
   );
 }
 
-export function Navbar({ chrome = groundworkChrome }: { chrome?: Chrome }) {
+/** `themeToggle`: the day/night switch, for a page whose content is themed (CoreFlagging's home page). */
+export function Navbar({ chrome = groundworkChrome, themeToggle = false }: { chrome?: Chrome; themeToggle?: boolean }) {
   const pathname = usePathname();
   const navLinks = chrome.navLinks;
   const [open, setOpen] = useState(false);
@@ -154,7 +157,7 @@ export function Navbar({ chrome = groundworkChrome }: { chrome?: Chrome }) {
   return (
     // Paper-tinted glass, no bottom shadow/edge: over the paper page the bar
     // dissolves into the background; over the hero it still frosts.
-    <header className="fixed inset-x-0 top-0 z-50">
+    <header className="fixed inset-x-0 top-0 z-50 pt-[env(safe-area-inset-top)]">
       {/* The glass lives on its own layer: backdrop-filter turns an element
           into the containing block for fixed descendants, which would pin the
           full-screen mobile menu inside this 80px bar. The header itself must
@@ -163,12 +166,12 @@ export function Navbar({ chrome = groundworkChrome }: { chrome?: Chrome }) {
         aria-hidden
         className="absolute inset-0 -z-10 bg-paper/55 backdrop-blur-xl backdrop-saturate-150"
       />
-      <nav className="container-site relative flex h-20 items-center justify-between">
+      <nav className="container-site safe-x relative flex h-20 items-center justify-between">
         <BrandLockup chrome={chrome} />
 
         {/* Desktop: links · hairline · status dot + language · the Map CTA */}
-        <div className="hidden items-center gap-7 md:flex">
-          <ul className="flex items-center gap-7">
+        <div className="hidden items-center gap-5 lg:flex xl:gap-7">
+          <ul className="flex items-center gap-5 xl:gap-7">
             {navLinks.map((link) => (
               <li key={link.href}>
                 <UnderlineLink
@@ -183,21 +186,24 @@ export function Navbar({ chrome = groundworkChrome }: { chrome?: Chrome }) {
           {/* Same cluster as the workspace pill — status, language, feedback — so the
               control is in the same relative place whichever chrome you are under. It
               renders only when signed in; a signed-out visitor gets no dead button. */}
-          <span className="flex items-center gap-5">
+          <span className="flex items-center gap-5 whitespace-nowrap">
             <StatusDot />
             {chrome.languages && <LangMenu />}
             <FeedbackButton tone="paper" />
+            {themeToggle && <ThemeToggle />}
           </span>
           <MapCta cta={chrome.cta} />
         </div>
 
-        {/* Mobile hamburger: two bars meet in the middle, then cross */}
+        {/* Mobile: the day/night switch stays in the bar, beside the hamburger (two bars meet, then cross) */}
+        <div className="flex items-center gap-1.5 lg:hidden">
+        {themeToggle && <ThemeToggle />}
         <button
           type="button"
           onClick={() => setOpen((v) => !v)}
           aria-expanded={open}
           aria-label={open ? "Close menu" : "Open menu"}
-          className="relative z-[70] flex size-10 items-center justify-center md:hidden"
+          className="relative z-[70] flex size-11 items-center justify-center lg:hidden"
         >
           <span
             className={cn(
@@ -212,6 +218,7 @@ export function Navbar({ chrome = groundworkChrome }: { chrome?: Chrome }) {
             )}
           />
         </button>
+        </div>
       </nav>
 
       {/* Mobile menu: full-screen cyan overlay */}
@@ -222,7 +229,7 @@ export function Navbar({ chrome = groundworkChrome }: { chrome?: Chrome }) {
             animate={{ clipPath: "inset(0 0 0% 0)" }}
             exit={{ clipPath: "inset(0 0 100% 0)" }}
             transition={{ duration: 0.45, ease: EASE }}
-            className="fixed inset-0 z-[60] flex flex-col bg-cyan/85 backdrop-blur-xl md:hidden"
+            className="core-light fixed inset-0 z-[60] flex flex-col bg-cyan/85 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] backdrop-blur-xl lg:hidden"
           >
             <div className="container-site flex h-20 items-center">
               <BrandLockup chrome={chrome} />

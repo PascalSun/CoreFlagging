@@ -1,4 +1,5 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
+import { THEMED_VIEWPORT } from "@/lib/theme";
 import { notFound } from "next/navigation";
 import { Hub } from "@/components/holePages/Hub";
 import { indexedRows } from "@/lib/holePages/data";
@@ -17,6 +18,8 @@ async function hub(slug: string) {
   const h = regionHubs(indexed).find((x) => x.slug === slug);
   return h ? { h, indexed } : null;
 }
+
+export const viewport: Viewport = THEMED_VIEWPORT;
 
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const x = await hub((await params).region);

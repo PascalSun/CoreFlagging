@@ -1,4 +1,5 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
+import { THEMED_VIEWPORT } from "@/lib/theme";
 import Link from "next/link";
 import { FooterSpacer } from "@/components/landing/footer";
 import { SmoothScroll } from "@/components/landing/smooth-scroll";
@@ -8,6 +9,8 @@ import { pageMeta } from "@/lib/seo";
 
 // Questions about CoreFlagging, every answer open on the page: what a search engine or an answer engine reads is
 // what a person reads. Laid out like the landing's "Read it with care": the title on the left, hairline rows right.
+
+export const viewport: Viewport = THEMED_VIEWPORT;
 
 export const metadata: Metadata = {
   icons: { icon: "/brand/coretrace-mark.svg", apple: "/brand/coretrace-mark.svg" },
@@ -32,7 +35,7 @@ function Answer({ a }: { a: string }) {
 
 export default function FaqPage() {
   return (
-    <div className="bg-paper text-ink [font-family:var(--font-jakarta),system-ui,sans-serif]">
+    <div className="core-theme bg-paper text-ink [font-family:var(--font-jakarta),system-ui,sans-serif]">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(FAQ_JSON_LD).replace(/</g, "\\u003c") }} />
       <SmoothScroll />
       <CoreNavbar />
