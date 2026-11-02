@@ -221,13 +221,13 @@ export function Navbar({ chrome = groundworkChrome, themeToggle = false }: { chr
         </div>
       </nav>
 
-      {/* Mobile menu: full-screen cyan overlay */}
+      {/* Mobile menu (phones, iPads): full-screen overlay, opened from the right with its links on the right, under the button */}
       <AnimatePresence>
         {open && (
           <motion.div
-            initial={{ clipPath: "inset(0 0 100% 0)" }}
-            animate={{ clipPath: "inset(0 0 0% 0)" }}
-            exit={{ clipPath: "inset(0 0 100% 0)" }}
+            initial={{ clipPath: "inset(0 0 0 100%)" }}
+            animate={{ clipPath: "inset(0 0 0 0%)" }}
+            exit={{ clipPath: "inset(0 0 0 100%)" }}
             transition={{ duration: 0.45, ease: EASE }}
             className="core-light fixed inset-0 z-[60] flex flex-col bg-cyan/85 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] backdrop-blur-xl lg:hidden"
           >
@@ -236,7 +236,7 @@ export function Navbar({ chrome = groundworkChrome, themeToggle = false }: { chr
             </div>
             {/* Order: Home · Map · Gold Run — the Map CTA sits between the
                 two text links rather than leading the list. */}
-            <ul className="container-site flex flex-col gap-1 pt-8">
+            <ul className="container-site flex flex-col items-end gap-1 pt-8 text-right">
               {[
                 navLinks[0],
                 chrome.cta,
@@ -266,7 +266,7 @@ export function Navbar({ chrome = groundworkChrome, themeToggle = false }: { chr
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.32, duration: 0.4, ease: EASE }}
-              className="container-site mt-auto mb-10 flex items-center gap-6"
+              className="container-site mt-auto mb-10 flex items-center justify-end gap-6"
             >
               <StatusDot />
               {chrome.languages && <LangMenu up />}
