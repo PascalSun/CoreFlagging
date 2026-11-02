@@ -33,7 +33,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" suppressHydrationWarning className={`${geistSans.variable} ${geistMono.variable} ${manrope.variable} ${jakarta.variable} h-full antialiased`}>
+    <html lang="en" data-theme="dark" suppressHydrationWarning className={`${geistSans.variable} ${geistMono.variable} ${manrope.variable} ${jakarta.variable} h-full antialiased`}>
       {/* the saved day/night choice, before the first paint (only the home page is themed; elsewhere it is inert) */}
       <head><script dangerouslySetInnerHTML={{ __html: THEME_BOOT }} /></head>
       <body className="min-h-full flex flex-col bg-slate-50 text-slate-900">

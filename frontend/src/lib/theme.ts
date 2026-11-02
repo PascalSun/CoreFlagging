@@ -10,24 +10,24 @@ export const THEME_EVENT = "cf-theme";                 // fired on window when t
 export const THEME_GROUND = { light: "#f4f4f4", dark: "#0b1215" } as const;
 export type ThemeChoice = "system" | "light" | "dark";
 
-/** The viewport of a themed page (home, FAQ, the drillhole pages): day or night with the device, the browser's bar
- * on the page's ground; a saved choice overrides it before paint (THEME_BOOT). */
+/** The viewport of a themed page (home, FAQ, the drillhole pages): night by default under either device setting, the
+ * browser's bar on the page's ground; a saved day choice repaints it before paint (THEME_BOOT). */
 export const THEMED_VIEWPORT: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: THEME_GROUND.light },
+    { media: "(prefers-color-scheme: light)", color: THEME_GROUND.dark },
     { media: "(prefers-color-scheme: dark)", color: THEME_GROUND.dark },
   ],
-  colorScheme: "light dark",
+  colorScheme: "dark light",
 };
 
-/** Runs in <head> before the page paints: the saved choice becomes html[data-theme] (no flash of the other mode),
- * and the theme-color metas follow it. "system" leaves data-theme off, so the CSS media query decides. */
+/** Runs in <head> before the page paints: night unless a day choice is saved, as html[data-theme] (no flash of the
+ * other mode), and the theme-color metas follow it. */
 export const THEME_BOOT = `(function(){try{var k=${JSON.stringify(THEME_STORE)},g=${JSON.stringify(THEME_GROUND)};
-var c=localStorage.getItem(k);var d=document.documentElement;
-if(c==="light"||c==="dark"){d.setAttribute("data-theme",c);}
+var c=null;try{c=localStorage.getItem(k)}catch(e){}var d=document.documentElement;
+d.setAttribute("data-theme",c==="light"?"light":"dark");
 var sync=function(){var t=d.getAttribute("data-theme");document.querySelectorAll('meta[name="theme-color"]').forEach(function(m){
 if(!m.hasAttribute("data-media")){m.setAttribute("data-media",m.getAttribute("media")||"");}
 if(t){m.setAttribute("content",g[t]);m.removeAttribute("media");}
@@ -37,11 +37,10 @@ window.__cfThemeSync=sync;sync();document.addEventListener("DOMContentLoaded",sy
 /** Apply a choice now (the toggle): html[data-theme], the theme-color metas, and the saved value. */
 export function applyTheme(choice: ThemeChoice) {
   const d = document.documentElement;
-  if (choice === "system") d.removeAttribute("data-theme");
-  else d.setAttribute("data-theme", choice);
+  d.setAttribute("data-theme", choice === "light" ? "light" : "dark");      // night unless day is chosen
   try {
-    if (choice === "system") localStorage.removeItem(THEME_STORE);
-    else localStorage.setItem(THEME_STORE, choice);
+    if (choice === "light") localStorage.setItem(THEME_STORE, "light");
+    else localStorage.removeItem(THEME_STORE);
   } catch { /* private mode: the choice lasts for this page only */ }
   (window as unknown as { __cfThemeSync?: () => void }).__cfThemeSync?.();
   window.dispatchEvent(new Event(THEME_EVENT));
@@ -50,6 +49,6 @@ export function applyTheme(choice: ThemeChoice) {
 export function savedTheme(): ThemeChoice {
   try {
     const c = localStorage.getItem(THEME_STORE);
-    return c === "light" || c === "dark" ? c : "system";
-  } catch { return "system"; }
+    return c === "light" ? "light" : "dark";
+  } catch { return "dark"; }
 }
