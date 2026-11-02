@@ -1,4 +1,5 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
+import { THEMED_VIEWPORT } from "@/lib/theme";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { DataPage, LINK, Prose, Section, type Source } from "@/components/holePages/Page";
@@ -22,6 +23,8 @@ export async function generateStaticParams() { return []; }
 
 type Params = { params: Promise<{ state: string; slug: string }> };
 
+
+export const viewport: Viewport = THEMED_VIEWPORT;
 
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const { state, slug } = await params;
@@ -60,8 +63,8 @@ export default async function HolePage({ params }: Params) {
     >
       {(f.training || f.state !== "WA") && (
         <div className="mb-8 flex flex-col gap-2">
-          {f.state !== "WA" && <p className="rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-900">{OUTSIDE_WA}</p>}
-          {f.training && <p className="rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-900">{TRAINING}</p>}
+          {f.state !== "WA" && <p className="rounded-lg bg-note px-4 py-3 text-sm text-note-ink">{OUTSIDE_WA}</p>}
+          {f.training && <p className="rounded-lg bg-note px-4 py-3 text-sm text-note-ink">{TRAINING}</p>}
         </div>
       )}
 
