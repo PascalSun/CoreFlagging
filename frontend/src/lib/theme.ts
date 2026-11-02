@@ -16,10 +16,8 @@ export const THEMED_VIEWPORT: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
-  themeColor: [
-    { media: "(prefers-color-scheme: light)", color: THEME_GROUND.dark },
-    { media: "(prefers-color-scheme: dark)", color: THEME_GROUND.dark },
-  ],
+  // no themeColor: Safari (iOS/iPadOS 26) then colours its bar from the page's own top (the header), one surface,
+  // as Biohotspot does; a theme-color gets Safari's glass tint on top and reads lighter than the header
   colorScheme: "dark light",
 };
 
