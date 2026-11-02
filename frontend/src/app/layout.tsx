@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono, Manrope, Plus_Jakarta_Sans } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 import "mapbox-gl/dist/mapbox-gl.css";
 import "@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css";
@@ -8,11 +8,14 @@ import { GoogleAnalytics } from "@/components/GoogleAnalytics";
 import { KEYWORDS, SHARE_IMAGE, SITE_NAME, SITE_URL } from "@/lib/seo";
 import { THEME_BOOT } from "@/lib/theme";
 
-const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
-const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
+// The faces come from pinned Fontsource packages (the Google Fonts files, latin subset) through next/font/local:
+// next/font/google downloads them during `next build`, and a failed download failed the deploy (GeoThought,
+// 2026-11-02). With these the build fetches nothing but the packages bun installs.
+const geistSans = localFont({ variable: "--font-geist-sans", src: "../../node_modules/@fontsource-variable/geist/files/geist-latin-wght-normal.woff2", weight: "100 900" });
+const geistMono = localFont({ variable: "--font-geist-mono", src: "../../node_modules/@fontsource-variable/geist-mono/files/geist-mono-latin-wght-normal.woff2", weight: "100 900" });
 // landing-page faces (home page chrome only; other routes keep Geist)
-const manrope = Manrope({ variable: "--font-manrope", subsets: ["latin"] });
-const jakarta = Plus_Jakarta_Sans({ variable: "--font-jakarta", subsets: ["latin"] });
+const manrope = localFont({ variable: "--font-manrope", src: "../../node_modules/@fontsource-variable/manrope/files/manrope-latin-wght-normal.woff2", weight: "200 800" });
+const jakarta = localFont({ variable: "--font-jakarta", src: "../../node_modules/@fontsource-variable/plus-jakarta-sans/files/plus-jakarta-sans-latin-wght-normal.woff2", weight: "200 800" });
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL), // canonicals and Open Graph URLs resolve against the public host
