@@ -42,11 +42,13 @@ jobs:
             -o /tmp/cloudflared && chmod +x /tmp/cloudflared
           /tmp/cloudflared access tcp --hostname "$TUNNEL_HOSTNAME" --url 127.0.0.1:12222 \
             > /tmp/cloudflared.log 2>&1 &
+          echo $! > /tmp/cloudflared.pid
           for i in $(seq 30); do nc -z 127.0.0.1 12222 && exit 0; sleep 1; done
           echo "cloudflared did not open 127.0.0.1:12222"; cat /tmp/cloudflared.log; exit 1
 
       - name: Two-hop deploy (core-scan)
         env:
+          TUNNEL_HOSTNAME: ${{ secrets.DEPLOY_TUNNEL_HOSTNAME }}
           USER: ${{ secrets.DEPLOY_USER }}
           KEY: ${{ secrets.DEPLOY_SSH_KEY }}
           SERVER: ${{ secrets.DEPLOY_SERVER }}
@@ -77,8 +79,13 @@ jobs:
             ssh -o ServerAliveInterval=30 -o ServerAliveCountMax=40 -o StrictHostKeyChecking=no ${SERVER_USER}@${SERVER} '
               set -e
               echo \"$SUM  $TGZ\" | sha256sum -c -
-              bash ${BASE}/redeploy.sh $TGZ CoreTrace
             '
             rm -f $TGZ
           "
+          # Hop 3: the redeploy itself, DETACHED on the app server and followed with short, retried ssh calls: a dropped
+          # tunnel or jump-box link no longer fails the job while the build carries on there (.github/scripts/remote-run.sh
+          # reopens the tunnel, reconnects, prints the output as it comes and exits with the redeploy's own exit code).
+          export TUNNEL_HOSTNAME KEYFILE=/tmp/deploy_key
+          bash .github/scripts/remote-run.sh "ct-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" \
+            "bash ${BASE}/redeploy.sh $TGZ CoreTrace < /dev/null"
           rm -f /tmp/app.tgz /tmp/deploy_key
