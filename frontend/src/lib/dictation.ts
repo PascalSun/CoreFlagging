@@ -54,28 +54,61 @@ const joinText = (base: string, heard: string) => (base && heard ? `${base} ${he
 // The audio tap: the microphone's samples, as they come, to the page (a worklet: no main-thread glitches).
 const TAP = `class Tap extends AudioWorkletProcessor{process(i){const c=i[0]&&i[0][0];if(c)this.port.postMessage(c.slice(0));return true}}registerProcessor("pcm-tap",Tap)`;
 
-/** Float samples at the context's rate → 16 kHz PCM16, sent 100 ms at a time. */
-class Pcm16k {
-  private pending: number[] = [];
-  private pos = 0;
-  constructor(private rate: number, private send: (b: ArrayBuffer) => void) {}
+/** Float samples → 16 kHz PCM16, sent 100 ms at a time. At 16 kHz already (the context was made at 16 kHz: the
+ * browser resampled, properly) they are only converted; otherwise they are resampled here with a windowed sinc
+ * (a real low-pass: a plain average lets the 8–24 kHz band fold back into speech), the input carried over from one
+ * buffer to the next so a window that spans two buffers is whole. */
+export class Pcm16k {
+  private out: number[] = [];
+  private buf: number[] = [];                     // input not yet wholly used
+  private t = 0;                                  // the next output sample's place in buf, in input samples
+  private readonly step: number;
+  private readonly half: number;                  // the filter's half-width, in input samples
+  private readonly fc: number;                    // its cutoff, in cycles per input sample
+  constructor(private rate: number, private send: (b: ArrayBuffer) => void) {
+    this.step = rate / 16000;
+    this.fc = 0.45 / Math.max(1, this.step);      // 7.2 kHz at any input rate: under 16 kHz's Nyquist
+    this.half = Math.ceil(8 * Math.max(1, this.step));
+  }
+  private tap(d: number): number {                // sinc × Blackman, at distance d input samples
+    if (Math.abs(d) >= this.half) return 0;
+    const w = 0.42 + 0.5 * Math.cos(Math.PI * d / this.half) + 0.08 * Math.cos(2 * Math.PI * d / this.half);
+    const x = 2 * Math.PI * this.fc * d;
+    return 2 * this.fc * (d === 0 ? 1 : Math.sin(x) / x) * w;
+  }
   push(x: Float32Array) {
-    const step = this.rate / 16000;
-    // average the samples each output sample stands for (a cheap low-pass before taking every step-th)
-    for (; this.pos < x.length; this.pos += step) {
-      const a = Math.floor(this.pos), b = Math.min(x.length, Math.floor(this.pos + step));
-      let s = 0;
-      for (let i = a; i < Math.max(a + 1, b); i++) s += x[i];
-      this.pending.push(s / Math.max(1, b - a));
+    if (this.rate === 16000) {
+      for (let i = 0; i < x.length; i++) this.out.push(x[i]);
+    } else {
+      for (let i = 0; i < x.length; i++) this.buf.push(x[i]);
+      if (!this.t) this.t = this.half;            // the first output once a whole window is there
+      while (this.t + this.half < this.buf.length) {
+        const c = Math.floor(this.t);
+        let s = 0, g = 0;
+        for (let k = c - this.half + 1; k <= c + this.half; k++) { const h = this.tap(this.t - k); s += this.buf[k] * h; g += h; }
+        this.out.push(g ? s / g : 0);
+        this.t += this.step;
+      }
+      const drop = Math.max(0, Math.floor(this.t) - this.half);   // keep what the next window still needs
+      if (drop) { this.buf.splice(0, drop); this.t -= drop; }
     }
-    this.pos -= x.length;
-    while (this.pending.length >= 1600) {
-      const out = new Int16Array(1600);
-      for (let i = 0; i < 1600; i++) out[i] = Math.max(-32768, Math.min(32767, Math.round(this.pending[i] * 32767)));
-      this.pending.splice(0, 1600);
-      this.send(out.buffer);
+    while (this.out.length >= 1600) {
+      const o = new Int16Array(1600);
+      for (let i = 0; i < 1600; i++) o[i] = Math.max(-32768, Math.min(32767, Math.round(this.out[i] * 32767)));
+      this.out.splice(0, 1600);
+      this.send(o.buffer);
     }
   }
+}
+
+/** An audio context at 16 kHz, so the browser resamples the microphone (well, and off the main thread); one at the
+ * device's rate if this browser cannot make that. Made inside the tap and resumed there: iOS starts audio only from
+ * a gesture. */
+export function audioContext16k(): AudioContext {
+  let ctx: AudioContext;
+  try { ctx = new AudioContext({ sampleRate: 16000 }); } catch { ctx = new AudioContext(); }
+  void ctx.resume();
+  return ctx;
 }
 
 type Live = { ws: WebSocket | null; ctx: AudioContext | null; stream: MediaStream | null; node: AudioWorkletNode | null };
@@ -134,10 +167,11 @@ export function useDictation(lang: string, onText: (text: string) => void) {
   }, [lang]);
 
   /** Our Whisper, streamed: a session from this site's server, the microphone, a socket to the gateway. */
-  const startStream = useCallback(async (current: string, ctx: AudioContext): Promise<boolean> => {
+  const startStream = useCallback(async (current: string, first: AudioContext): Promise<boolean> => {
     const token = authToken();
     if (!token) return false;
     const base = current.trimEnd();
+    let ctx = first;
     const l: Live = { ws: null, ctx, stream: null, node: null };
     live.current = l;
     let session: { url?: string };
@@ -153,7 +187,11 @@ export function useDictation(lang: string, onText: (text: string) => void) {
       return false;                                 // not reachable: the browser's recogniser instead
     }
     try {
-      l.stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true } });
+      // the voice as it is: a phone's echo cancelling and noise suppression are tuned for calls, and they cut and
+      // smear what Whisper hears (it was trained on plain recordings); the gain control keeps a far voice loud enough
+      l.stream = await navigator.mediaDevices.getUserMedia({
+        audio: { channelCount: 1, echoCancellation: false, noiseSuppression: false, autoGainControl: true },
+      });
     } catch (e) {
       release();
       setState((e as DOMException)?.name === "NotAllowedError" ? "denied" : "error");
@@ -180,8 +218,18 @@ export function useDictation(lang: string, onText: (text: string) => void) {
     };
     ws.onclose = () => { release(); setState((s) => (s === "listening" ? "idle" : s)); };
     ws.onerror = () => { release(); setState((s) => (s === "listening" ? "error" : s)); };
+    let src: MediaStreamAudioSourceNode;
+    try {
+      src = ctx.createMediaStreamSource(l.stream);
+    } catch {
+      // Firefox will not join a microphone to a context at another rate: one at the device's rate, resampled here
+      void ctx.close().catch(() => {});
+      ctx = new AudioContext();
+      void ctx.resume();
+      l.ctx = ctx;
+      src = ctx.createMediaStreamSource(l.stream);
+    }
     await ctx.audioWorklet.addModule(URL.createObjectURL(new Blob([TAP], { type: "application/javascript" })));
-    const src = ctx.createMediaStreamSource(l.stream);
     const node = new AudioWorkletNode(ctx, "pcm-tap");
     const mute = ctx.createGain();
     mute.gain.value = 0;                             // the worklet must reach the output to run; it is not heard
@@ -211,7 +259,7 @@ export function useDictation(lang: string, onText: (text: string) => void) {
     if (canStream() && authToken()) {
       // the audio context is made now, inside the tap: Safari lets audio start only from a gesture
       let ctx: AudioContext | null = null;
-      try { ctx = new AudioContext(); void ctx.resume(); } catch { ctx = null; }
+      try { ctx = audioContext16k(); } catch { ctx = null; }
       if (ctx) {
         setState("listening");
         const c = ctx;
