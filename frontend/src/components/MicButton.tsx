@@ -7,19 +7,25 @@ import { SPEECH_LANG, useDictation, useDictationSupported } from "@/lib/dictatio
 import { useLocale, type Locale } from "@/lib/i18n";
 
 /** The mic's own words, so it needs no dictionary keys (same wording as the geo hub's). */
-export const VOICE_TEXT: Record<Locale, { start: string; stop: string; listening: string; denied: string; error: string }> = {
+export const VOICE_TEXT: Record<Locale, { start: string; stop: string; listening: string; denied: string; error: string; fallback: string; nosound: string }> = {
   en: { start: "Speak instead of typing", stop: "Stop listening", listening: "Listening…",
-        denied: "Microphone blocked: allow it in the browser's settings for this site to speak.", error: "Didn't catch that. Try again." },
+        denied: "Microphone blocked: allow it in the browser's settings for this site to speak.", error: "Didn't catch that. Try again.",
+        fallback: "No sound from the microphone: using the browser's speech recognition instead.", nosound: "No sound from the microphone. Check it isn't muted or in use by another app." },
   zh: { start: "语音输入", stop: "停止语音输入", listening: "正在听…",
-        denied: "麦克风被阻止：请在浏览器的网站设置中允许麦克风。", error: "没听清，请再试一次。" },
+        denied: "麦克风被阻止：请在浏览器的网站设置中允许麦克风。", error: "没听清，请再试一次。",
+        fallback: "麦克风没有声音：已改用浏览器的语音识别。", nosound: "麦克风没有声音，请检查是否静音或被其他应用占用。" },
   fr: { start: "Dicter au lieu de taper", stop: "Arrêter l'écoute", listening: "Écoute…",
-        denied: "Micro bloqué : autorisez-le dans les réglages du navigateur pour ce site.", error: "Rien entendu. Réessayez." },
+        denied: "Micro bloqué : autorisez-le dans les réglages du navigateur pour ce site.", error: "Rien entendu. Réessayez.",
+        fallback: "Aucun son du micro : la reconnaissance vocale du navigateur prend le relais.", nosound: "Aucun son du micro. Vérifiez qu'il n'est pas coupé ni utilisé par une autre app." },
   es: { start: "Dictar en lugar de escribir", stop: "Dejar de escuchar", listening: "Escuchando…",
-        denied: "Micrófono bloqueado: permítalo en la configuración del navegador para este sitio.", error: "No se oyó nada. Inténtelo de nuevo." },
+        denied: "Micrófono bloqueado: permítalo en la configuración del navegador para este sitio.", error: "No se oyó nada. Inténtelo de nuevo.",
+        fallback: "El micrófono no envía sonido: se usa el reconocimiento de voz del navegador.", nosound: "El micrófono no envía sonido. Compruebe que no esté silenciado ni en uso por otra app." },
   pt: { start: "Ditar em vez de escrever", stop: "Parar de ouvir", listening: "A ouvir…",
-        denied: "Microfone bloqueado: permita-o nas definições do navegador para este site.", error: "Não se ouviu nada. Tente de novo." },
+        denied: "Microfone bloqueado: permita-o nas definições do navegador para este site.", error: "Não se ouviu nada. Tente de novo.",
+        fallback: "O microfone não envia som: a usar o reconhecimento de voz do navegador.", nosound: "O microfone não envia som. Verifique se não está silenciado nem em uso por outra app." },
   id: { start: "Bicara alih-alih mengetik", stop: "Berhenti mendengarkan", listening: "Mendengarkan…",
-        denied: "Mikrofon diblokir: izinkan di pengaturan browser untuk situs ini.", error: "Tidak terdengar. Coba lagi." },
+        denied: "Mikrofon diblokir: izinkan di pengaturan browser untuk situs ini.", error: "Tidak terdengar. Coba lagi.",
+        fallback: "Mikrofon tidak mengirim suara: memakai pengenalan suara browser.", nosound: "Mikrofon tidak mengirim suara. Periksa apakah dibisukan atau dipakai aplikasi lain." },
 };
 
 export function MicButton({ value, onChange, onStart, onListening, size = 28, tip = "above", className = "" }: {
@@ -37,7 +43,7 @@ export function MicButton({ value, onChange, onStart, onListening, size = 28, ti
   const supported = useDictationSupported();
   const { locale } = useLocale();
   const tx = VOICE_TEXT[locale] ?? VOICE_TEXT.en;
-  const { state, start, stop, reset } = useDictation(SPEECH_LANG[locale] ?? "en-AU", onChange);
+  const { state, notice, start, stop, reset } = useDictation(SPEECH_LANG[locale] ?? "en-AU", onChange);
   const listening = state === "listening";
 
   useEffect(() => { onListening?.(listening); }, [listening, onListening]);
@@ -69,10 +75,10 @@ export function MicButton({ value, onChange, onStart, onListening, size = 28, ti
           </>
         ) : <Mic size={Math.round(size * 0.58)} />}
       </button>
-      {(state === "denied" || state === "error") && (
+      {(state === "denied" || state === "error" || notice) && (
         <span role="status"
           className={`absolute z-50 w-max max-w-[min(16rem,calc(100vw-2rem))] ${tip === "below" ? "left-1/2 top-full mt-2 -translate-x-1/2" : "bottom-full right-0 mb-2"} rounded-xl bg-slate-900 px-3 py-2 text-xs leading-snug text-white shadow-lg`}>
-          {state === "denied" ? tx.denied : tx.error}
+          {notice === "fallback" ? tx.fallback : notice === "nosound" ? tx.nosound : state === "denied" ? tx.denied : tx.error}
         </span>
       )}
     </span>
