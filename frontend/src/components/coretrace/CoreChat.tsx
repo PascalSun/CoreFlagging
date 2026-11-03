@@ -1,5 +1,6 @@
 "use client";
 
+import { MicButton } from "@/components/MicButton";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ModelPicker, ModelTag, useChatModel } from "@/components/chat/ModelPicker";
 import { useChat } from "@ai-sdk/react";
@@ -253,6 +254,8 @@ export function CoreChat({ context, onOpen, signedIn, onSignIn }: {
             onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(input); } }}
             className="max-h-[96px] min-h-[24px] flex-1 resize-none overflow-y-auto bg-transparent text-base leading-[22px] text-slate-700 outline-none placeholder:text-slate-400 sm:text-sm" />
           <ModelPicker options={llmOptions} choice={llmChoice} onChange={setLlm} disabled={busy} />
+          {/* speak instead of typing: the words land in the box to read and send (never sent by themselves) */}
+          <MicButton value={input} onChange={setInput} size={28} />
           <button type="submit" disabled={busy || !input.trim()} aria-label="Send" className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-slate-900 text-white transition-opacity disabled:opacity-40">{busy ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}</button>
         </div>
       </form>
