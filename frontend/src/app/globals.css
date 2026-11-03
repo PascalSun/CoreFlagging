@@ -319,3 +319,15 @@ body {
     font-size: 16px;
   }
 }
+
+/* iOS Safari zooms the whole page when a field it focuses has text under 16px, and stays zoomed. On a touch
+   screen every typing surface gets 16px text instead; the box keeps its height (padding/height come from the
+   field's own classes), only the glyphs grow ~1-2px. Not maximum-scale=1: that would also kill pinch-zoom. */
+@media (pointer: coarse), (hover: none) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="image"]),
+  textarea,
+  select,
+  [contenteditable]:not([contenteditable="false"]) {
+    font-size: 16px !important;
+  }
+}
