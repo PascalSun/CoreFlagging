@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { ChevronDown, Cloud, Cpu } from "lucide-react";
 
-// Cloud (OpenRouter) or local (our own GPU's Ollama) for the assistant, picked in the chat bar.
+// Cloud (OpenRouter) or local (our own GPU's Ollama) for the assistant, picked in the assistant's header
+// (`compact`: an icon button among the header's icons) or, where a page has no header, as a pill.
 // The server lists what it can serve (/api/chat-models); the choice is kept per browser and
 // travels with each message as `llm`. On the local model the pill shows our GPU's queue (the LLM gateway's).
 
@@ -58,8 +59,10 @@ export function useChatModel() {
 
 /** A small pill before the send button: "Cloud" or "Local" (and, our GPU busy, "Local · 3 ahead" or "Local · next"); the model's name,
  *  the GPU's state and the wait are in its tooltip, and the list names both models. */
-export function ModelPicker({ options, choice, onChange, disabled }: {
+export function ModelPicker({ options, choice, onChange, disabled, compact }: {
   options: Option[]; choice: ChatChoice | null; onChange: (c: ChatChoice) => void; disabled?: boolean;
+  /** an icon button the size of the assistant header's other icons (the header's toolbar), not a labelled pill */
+  compact?: boolean;
 }) {
   const cur = options.find((o) => o.id === choice) ?? options[0];
   const q = useQueue(cur?.id === "local" ? cur.queue : undefined);
@@ -71,17 +74,34 @@ export function ModelPicker({ options, choice, onChange, disabled }: {
   // "ahead": people's calls before this one (a batch run waits behind it); none ahead but every slot taken: it is next
   const gpu = q ? (!q.available ? "our GPU is not answering" : disabled ? "your message is with our GPU" : !busy ? "our GPU is free"
     : ahead ? `${ahead} ahead on our GPU, ${wait(eta)}` : `our GPU is full; yours is next, ${wait(eta)}`) : "";
+  const tip = `Model: ${cur.label} · ${cur.model}${gpu ? ` · ${gpu}` : ""}`;
+  const dot = q && <span aria-hidden className={`size-1.5 shrink-0 rounded-full ${!q.available ? "bg-rose-500" : disabled ? "animate-pulse bg-sky-500" : busy ? "bg-amber-500" : "bg-emerald-500"}`} />;
+  const select = (
+    <select aria-label={`Model: ${cur.label} · ${cur.model}`} value={cur.id} disabled={disabled} onChange={(e) => onChange(e.target.value as ChatChoice)}
+      className="absolute inset-0 cursor-pointer opacity-0 disabled:cursor-not-allowed">
+      {options.map((o) => <option key={o.id} value={o.id}>{o.label} · {o.model}</option>)}
+    </select>
+  );
+  if (compact) {
+    // the native select opens the device's own picker (a sheet on phones), so it always stays on screen
+    return (
+      <label data-tour="model" title={tip}
+        className="relative grid h-7 w-7 shrink-0 place-items-center rounded-lg text-slate-400 hover:bg-white/70 hover:text-slate-600">
+        <Icon size={15} aria-hidden />
+        {dot && <span className="absolute right-1 top-1 grid place-items-center">{dot}</span>}
+        {cur.id === "local" && busy && <span className="absolute -bottom-0.5 -right-0.5 rounded-full bg-amber-500 px-1 text-[9px] font-semibold leading-[13px] text-white">{ahead || "1"}</span>}
+        {select}
+      </label>
+    );
+  }
   return (
-    <label data-tour="model" title={`Model: ${cur.label} · ${cur.model}${gpu ? ` · ${gpu}` : ""}`}
+    <label data-tour="model" title={tip}
       className="relative flex h-7 max-w-[10rem] shrink-0 items-center gap-1 rounded-lg border border-slate-200 bg-white/80 pl-2 pr-1.5 text-xs text-slate-600 hover:border-slate-300 hover:text-slate-800">
       <Icon size={13} className="shrink-0" aria-hidden />
-      {q && <span aria-hidden className={`size-1.5 shrink-0 rounded-full ${!q.available ? "bg-rose-500" : disabled ? "animate-pulse bg-sky-500" : busy ? "bg-amber-500" : "bg-emerald-500"}`} />}
+      {dot}
       <span className="truncate"><span className="font-medium">{cur.label}</span>{cur.id === "local" && busy && <span className="text-amber-700"> · {ahead ? `${ahead} ahead` : "next"}</span>}</span>
       <ChevronDown size={12} className="shrink-0 text-slate-400" aria-hidden />
-      <select aria-label="Model" value={cur.id} disabled={disabled} onChange={(e) => onChange(e.target.value as ChatChoice)}
-        className="absolute inset-0 cursor-pointer opacity-0 disabled:cursor-not-allowed">
-        {options.map((o) => <option key={o.id} value={o.id}>{o.label} · {o.model}</option>)}
-      </select>
+      {select}
     </label>
   );
 }

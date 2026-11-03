@@ -433,7 +433,11 @@ export function CoreTraceMap() {
               <h2 className="font-display text-[15px] font-semibold text-slate-900">Ask about the core</h2>
               <p className="truncate text-xs text-slate-500">{selected ? `Talking about ${selected.name}${metre !== null ? `, ${metre} m` : ""}` : "Any hole, metre or model, in any language"}</p>
             </div>
-            <button type="button" onClick={() => setChatOpen(false)} aria-label="Close the assistant" className="grid size-8 place-items-center rounded-lg text-slate-500 hover:bg-slate-100"><X size={16} /></button>
+            <div className="flex shrink-0 items-center gap-1">
+              {/* the chat's own tools (the model picker) land here, so the composer keeps the box, the mic and send */}
+              <div id="corechat-tools" className="flex items-center" />
+              <button type="button" onClick={() => setChatOpen(false)} aria-label="Close the assistant" className="grid size-8 place-items-center rounded-lg text-slate-500 hover:bg-slate-100"><X size={16} /></button>
+            </div>
           </div>
           <CoreChat context={{ hole: selected?.key ?? null, m: metre, model: sp.get("model") }} onOpen={openFromChat} signedIn={authed} onSignIn={toSignIn} />
         </aside>

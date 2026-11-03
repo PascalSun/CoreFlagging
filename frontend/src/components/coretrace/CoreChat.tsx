@@ -2,6 +2,7 @@
 
 import { MicButton } from "@/components/MicButton";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { ModelPicker, ModelTag, useChatModel } from "@/components/chat/ModelPicker";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, lastAssistantMessageIsCompleteWithToolCalls } from "ai";
@@ -109,7 +110,10 @@ export function CoreChat({ context, onOpen, signedIn, onSignIn }: {
   const [input, setInput] = useState("");
   const endRef = useRef<HTMLDivElement>(null);
 
-  const { options: llmOptions, choice: llmChoice, setChoice: setLlm, ref: llmRef } = useChatModel();   // cloud or local model, picked in the input bar
+  const { options: llmOptions, choice: llmChoice, setChoice: setLlm, ref: llmRef } = useChatModel();   // cloud or local model, picked in the panel's header
+  // the panel header's slot for the chat's tools (CoreTraceMap renders it before this mounts)
+  const [toolsSlot, setToolsSlot] = useState<HTMLElement | null>(null);
+  useEffect(() => { const id = requestAnimationFrame(() => setToolsSlot(document.getElementById("corechat-tools"))); return () => cancelAnimationFrame(id); }, []);
   // built once; its callbacks read the refs when a message is sent, not during render
   // eslint-disable-next-line react-hooks/refs
   const transport = useMemo(() => new DefaultChatTransport({
@@ -195,6 +199,8 @@ export function CoreChat({ context, onOpen, signedIn, onSignIn }: {
   }
   return (
     <div className="flex min-h-0 flex-1 flex-col">
+      {/* the model (Cloud / Local) sits in the panel's header beside the close button (CoreTraceMap's slot) */}
+      {toolsSlot && createPortal(<ModelPicker compact options={llmOptions} choice={llmChoice} onChange={setLlm} disabled={busy} />, toolsSlot)}
       <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
         {messages.length > 0 && (
           <div className="sticky top-0 z-10 -mx-4 -mt-3 mb-1 flex justify-end bg-gradient-to-b from-white via-white/90 to-transparent px-4 pt-2 pb-3">
@@ -253,7 +259,6 @@ export function CoreChat({ context, onOpen, signedIn, onSignIn }: {
           <textarea value={input} onChange={(e) => setInput(e.target.value)} rows={1} placeholder={context.hole ? `Ask about ${context.hole}…` : "Ask about the core…"} aria-label="Message"
             onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(input); } }}
             className="max-h-[96px] min-h-[24px] flex-1 resize-none overflow-y-auto bg-transparent text-base leading-[22px] text-slate-700 outline-none placeholder:text-slate-400 sm:text-sm" />
-          <ModelPicker options={llmOptions} choice={llmChoice} onChange={setLlm} disabled={busy} />
           {/* speak instead of typing: the words land in the box to read and send (never sent by themselves) */}
           <MicButton value={input} onChange={setInput} size={28} />
           <button type="submit" disabled={busy || !input.trim()} aria-label="Send" className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-slate-900 text-white transition-opacity disabled:opacity-40">{busy ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}</button>
