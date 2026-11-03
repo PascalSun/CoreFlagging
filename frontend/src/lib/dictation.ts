@@ -1,5 +1,5 @@
 "use client";
-// Speak instead of typing. Signed in, the words come from our own Whisper (large-v3-turbo on the GPU, through the LLM
+// Speak instead of typing. Signed in, the words come from our own Whisper (on the GPU, through the LLM
 // gateway): the page streams the microphone to it and the text grows in the field while one speaks, every ~0.6 s,
 // with the site's own place names and terms spelt right. Otherwise, or when that is not reachable, the browser's own
 // speech recognition (Web Speech API: Safari on iPhone/iPad from iOS 14.5, Chrome, Edge; not Firefox). Either way the
@@ -101,21 +101,37 @@ export class Pcm16k {
   }
 }
 
-/** An audio context at 16 kHz, so the browser resamples the microphone (well, and off the main thread); one at the
- * device's rate if this browser cannot make that. Made inside the tap and resumed there: iOS starts audio only from
- * a gesture. */
-export function audioContext16k(): AudioContext {
-  let ctx: AudioContext;
-  try { ctx = new AudioContext({ sampleRate: 16000 }); } catch { ctx = new AudioContext(); }
-  void ctx.resume();
+/** An audio context at the device's rate (never another: WebKit, iOS above all, then hands the page silence from
+ * the microphone), its samples resampled to 16 kHz by Pcm16k. Made inside the tap and resumed there: iOS starts audio
+ * only from a gesture. */
+export function audioContext(): AudioContext {
+  const ctx = new AudioContext();
+  void ctx.resume().catch(() => {});
   return ctx;
 }
 
-type Live = { ws: WebSocket | null; ctx: AudioContext | null; stream: MediaStream | null; node: AudioWorkletNode | null };
+/** How long the microphone has to send sound before it is taken as dead (no frames, or only zeros). */
+const WATCH_MS = 1500;
+/** Below this RMS (about -100 dBFS) the first second is silence no microphone makes: zeros. */
+const DEAD_RMS = 1e-5;
+
+/** Said next to the button: the microphone sent nothing, so the browser's recogniser took over, or nothing could. */
+export type DictationNotice = "fallback" | "nosound" | null;
+
+type Live = {
+  ws: WebSocket | null; ctx: AudioContext | null; stream: MediaStream | null; node: AudioWorkletNode | null;
+  watch?: ReturnType<typeof setTimeout>; stopping?: boolean;
+};
 
 /** Dictation into a text value: `start(current)` keeps what is already typed and appends what is heard. */
 export function useDictation(lang: string, onText: (text: string) => void) {
   const [state, setState] = useState<DictationState>("idle");
+  const [notice, setNotice] = useState<DictationNotice>(null);
+  useEffect(() => {                                // a note, not a state: it goes by itself
+    if (!notice) return;
+    const id = setTimeout(() => setNotice(null), 6000);
+    return () => clearTimeout(id);
+  }, [notice]);
   const rec = useRef<Recognition | null>(null);
   const live = useRef<Live | null>(null);
   const onTextRef = useRef(onText);
@@ -125,6 +141,8 @@ export function useDictation(lang: string, onText: (text: string) => void) {
     const l = live.current;
     live.current = null;
     if (!l) return;
+    clearTimeout(l.watch);
+    if (l.ctx) l.ctx.onstatechange = null;
     l.node?.disconnect();
     l.stream?.getTracks().forEach((t) => t.stop());
     l.ctx?.close().catch(() => {});
@@ -167,11 +185,11 @@ export function useDictation(lang: string, onText: (text: string) => void) {
   }, [lang]);
 
   /** Our Whisper, streamed: a session from this site's server, the microphone, a socket to the gateway. */
-  const startStream = useCallback(async (current: string, first: AudioContext): Promise<boolean> => {
+  const startStream = useCallback(async (current: string, first: AudioContext, dead: () => void): Promise<boolean> => {
     const token = authToken();
     if (!token) return false;
     const base = current.trimEnd();
-    let ctx = first;
+    const ctx = first;
     const l: Live = { ws: null, ctx, stream: null, node: null };
     live.current = l;
     let session: { url?: string };
@@ -213,36 +231,51 @@ export function useDictation(lang: string, onText: (text: string) => void) {
         const m = JSON.parse(typeof ev.data === "string" ? ev.data : "") as { type: string; committed?: string; tentative?: string; text?: string };
         if (m.type === "partial") onTextRef.current(joinText(base, [m.committed, m.tentative].filter(Boolean).join(" ").trim()));
         else if (m.type === "final") onTextRef.current(joinText(base, (m.text ?? "").trim()));
-        else if (m.type === "error") setState("error");
+        else if (m.type === "error") {
+          if ((m as { reason?: string }).reason === "no-audio" && !l.stopping) dead();   // the server heard nothing
+          else setState("error");
+        }
       } catch { /* not ours */ }
     };
     ws.onclose = () => { release(); setState((s) => (s === "listening" ? "idle" : s)); };
     ws.onerror = () => { release(); setState((s) => (s === "listening" ? "error" : s)); };
-    let src: MediaStreamAudioSourceNode;
-    try {
-      src = ctx.createMediaStreamSource(l.stream);
-    } catch {
-      // Firefox will not join a microphone to a context at another rate: one at the device's rate, resampled here
-      void ctx.close().catch(() => {});
-      ctx = new AudioContext();
-      void ctx.resume();
-      l.ctx = ctx;
-      src = ctx.createMediaStreamSource(l.stream);
-    }
+    const src = ctx.createMediaStreamSource(l.stream);
     await ctx.audioWorklet.addModule(URL.createObjectURL(new Blob([TAP], { type: "application/javascript" })));
+    if (live.current !== l) return true;            // stopped meanwhile
     const node = new AudioWorkletNode(ctx, "pcm-tap");
     const mute = ctx.createGain();
     mute.gain.value = 0;                             // the worklet must reach the output to run; it is not heard
     const pcm = new Pcm16k(ctx.sampleRate, (b) => { if (ws.readyState === WebSocket.OPEN) ws.send(b); });
-    node.port.onmessage = (e: MessageEvent<Float32Array>) => pcm.push(e.data);
+    // the first second's level: a microphone that sends only zeros is dead (another app has it, an iOS audio session
+    // switch, a rate the browser will not convert), never a quiet room
+    let frames = 0, heard = 0, energy = 0;
+    const second = ctx.sampleRate;
+    node.port.onmessage = (e: MessageEvent<Float32Array>) => {
+      frames++;
+      const x = e.data;
+      for (let i = 0; i < x.length && heard < second; i++, heard++) energy += x[i] * x[i];
+      pcm.push(x);
+    };
     src.connect(node).connect(mute).connect(ctx.destination);
     l.node = node;
+    // getUserMedia switches iOS to play-and-record, which can suspend or interrupt the context made in the tap:
+    // resume it now, and again whenever that happens while listening
+    const c = ctx;
+    c.onstatechange = () => {
+      if (live.current === l && (c.state === "suspended" || (c.state as string) === "interrupted")) void c.resume().catch(() => {});
+    };
+    await c.resume().catch(() => {});
+    l.watch = setTimeout(() => {
+      if (live.current !== l || l.stopping) return;
+      if (!frames || (heard && Math.sqrt(energy / heard) < DEAD_RMS)) dead();
+    }, WATCH_MS);
     return true;
   }, [lang, release]);
 
   const stop = useCallback(() => {
     rec.current?.stop();
     const l = live.current;
+    if (l) l.stopping = true;
     if (l?.ws?.readyState === WebSocket.OPEN) {
       l.ws.send(JSON.stringify({ type: "end" }));   // the final text comes, then the gateway closes the socket
       l.node?.disconnect();
@@ -256,14 +289,21 @@ export function useDictation(lang: string, onText: (text: string) => void) {
   const start = useCallback((current: string) => {
     rec.current?.abort();
     release();
+    setNotice(null);
     if (canStream() && authToken()) {
       // the audio context is made now, inside the tap: Safari lets audio start only from a gesture
       let ctx: AudioContext | null = null;
-      try { ctx = audioContext16k(); } catch { ctx = null; }
+      try { ctx = audioContext(); } catch { ctx = null; }
       if (ctx) {
         setState("listening");
         const c = ctx;
-        void startStream(current, c).then((handled) => {
+        // no sound reaches us: never a mic that listens to nothing; the browser's recogniser if there is one
+        const dead = () => {
+          release();
+          if (recognitionCtor()) { setNotice("fallback"); startBrowser(current); }
+          else { setNotice("nosound"); setState("error"); }
+        };
+        void startStream(current, c, dead).then((handled) => {
           if (!handled) { c.close().catch(() => {}); if (recognitionCtor()) startBrowser(current); else setState("error"); }
         }).catch(() => { release(); if (recognitionCtor()) startBrowser(current); else setState("error"); });
         return;
@@ -272,6 +312,6 @@ export function useDictation(lang: string, onText: (text: string) => void) {
     startBrowser(current);
   }, [release, startBrowser, startStream]);
 
-  const reset = useCallback(() => setState("idle"), []);
-  return { state, start, stop, reset };
+  const reset = useCallback(() => { setState("idle"); setNotice(null); }, []);
+  return { state, notice, start, stop, reset };
 }
