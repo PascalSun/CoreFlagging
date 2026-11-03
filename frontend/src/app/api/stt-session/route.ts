@@ -38,9 +38,9 @@ export async function POST(req: Request) {
     const r = await fetch(`${GATEWAY}/v1/audio/sessions`, {
       method: "POST", cache: "no-store",
       headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json", "X-Priority": "interactive" },
-      // the language is detected from the speech (one may speak Chinese with the English page); the vocabulary
-      // follows the page's language
-      body: JSON.stringify({ prompt: STT_VOCAB[base] ?? STT_VOCAB.en }),
+      // the language is detected from the speech (one may speak Chinese with the English page): the page's
+      // vocabulary until it is heard, then that language's
+      body: JSON.stringify({ prompt: STT_VOCAB[base] ?? STT_VOCAB.en, prompts: STT_VOCAB }),
     });
     if (!r.ok) return Response.json({ error: `gateway ${r.status}` }, { status: 502 });
     const s = (await r.json()) as { url: string; expires_in: number };
