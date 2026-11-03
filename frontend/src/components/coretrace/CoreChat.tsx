@@ -109,6 +109,16 @@ export function CoreChat({ context, onOpen, signedIn, onSignIn }: {
   useEffect(() => { ctxRef.current = context; openRef.current = onOpen; });
   const [input, setInput] = useState("");
   const endRef = useRef<HTMLDivElement>(null);
+  // the message box grows with its text (typed or dictated) to 5 lines, then scrolls; while the mic has the
+  // focus the newest words stay in view
+  const box = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    const el = box.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, 5 * 22 + 4)}px`;
+    if (document.activeElement !== el) el.scrollTop = el.scrollHeight;
+  }, [input]);
 
   const { options: llmOptions, choice: llmChoice, setChoice: setLlm, ref: llmRef } = useChatModel();   // cloud or local model, picked in the panel's header
   // the panel header's slot for the chat's tools (CoreTraceMap renders it before this mounts)
@@ -256,9 +266,9 @@ export function CoreChat({ context, onOpen, signedIn, onSignIn }: {
       </div>
       <form className="p-3" onSubmit={(e) => { e.preventDefault(); send(input); }}>
         <div className="flex items-end gap-2 rounded-2xl border border-slate-200/70 bg-white/60 px-2.5 py-1.5 focus-within:border-slate-400">
-          <textarea value={input} onChange={(e) => setInput(e.target.value)} rows={1} placeholder={context.hole ? `Ask about ${context.hole}…` : "Ask about the core…"} aria-label="Message"
+          <textarea ref={box} value={input} onChange={(e) => setInput(e.target.value)} rows={1} placeholder={context.hole ? `Ask about ${context.hole}…` : "Ask about the core…"} aria-label="Message"
             onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(input); } }}
-            className="max-h-[96px] min-h-[24px] flex-1 resize-none overflow-y-auto bg-transparent text-base leading-[22px] text-slate-700 outline-none placeholder:text-slate-400 sm:text-sm" />
+            className="max-h-[114px] min-h-[24px] flex-1 resize-none overflow-y-auto bg-transparent text-base leading-[22px] text-slate-700 outline-none placeholder:text-slate-400 sm:text-sm" />
           {/* speak instead of typing: the words land in the box to read and send (never sent by themselves) */}
           <MicButton value={input} onChange={setInput} size={28} />
           <button type="submit" disabled={busy || !input.trim()} aria-label="Send" className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-slate-900 text-white transition-opacity disabled:opacity-40">{busy ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}</button>
