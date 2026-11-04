@@ -233,6 +233,8 @@ function SampleLevel({ hole, from, to }: { hole: HoleDetail; from: number; to: n
   const colW = img.w && img.h ? Math.max(56, Math.min(180, Math.round((H * img.w) / img.h))) : 120;
   const ticks = useMemo(() => sampleTicks(samples, hi - lo, hp ? Math.ceil(14 / hp) : 1), [samples, hi, lo, hp]);
   const breaks = useMemo(() => samples.flatMap((s, k) => k && (s.tray !== samples[k - 1].tray || s.section !== samples[k - 1].section) ? [{ k, label: s.tray !== samples[k - 1].tray ? `tray ${s.tray}` : `section ${s.section}` }] : []), [samples]);
+  // pointer move reads with a mouse; pointer down is a tap on a phone
+  const readAt = (e: React.PointerEvent<HTMLDivElement>) => { const y = e.clientY - e.currentTarget.getBoundingClientRect().top; setHov(Math.max(0, Math.min(n - 1, Math.floor(y / hp)))); };
   const hs: Sample | null = hov !== null ? samples[hov] ?? null : null;
   const status = (sq.error as { status?: number } | null)?.status;
   const col = (g: string | undefined, m: string | undefined) => (m ? groupColor(g) : "#e2e8f0");
@@ -259,9 +261,9 @@ function SampleLevel({ hole, from, to }: { hole: HoleDetail; from: number; to: n
           </div>
           <div className="max-h-[70vh] flex-none overflow-y-auto overscroll-contain rounded-md @md:order-1">
             <div className="relative flex gap-1" style={{ height: H }} onMouseLeave={() => setHov(null)}
-              onPointerMove={(e) => { const y = e.clientY - e.currentTarget.getBoundingClientRect().top; setHov(Math.max(0, Math.min(n - 1, Math.floor(y / hp)))); }}>
+              onPointerMove={(e) => readAt(e)} onPointerDown={(e) => readAt(e)}>
               <div className="relative w-12 flex-none font-mono text-[9px] text-slate-400">
-                {ticks.map((t) => <span key={t.k} className="absolute right-1 -translate-y-1/2 whitespace-nowrap" style={{ top: t.k * hp }}>{t.d}</span>)}
+                {ticks.map((t) => <span key={t.k} className={cn("absolute right-1 whitespace-nowrap", t.k ? "-translate-y-1/2" : "")} style={{ top: t.k * hp }}>{t.d}</span>)}
               </div>
               <div className="relative flex-none overflow-hidden bg-slate-100" style={{ width: colW, height: H }}>
                 {/* stretched to the columns' height on purpose: its rows are the samples, one block each */}

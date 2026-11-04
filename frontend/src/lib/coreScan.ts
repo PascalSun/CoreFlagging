@@ -253,6 +253,7 @@ export const coreScan = {
       const b = (await res.json().catch(() => ({}))) as { error?: string; message?: string; detail?: string };
       const why = b.message || b.detail || b.error;
       throw new CoreError(res.status, why || (res.status === 404 ? "The sample sheets are not available for this hole (no package or line scan to read)."
+        : res.status === 401 || res.status === 403 ? `The platform did not allow this (${res.status}). Sign in if the scan is your own upload.`
         : res.status >= 500 ? "The sheet service is not answering right now; try again in a minute." : `request failed (${res.status})`), b.error);
     }
     return res.blob();
