@@ -43,8 +43,11 @@ export function MicButton({ value, onChange, onStart, onListening, size = 28, ti
   const supported = useDictationSupported();
   const { locale } = useLocale();
   const tx = VOICE_TEXT[locale] ?? VOICE_TEXT.en;
-  const { state, notice, start, stop, reset } = useDictation(SPEECH_LANG[locale] ?? "en-AU", onChange);
+  const { state, notice, start, stop, reset, prewarm } = useDictation(SPEECH_LANG[locale] ?? "en-AU", onChange);
   const listening = state === "listening";
+  // tapped, the microphone not sending yet: no pulse until what is said is kept (it is, from its first frame)
+  const starting = state === "starting";
+  const active = listening || starting;
 
   useEffect(() => { onListening?.(listening); }, [listening, onListening]);
   useEffect(() => {
@@ -54,26 +57,31 @@ export function MicButton({ value, onChange, onStart, onListening, size = 28, ti
   }, [state, reset]);
 
   if (!supported) return null;
-  const label = listening ? tx.stop : tx.start;
+  const label = active ? tx.stop : tx.start;
   return (
     <span className="relative inline-flex shrink-0">
       <button
         type="button"
         aria-label={label}
         title={label}
-        aria-pressed={listening}
-        onClick={() => { if (listening) stop(); else { onStart?.(); start(value); } }}
+        aria-pressed={active}
+        aria-busy={starting}
+        // the session is asked for as a tap may come, so the socket opens sooner
+        onPointerEnter={prewarm}
+        onPointerDown={prewarm}
+        onFocus={prewarm}
+        onClick={() => { if (active) stop(); else { onStart?.(); start(value); } }}
         style={{ width: size, height: size }}
         // a 44px tap area around a smaller mark, like the field's other buttons
         className={`relative grid place-items-center rounded-full transition-colors before:absolute before:-inset-2 before:content-[''] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900 ${
-          listening ? "bg-rose-600 text-white" : "text-slate-500 hover:bg-slate-100 hover:text-slate-800"} ${className}`}
+          listening ? "bg-rose-600 text-white" : starting ? "bg-rose-100 text-rose-600 ring-2 ring-rose-300" : "text-slate-500 hover:bg-slate-100 hover:text-slate-800"} ${className}`}
       >
         {listening ? (
           <>
             <span aria-hidden className="absolute inset-0 animate-ping rounded-full bg-rose-500/40 motion-reduce:animate-none" />
             <Square size={Math.round(size * 0.38)} className="relative fill-current" />
           </>
-        ) : <Mic size={Math.round(size * 0.58)} />}
+        ) : <Mic size={Math.round(size * 0.58)} className={starting ? "animate-pulse motion-reduce:animate-none" : undefined} />}
       </button>
       {(state === "denied" || state === "error" || notice) && (
         <span role="status"

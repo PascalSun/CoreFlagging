@@ -47,7 +47,8 @@ export function useDictationSupported(): boolean {
   return useSyncExternalStore(noop, () => recognitionCtor() !== null || (canStream() && !!authToken()), () => false);
 }
 
-export type DictationState = "idle" | "listening" | "denied" | "error";
+/** "starting": tapped, the microphone not yet sending; "listening": it is (what is said from here is kept). */
+export type DictationState = "idle" | "starting" | "listening" | "denied" | "error";
 
 const joinText = (base: string, heard: string) => (base && heard ? `${base} ${heard}` : base || heard);
 
@@ -121,7 +122,59 @@ export type DictationNotice = "fallback" | "nosound" | null;
 type Live = {
   ws: WebSocket | null; ctx: AudioContext | null; stream: MediaStream | null; node: AudioWorkletNode | null;
   watch?: ReturnType<typeof setTimeout>; stopping?: boolean;
+  /** the 16 kHz PCM heard before the socket is open, sent first and in order when it opens; null once it has */
+  queue: ArrayBuffer[] | null;
+  frames: number;
 };
+
+/** At most this much is kept while the socket opens (100 ms frames): 10 s. */
+const QUEUE_MAX = 100;
+
+/* A live session (one-use, short-lived) asked for ahead of the tap, so the socket opens sooner: on the button's hover,
+ * focus or press. Kept until used or nearly expired; one per page language. */
+type Session = { url: string; exp: number };
+const sessions = new Map<string, { s?: Session; pending?: Promise<Session | null> }>();
+
+async function fetchSession(lang: string, token: string): Promise<Session | null> {
+  try {
+    const res = await fetch(SESSION_PATH, {
+      method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ lang }),
+    });
+    if (!res.ok) return null;
+    const j = (await res.json()) as { url?: string; expires_in?: number };
+    if (!j.url) return null;
+    return { url: j.url, exp: Date.now() + Math.max(5, (j.expires_in ?? 60) - 15) * 1000 };
+  } catch {
+    return null;
+  }
+}
+
+/** Ask for a session now, for a tap that may come (nothing if one is in hand or on its way). */
+function prewarmSession(lang: string): void {
+  const token = authToken();
+  if (!token || !canStream()) return;
+  const e = sessions.get(lang) ?? {};
+  if ((e.s && e.s.exp > Date.now()) || e.pending) return;
+  const pending = fetchSession(lang, token).then((s) => {
+    const cur = sessions.get(lang);
+    if (cur?.pending === pending) sessions.set(lang, s ? { s } : {});
+    return s;
+  });
+  sessions.set(lang, { pending });
+}
+
+/** The session for this tap: the one asked for ahead if it is still good (each opens one stream), else a new one. */
+async function takeSession(lang: string, token: string): Promise<Session | null> {
+  const e = sessions.get(lang);
+  sessions.delete(lang);
+  if (e?.s && e.s.exp > Date.now()) return e.s;
+  if (e?.pending) {
+    const s = await e.pending;
+    if (s && s.exp > Date.now()) return s;
+  }
+  return fetchSession(lang, token);
+}
 
 /** Dictation into a text value: `start(current)` keeps what is already typed and appends what is heard. */
 export function useDictation(lang: string, onText: (text: string) => void) {
@@ -184,26 +237,16 @@ export function useDictation(lang: string, onText: (text: string) => void) {
     }
   }, [lang]);
 
-  /** Our Whisper, streamed: a session from this site's server, the microphone, a socket to the gateway. */
-  const startStream = useCallback(async (current: string, first: AudioContext, dead: () => void): Promise<boolean> => {
+  /** Our Whisper, streamed: the microphone at once (what is said is kept from its first frame), and meanwhile a
+   * session from this site's server and a socket to the gateway; what was heard before the socket opened goes
+   * first. */
+  const startStream = useCallback(async (current: string, ctx: AudioContext, dead: () => void): Promise<boolean> => {
     const token = authToken();
     if (!token) return false;
     const base = current.trimEnd();
-    const ctx = first;
-    const l: Live = { ws: null, ctx, stream: null, node: null };
+    const l: Live = { ws: null, ctx, stream: null, node: null, queue: [], frames: 0 };
     live.current = l;
-    let session: { url?: string };
-    try {
-      const res = await fetch(SESSION_PATH, {
-        method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ lang }),
-      });
-      if (!res.ok) throw new Error(String(res.status));
-      session = await res.json();
-      if (!session.url) throw new Error("no url");
-    } catch {
-      return false;                                 // not reachable: the browser's recogniser instead
-    }
+    const session = takeSession(lang, token);      // in parallel with the microphone
     try {
       // the voice as it is: a phone's echo cancelling and noise suppression are tuned for calls, and they cut and
       // smear what Whisper hears (it was trained on plain recordings); the gain control keeps a far voice loud enough
@@ -211,12 +254,53 @@ export function useDictation(lang: string, onText: (text: string) => void) {
         audio: { channelCount: 1, echoCancellation: false, noiseSuppression: false, autoGainControl: true },
       });
     } catch (e) {
-      release();
+      if (live.current === l) release();
       setState((e as DOMException)?.name === "NotAllowedError" ? "denied" : "error");
       return true;                                  // handled: no fallback (it would ask for the microphone again)
     }
     if (live.current !== l) { l.stream.getTracks().forEach((t) => t.stop()); return true; }  // stopped meanwhile
-    const ws = new WebSocket(session.url);
+    const src = ctx.createMediaStreamSource(l.stream);
+    await ctx.audioWorklet.addModule(URL.createObjectURL(new Blob([TAP], { type: "application/javascript" })));
+    if (live.current !== l) return true;
+    const node = new AudioWorkletNode(ctx, "pcm-tap");
+    const mute = ctx.createGain();
+    mute.gain.value = 0;                             // the worklet must reach the output to run; it is not heard
+    const pcm = new Pcm16k(ctx.sampleRate, (b) => {
+      if (l.queue) { if (l.queue.length < QUEUE_MAX) l.queue.push(b); }
+      else if (l.ws?.readyState === WebSocket.OPEN) l.ws.send(b);
+    });
+    // the first second's level: a microphone that sends only zeros is dead (another app has it, an iOS audio session
+    // switch, a rate the browser will not convert), never a quiet room
+    let heard = 0, energy = 0;
+    const second = ctx.sampleRate;
+    node.port.onmessage = (e: MessageEvent<Float32Array>) => {
+      if (l.frames++ === 0 && live.current === l) setState((s) => (s === "starting" ? "listening" : s));  // it hears now
+      const x = e.data;
+      for (let i = 0; i < x.length && heard < second; i++, heard++) energy += x[i] * x[i];
+      pcm.push(x);
+    };
+    src.connect(node).connect(mute).connect(ctx.destination);
+    l.node = node;
+    // getUserMedia switches iOS to play-and-record, which can suspend or interrupt the context made in the tap:
+    // resume it now, and again whenever that happens while listening
+    ctx.onstatechange = () => {
+      if (live.current === l && (ctx.state === "suspended" || (ctx.state as string) === "interrupted")) void ctx.resume().catch(() => {});
+    };
+    await ctx.resume().catch(() => {});
+    l.watch = setTimeout(() => {
+      if (live.current !== l || l.stopping) return;
+      if (!l.frames || (heard && Math.sqrt(energy / heard) < DEAD_RMS)) dead();
+    }, WATCH_MS);
+
+    // the socket, while the microphone is already heard
+    const s = await session;
+    if (live.current !== l) return true;
+    if (!s) {
+      if (l.stopping) { release(); setState("idle"); return true; }
+      release();
+      return false;                                 // not reachable: the browser's recogniser instead
+    }
+    const ws = new WebSocket(s.url);
     ws.binaryType = "arraybuffer";
     l.ws = ws;
     const opened = await new Promise<boolean>((ok) => {
@@ -225,7 +309,12 @@ export function useDictation(lang: string, onText: (text: string) => void) {
       ws.onerror = () => { clearTimeout(t); ok(false); };
       ws.onclose = () => { clearTimeout(t); ok(false); };
     });
-    if (!opened) { release(); return false; }
+    if (live.current !== l) return true;
+    if (!opened) {
+      if (l.stopping) { release(); setState("idle"); return true; }
+      release();
+      return false;
+    }
     ws.onmessage = (ev) => {
       try {
         const m = JSON.parse(typeof ev.data === "string" ? ev.data : "") as { type: string; committed?: string; tentative?: string; text?: string };
@@ -237,47 +326,26 @@ export function useDictation(lang: string, onText: (text: string) => void) {
         }
       } catch { /* not ours */ }
     };
-    ws.onclose = () => { release(); setState((s) => (s === "listening" ? "idle" : s)); };
-    ws.onerror = () => { release(); setState((s) => (s === "listening" ? "error" : s)); };
-    const src = ctx.createMediaStreamSource(l.stream);
-    await ctx.audioWorklet.addModule(URL.createObjectURL(new Blob([TAP], { type: "application/javascript" })));
-    if (live.current !== l) return true;            // stopped meanwhile
-    const node = new AudioWorkletNode(ctx, "pcm-tap");
-    const mute = ctx.createGain();
-    mute.gain.value = 0;                             // the worklet must reach the output to run; it is not heard
-    const pcm = new Pcm16k(ctx.sampleRate, (b) => { if (ws.readyState === WebSocket.OPEN) ws.send(b); });
-    // the first second's level: a microphone that sends only zeros is dead (another app has it, an iOS audio session
-    // switch, a rate the browser will not convert), never a quiet room
-    let frames = 0, heard = 0, energy = 0;
-    const second = ctx.sampleRate;
-    node.port.onmessage = (e: MessageEvent<Float32Array>) => {
-      frames++;
-      const x = e.data;
-      for (let i = 0; i < x.length && heard < second; i++, heard++) energy += x[i] * x[i];
-      pcm.push(x);
-    };
-    src.connect(node).connect(mute).connect(ctx.destination);
-    l.node = node;
-    // getUserMedia switches iOS to play-and-record, which can suspend or interrupt the context made in the tap:
-    // resume it now, and again whenever that happens while listening
-    const c = ctx;
-    c.onstatechange = () => {
-      if (live.current === l && (c.state === "suspended" || (c.state as string) === "interrupted")) void c.resume().catch(() => {});
-    };
-    await c.resume().catch(() => {});
-    l.watch = setTimeout(() => {
-      if (live.current !== l || l.stopping) return;
-      if (!frames || (heard && Math.sqrt(energy / heard) < DEAD_RMS)) dead();
-    }, WATCH_MS);
+    ws.onclose = () => { release(); setState((st) => (st === "listening" || st === "starting" ? "idle" : st)); };
+    ws.onerror = () => { release(); setState((st) => (st === "listening" || st === "starting" ? "error" : st)); };
+    const q = l.queue ?? [];
+    l.queue = null;                                  // from now on frames go straight to the socket
+    for (const b of q) ws.send(b);                   // what was said while the socket opened, first, in order
+    if (l.stopping) ws.send(JSON.stringify({ type: "end" }));   // the tap to stop came already: the final follows
     return true;
   }, [lang, release]);
 
   const stop = useCallback(() => {
     rec.current?.stop();
     const l = live.current;
-    if (l) l.stopping = true;
-    if (l?.ws?.readyState === WebSocket.OPEN) {
+    if (!l) { setState("idle"); return; }
+    l.stopping = true;
+    if (l.ws?.readyState === WebSocket.OPEN && !l.queue) {
       l.ws.send(JSON.stringify({ type: "end" }));   // the final text comes, then the gateway closes the socket
+      l.node?.disconnect();
+      l.stream?.getTracks().forEach((t) => t.stop());
+    } else if (l.queue?.length) {
+      // heard already, the socket still opening: stop hearing; what was heard goes when it opens, then the final
       l.node?.disconnect();
       l.stream?.getTracks().forEach((t) => t.stop());
     } else {
@@ -295,7 +363,7 @@ export function useDictation(lang: string, onText: (text: string) => void) {
       let ctx: AudioContext | null = null;
       try { ctx = audioContext(); } catch { ctx = null; }
       if (ctx) {
-        setState("listening");
+        setState("starting");                       // "listening" once the microphone sends
         const c = ctx;
         // no sound reaches us: never a mic that listens to nothing; the browser's recogniser if there is one
         const dead = () => {
@@ -312,6 +380,9 @@ export function useDictation(lang: string, onText: (text: string) => void) {
     startBrowser(current);
   }, [release, startBrowser, startStream]);
 
+  /** A tap may come (hover, focus, press): ask for the session now, so the socket opens sooner. */
+  const prewarm = useCallback(() => prewarmSession(lang), [lang]);
+
   const reset = useCallback(() => { setState("idle"); setNotice(null); }, []);
-  return { state, notice, start, stop, reset };
+  return { state, notice, start, stop, reset, prewarm };
 }
