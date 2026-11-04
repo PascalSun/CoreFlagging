@@ -258,6 +258,19 @@ export const coreScan = {
     }
     return res.blob();
   },
+  /** One sample sheet drawn as a PNG, for the Sample sheets tab's preview (the caller makes and revokes the object
+   * URL). A platform or service that does not draw PNGs yet answers 400/422, or sends the PDF anyway: both are
+   * `CoreError(…, "no_preview")`, which the tab shows as "not available yet" rather than as a failure; 404 is the
+   * hole having no package to draw from (`"no_package"`). */
+  async sheetPreview(key: string, body: SheetsBody & { intervals: SheetInterval[] }): Promise<Blob> {
+    const res = await call(`/holes/${enc(key)}/sheets.pdf`, { method: "POST", body: JSON.stringify({ ...body, format: "png" }), headers: { "Content-Type": "application/json" } });
+    if (res.status === 404) throw new CoreError(404, "no package", "no_package");
+    if (res.status === 400 || res.status === 415 || res.status === 422) throw new CoreError(res.status, "no preview", "no_preview");
+    if (!res.ok) throw new CoreError(res.status, res.status >= 500 ? "The sheet service is not answering right now." : `request failed (${res.status})`);
+    const blob = await res.blob();
+    if (!(res.headers.get("content-type") || blob.type).startsWith("image/")) throw new CoreError(415, "no preview", "no_preview");
+    return blob;
+  },
   /** The full-resolution line-scan photograph of a window (up to 5 m), as an image URL. */
   linescanUrl: (key: string, from: number, to: number, width = 600) => `${CORE_BASE}/holes/${enc(key)}/linescan.jpg?from=${from}&to=${to}&width=${width}`,
   /** The hole as a line in space, with the holes within `km` and what to highlight. */

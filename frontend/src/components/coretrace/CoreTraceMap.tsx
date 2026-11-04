@@ -127,7 +127,8 @@ export function CoreTraceMap() {
   const hq = useQuery({ queryKey: ["core-holes", authed], queryFn: coreScan.holes, staleTime: 60_000, refetchInterval: (qq) => (qq.state.data?.holes.some((h) => h.mine && ACTIVE.includes(h.status)) ? 4000 : false), refetchIntervalInBackground: true });
   const holes = useMemo(() => hq.data?.holes ?? [], [hq.data]);
   const typeName = useMemo(() => new Map((hq.data?.core_types ?? []).map((c) => [c.k, c.name])), [hq.data]);
-  const tab = sp.get("tab") || "window";
+  // "" when the address names no tab: the panel then picks (Window, or Sample sheets for an upload with samples)
+  const tab = sp.get("tab") || "";
   /** The assistant names holes as readers do; find the one it means and open it. */
   const openFromChat = (t: OpenTarget): boolean => {
     const n = t.hole.trim().toLowerCase();

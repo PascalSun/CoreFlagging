@@ -20,12 +20,13 @@ import { SampleSheets } from "@/components/coretrace/SampleSheets";
 import { cn } from "@/lib/utils";
 import { PLATFORM_URL } from "@ntlp/geodata-web/fetch";
 
-export type Tab = "window" | "metre" | "again" | "log" | "similar" | "quality" | "report";
+export type Tab = "window" | "metre" | "again" | "log" | "similar" | "quality" | "report" | "sheets";
 // "log" (Auto log) is hidden: its view is kept below, but no tab opens it and a link with ?tab=log (or the old
 // ?tab=gold) falls back to Window. The auto log still shows as the BD column and in Window at 10 m.
 const TABS: { id: Tab; label: string }[] = [
   { id: "window", label: "Window" }, { id: "again", label: "Unusual" },
   { id: "similar", label: "Similar core" }, { id: "quality", label: "Data quality" }, { id: "report", label: "Report" },
+  { id: "sheets", label: "Sample sheets" },
 ];
 
 const Fact = ({ k, v, sub }: { k: string; v: React.ReactNode; sub?: string }) => (
@@ -292,7 +293,7 @@ function MetreTab({ hole, metre, previewing, mv, loading, trays, onMetre, typeNa
   );
 }
 
-function Report({ hole, models, mvw, run, trays, win }: { hole: HoleDetail; models: CoreModelInfo[]; mvw: ModelView | undefined; run: string; trays: Tray[]; win: Window | null }) {
+function Report({ hole, models, mvw, run, trays, onSheets }: { hole: HoleDetail; models: CoreModelInfo[]; mvw: ModelView | undefined; run: string; trays: Tray[]; onSheets: () => void }) {
   const docRef = useRef<HTMLDivElement>(null);
   const frameRef = useRef<HTMLDivElement>(null);
   // the page is A4 at its own width; on a narrower panel it is shown scaled down, never reflowed
@@ -319,7 +320,7 @@ function Report({ hole, models, mvw, run, trays, win }: { hole: HoleDetail; mode
         <button type="button" onClick={exportIssues} className="flex items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 sm:justify-start"><Download size={14} />Quality issues (CSV)</button>
         <span className="col-span-2 text-[11px] text-slate-500">The PDF is this page, as shown.</span>
       </div>
-      <SampleSheets hole={hole} trays={trays} win={win} />
+      <p className="-mt-2 text-xs text-slate-600">One page per sample or tray? <button type="button" onClick={onSheets} className="inline-flex items-center gap-1 font-medium text-slate-900 underline decoration-slate-300 underline-offset-2 hover:decoration-slate-900"><ArrowRight size={12} />Sample sheets</button></p>
       <div ref={frameRef} className="w-full">
         <div className="overflow-hidden rounded-md shadow-[0_1px_3px_rgba(15,23,42,0.12),0_8px_28px_rgba(15,23,42,0.08)] ring-1 ring-slate-200" style={{ width: PAGE_W * scale, height: docH * scale || undefined }}>
           <div style={{ transform: `scale(${scale})`, transformOrigin: "top left", width: PAGE_W }}>
@@ -346,11 +347,15 @@ export function HolePanel({ holeKey, tab: tabProp, onTab, models, run, metre, on
   const qc = useQueryClient();
   // the open tab lives in the address, so a link (or the assistant) can open a hole on any tab
   // the "again" tab reads "Unusual" ("unusual" in a link is its older id); "metre" (This metre) became the Window tab's 1 m level
-  const tab: Tab = tabProp === "unusual" ? "again" : TABS.some((t) => t.id === tabProp) ? (tabProp as Tab) : "window";
-  const setTab = onTab;
   const hq = useQuery({ queryKey: ["core-hole", holeKey], queryFn: () => coreScan.hole(holeKey), refetchInterval: (q) => (q.state.data && ACTIVE.includes(q.state.data.status) ? 2500 : false),
     refetchIntervalInBackground: true });   // an upload is left to run in another tab; it should be done when the reader comes back
   const hole = hq.data; const ready = hole?.status === "ready";
+  // with no tab in the address, an upload whose TSG names its samples opens on Sample sheets (what such a reader
+  // usually came for), anything else on Window; once the reader picks a tab, no tab in the address means Window
+  const [picked, setPicked] = useState(false);
+  const tab: Tab = tabProp === "unusual" ? "again" : TABS.some((t) => t.id === tabProp) ? (tabProp as Tab)
+    : !picked && !tabProp && hole?.source === "upload" && hole.samples?.length ? "sheets" : "window";
+  const setTab = (t: Tab) => { setPicked(true); onTab(t); };
   // a scan the models could not read (chips, an unusable mask, another band grid): shown, not modelled
   const displayOnly = !!hole && ready && hole.results.length === 0;
   // the default model first, the conventional methods last, as the service lists them otherwise
@@ -502,7 +507,7 @@ export function HolePanel({ holeKey, tab: tabProp, onTab, models, run, metre, on
           <StripLog range={win ?? undefined} onRange={onWindow} metres={hole.metres} model={mvw} spectral={slq.data} spectralFine={fineWin ? slf.data : undefined} tokens={fineWin ? tkq.data : undefined} cursor={metre} onCursor={(m) => {
             // a click on the log selects the metre; on the Window tab (above 1 m) and on the pages that do not read the
             // log, it opens the metre at 1 m
-            if (tab === "report" || tab === "quality") { setTab("window"); openMetre(m); }
+            if (tab === "report" || tab === "quality" || tab === "sheets") { setTab("window"); openMetre(m); }
             else if (tab === "window" && (!win || levelOf(win) === "hole" || levelOf(win) === "10m")) openMetre(m);
             else jump(m);
           }} hasLith={hole.has_lith} hasAu={hole.au_m > 0} />
@@ -520,7 +525,7 @@ export function HolePanel({ holeKey, tab: tabProp, onTab, models, run, metre, on
             )}
             {modelPicker && <div className="max-lg:hidden">{modelPicker}</div>}
             <div className="flex gap-1 max-lg:flex-wrap max-lg:gap-1.5 max-lg:pb-3 lg:overflow-x-auto lg:[scrollbar-width:none]" role="tablist">
-              {TABS.filter((t) => !displayOnly || t.id === "window" || t.id === "quality" || t.id === "report").map((t) => (
+              {TABS.filter((t) => !displayOnly || t.id === "window" || t.id === "quality" || t.id === "report" || t.id === "sheets").map((t) => (
                 <button key={t.id} role="tab" data-tour={`tab-${t.id}`} aria-selected={tab === t.id} type="button" onClick={() => setTab(t.id)}
                   className={cn("flex-none text-xs font-medium lg:border-b-2 lg:px-2.5 lg:py-2 max-lg:rounded-full max-lg:px-3 max-lg:py-1.5 max-lg:ring-1",
                     tab === t.id ? "lg:border-slate-900 text-slate-900 max-lg:bg-slate-900 max-lg:text-white max-lg:ring-slate-900" : "lg:border-transparent text-slate-500 hover:text-slate-800 max-lg:bg-white max-lg:ring-slate-200")}>
@@ -585,7 +590,8 @@ export function HolePanel({ holeKey, tab: tabProp, onTab, models, run, metre, on
                 </div>);
             })()}
             {tab === "quality" && <QualityChecks issues={hole.issues} datasets={hole.datasets} jump={jump} />}
-            {tab === "report" && <Report hole={hole} models={models} mvw={mvw} run={useRun} trays={trays} win={win} />}
+            {tab === "report" && <Report hole={hole} models={models} mvw={mvw} run={useRun} trays={trays} onSheets={() => setTab("sheets")} />}
+            {tab === "sheets" && <SampleSheets hole={hole} trays={trays} win={win} spectral={slq.data} />}
           </div>
         </div>
       </div>
