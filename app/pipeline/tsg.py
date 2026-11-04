@@ -90,6 +90,39 @@ def _safe(name: str) -> str:
     return re.sub(r"[^A-Za-z0-9_.-]+", "_", name).strip("_")
 
 
+SAMPLE_ID = re.compile(r"^sample ?id$", re.I)
+NOT_A_SAMPLE = {"", "empty core tray"}
+
+
+def sample_ids(sp, depth: np.ndarray, dataset: str) -> list[dict]:
+    """The dataset's own samples, when the lab logged a SampleID per spectrum: [{id, from_m, to_m, dataset}] in the
+    order they first appear. from/to are the shallowest and deepest spectrum of that id, to plus one sample step (the
+    last spectrum covers a step of core). Blank ids and "Empty core tray" are not samples."""
+    col = None
+    for frame in (sp.scalars, sp.sampleheaders):
+        name = next((c for c in frame.columns if SAMPLE_ID.match(str(c).strip())), None)
+        if name is not None:
+            col = _labels(sp, name) if frame is sp.scalars and any(b.name == name for b in sp.bandheaders) else _text(_col(frame, name))
+            break
+    if col is None or len(col) != len(depth):
+        return []
+    ids = np.array([("" if v is None else str(v).strip()) for v in col], dtype=object)
+    ok = np.isfinite(depth) & np.array([v.lower() not in NOT_A_SAMPLE for v in ids])
+    if not ok.any():
+        return []
+    d = np.sort(depth[np.isfinite(depth)]); dd = np.diff(d); dd = dd[dd > 0]
+    step = float(np.median(dd)) if len(dd) else 0.0
+    out, seen = [], {}
+    for i in np.flatnonzero(ok):
+        k = ids[i]
+        if k not in seen:
+            seen[k] = len(out); out.append({"id": k, "from_m": float(depth[i]), "to_m": float(depth[i]), "dataset": dataset})
+        r = out[seen[k]]; r["from_m"] = min(r["from_m"], float(depth[i])); r["to_m"] = max(r["to_m"], float(depth[i]))
+    for r in out:
+        r["from_m"] = round(r["from_m"], 4); r["to_m"] = round(r["to_m"] + step, 4)
+    return out
+
+
 def _description_xml(meta: dict) -> str:
     return "<TSGDrillHoleMiscMeta>" + "".join(f"<{t}>{escape(str(meta[t]))}</{t}>" for t in META_TAGS if meta.get(t) not in (None, "")) + "</TSGDrillHoleMiscMeta>"
 
@@ -159,7 +192,7 @@ def write_dataset(pair: dict, hd: Path, meta: dict | None = None) -> dict:
                 (hd / "ds1m" / f"{_safe(name)}__{d8}.csv").write_text("Depth,Value\n" + "".join(f"{m + 0.5},{x!r}\n" for m, x in g.items()))
     m = dict(meta or {}); m.setdefault("DrillHoleName", h["hole"]); m.setdefault("InstrumentName", h["instrument"])
     from ..trays import index as tray_index
-    return {"trays": tray_index(s, depth), "dsid": dsid, "name": pair["name"], "depth": [float(np.nanmin(depth)), float(np.nanmax(depth))], "instrument": m.get("InstrumentName") or h["instrument"],
+    return {"trays": tray_index(s, depth), "samples": sample_ids(s, depth, pair["name"]), "dsid": dsid, "name": pair["name"], "depth": [float(np.nanmin(depth)), float(np.nanmax(depth))], "instrument": m.get("InstrumentName") or h["instrument"],
             "spectral": spectral, "description": _description_xml(m)}
 
 
