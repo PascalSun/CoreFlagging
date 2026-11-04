@@ -116,6 +116,39 @@ def linescan_in_window(dataset: str, lo: float, hi: float, refs: list[str] = Que
         raise HTTPException(404, str(e))
 
 
+class Interval(BaseModel):
+    label: str = ""
+    from_m: float
+    to_m: float
+
+
+class Sheets(BaseModel):
+    dataset: str
+    refs: list[str]
+    hole_name: str = ""
+    intervals: list[Interval]
+    swir: bool = True
+    tir: bool = True
+    results: str = "auto"         # auto | system | user
+    min_share: float = 0.05
+
+
+@app.post("/api/v1/sheets.pdf")
+def sample_sheets(body: Sheets):
+    """One A4 sample sheet per interval as a PDF: line scan with SWIR and TIR columns, group pies, mean spectra."""
+    from . import samples as smp, sheets
+    from fastapi.responses import Response as RawResponse
+    try:
+        req = sheets.check(body.model_dump())
+        pdf = sheets.render(body.refs, body.dataset, body.hole_name, req)
+    except sheets.BadRequest as e:
+        raise HTTPException(400, str(e))
+    except smp.NoPackage as e:
+        raise HTTPException(404, str(e))
+    name = "".join(c if c.isalnum() or c in "-_." else "_" for c in (body.hole_name or body.dataset))
+    return RawResponse(pdf, media_type="application/pdf", headers={"Content-Disposition": f'inline; filename="CoreFlagging_{name}_sheets.pdf"'})
+
+
 @app.get("/api/v1/trays/zoom/info")
 def tray_zoom_info(dataset: str, n: int, refs: list[str] = Query(...)):
     """Size and tile layout of a tray photograph's original, cutting its tiles on first use."""

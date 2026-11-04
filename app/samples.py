@@ -9,6 +9,10 @@ CORETRACE_WORK/pkg (the spectral files, the laser profile and the line scan; tri
     linescan(refs, dataset, lo, hi)  the line-scan image rows for the window as one JPEG strip, read by
                                      decoding only the chunks that cover those rows (the cras file is a
                                      stack of JPEG chunks of a fixed number of lines each)
+
+A ref is a mirrored dataset (sources.zip_path), or "upload:<hole key>" for a hole someone uploaded: its kept zip is
+fetched from the platform once and unpacked into the same cache, under a name of its own (two people's uploads can
+both be called DDH-1).
 """
 from __future__ import annotations
 
@@ -60,29 +64,70 @@ def _unpack(zip_path: Path, dest: Path, dataset: str) -> int:
     return n
 
 
+UPLOAD = "upload:"
+
+
+def _cache_name(refs: list[str], dataset: str) -> str:
+    """The cache folder of a dataset: its own name for a mirrored one, the hole key with it for an upload."""
+    up = next((r[len(UPLOAD):] for r in refs if r.startswith(UPLOAD)), None)
+    return _safe(dataset) if up is None else _safe(f"upload-{up}-{dataset}")
+
+
+def _upload_zip(key: str, dest: Path) -> bool:
+    """The kept zip of an uploaded hole, from the platform, written to `dest`. False when the platform has none."""
+    from .platform import Platform
+    try:
+        return Platform().package_zip(key, dest)
+    except RuntimeError:                  # no platform configured: this service cannot reach uploads
+        return False
+
+
+def _one_dataset(zip_path: Path) -> str | None:
+    """The dataset name of a zip that holds exactly one <name>_tsg.tsg, else None."""
+    with zipfile.ZipFile(zip_path) as z:
+        stems = {n[:-len("_tsg.tsg")] for i in z.infolist() if (n := i.filename.replace("\\", "/").split("/")[-1]).lower().endswith("_tsg.tsg")}
+    return stems.pop() if len(stems) == 1 else None
+
+
 def package(refs: list[str], dataset: str) -> Path:
-    """Where the dataset's files are, unpacking them from the first mirrored zip that holds them on first use."""
-    d = ROOT / _safe(dataset)
+    """Where the dataset's files are, unpacking them from the first zip that holds them on first use (a mirrored zip,
+    or an uploaded hole's zip fetched from the platform)."""
+    d = ROOT / _cache_name(refs, dataset)
     done = d / ".ready"
     if done.exists():
         done.touch(); return d
     with _guard:
-        lock = _locks.setdefault(dataset, threading.Lock())
+        lock = _locks.setdefault(d.name, threading.Lock())
     with lock:
         if done.exists():
             return d
         for ref in refs:
-            zp = sources.zip_path(ref)
+            fetched = None
+            if ref.startswith(UPLOAD):
+                ROOT.mkdir(parents=True, exist_ok=True)
+                fetched = zp = ROOT / f".{d.name}.zip"
+                if not _upload_zip(ref[len(UPLOAD):], zp):
+                    zp.unlink(missing_ok=True); continue
+            else:
+                zp = sources.zip_path(ref)
             if zp and zp.exists():
                 tmp = d.with_suffix(".tmp"); shutil.rmtree(tmp, ignore_errors=True)
                 try:
                     n = _unpack(zp, tmp, dataset)
+                    # an upload holds one hole: when its files are not named the way the platform names the dataset
+                    # (a rename, a cleaned-up name), its one dataset is the one meant. Not so for the mirror, where a
+                    # hole's datasets are each in their own zip and the wrong zip must not answer for another.
+                    if not n and fetched is not None and (only := _one_dataset(zp)) is not None:
+                        n = _unpack(zp, tmp, only)
                 except zipfile.BadZipFile:
                     continue
+                finally:
+                    if fetched is not None:
+                        fetched.unlink(missing_ok=True)
                 if n:
                     shutil.rmtree(d, ignore_errors=True); tmp.rename(d); done.touch(); _trim(); return d
                 shutil.rmtree(tmp, ignore_errors=True)
-        raise NoPackage(f"no package for {dataset} in the mirror")
+        raise NoPackage(f"no package for {dataset}" + (" (the upload is not kept)" if any(r.startswith(UPLOAD) for r in refs) else " in the mirror"))
 
 
 def _trim() -> None:
@@ -109,16 +154,17 @@ def _files(d: Path) -> dict[str, Path]:
 
 
 def _spectra_of(d: Path, dataset: str):
+    key = d.name                          # the cache folder: an upload and a mirrored dataset of one name are not one
     with _guard:
-        if dataset in _spectra:
-            _spectra.move_to_end(dataset); return _spectra[dataset]
+        if key in _spectra:
+            _spectra.move_to_end(key); return _spectra[key]
     from pytsg import parse_tsg as p
     f = _files(d)
     if "tsg" not in f or "bip" not in f:
         raise NoPackage("the package has no SWIR spectra")
     sp = p.read_tsg_bip_pair(str(f["tsg"]), str(f["bip"]), "nir")
     with _guard:
-        _spectra[dataset] = sp; _spectra.move_to_end(dataset)
+        _spectra[key] = sp; _spectra.move_to_end(key)
         while len(_spectra) > 4:
             _spectra.popitem(last=False)
     return sp
@@ -129,9 +175,10 @@ _tir: OrderedDict[str, object] = OrderedDict()       # dataset -> pytsg Spectra 
 
 def _tir_of(d: Path, dataset: str):
     """The dataset's TIR spectra, when the package has the TIR pair; None otherwise. Cached like the SWIR."""
+    key = d.name
     with _guard:
-        if dataset in _tir:
-            _tir.move_to_end(dataset); return _tir[dataset]
+        if key in _tir:
+            _tir.move_to_end(key); return _tir[key]
     f = _files(d)
     sp = None
     if "tir_tsg" in f and "tir_bip" in f:
@@ -141,7 +188,7 @@ def _tir_of(d: Path, dataset: str):
         except Exception:        # noqa: BLE001 - a damaged TIR file loses the TIR, not the samples
             sp = None
     with _guard:
-        _tir[dataset] = sp; _tir.move_to_end(dataset)
+        _tir[key] = sp; _tir.move_to_end(key)
         while len(_tir) > 4:
             _tir.popitem(last=False)
     return sp
@@ -259,18 +306,12 @@ def samples(refs: list[str], dataset: str, lo: float, hi: float, spectra: bool =
 _CRAS_HEAD = "20s2I8h4I2h"
 
 
-def linescan(refs: list[str], dataset: str, lo: float, hi: float, width: int = 600) -> bytes:
-    """The line-scan rows of [lo, hi) as one JPEG strip `width` pixels across (the core runs top to bottom,
-    shallow at the top). Only the JPEG chunks covering those rows are decoded."""
+def cras_rows(path: Path, i0: int, i1: int, factor: int = 1) -> np.ndarray:
+    """The line-scan rows of samples [i0, i1) as an RGB array, top = sample i0. Each sample is `specny` image rows
+    in the file, so the strip is linear in sample index (not in depth). Only the chunks covering those rows are
+    decoded; `factor` 2, 4 or 8 decodes them that much smaller (libjpeg scales while decoding, far faster)."""
     from simplejpeg import decode_jpeg
-    d = package(refs, dataset); f = _files(d)
-    if "cras" not in f:
-        raise NoPackage("the package has no line-scan image")
-    sp = _spectra_of(d, dataset)
-    i0, i1, _ = _window(sp, lo, hi)
-    if i1 <= i0:
-        raise NoPackage("no samples in that window")
-    with open(f["cras"], "rb") as fh:
+    with open(path, "rb") as fh:
         hd = struct.unpack(_CRAS_HEAD, fh.read(64))
         ns, nl, nb, specny, ctype, chunksize, nchunks = hd[1], hd[2], hd[3], hd[6], hd[9], hd[10], hd[11]
         if ctype != 1 or not chunksize:
@@ -278,15 +319,40 @@ def linescan(refs: list[str], dataset: str, lo: float, hi: float, width: int = 6
         offs = np.frombuffer(fh.read(4 * (nchunks + 1)), np.uint32).astype(np.int64)
         offs = np.where(np.diff(offs, prepend=0) < 0, offs + (1 << 32), offs)   # a file over 4 GB wraps the 32-bit offsets
         r0, r1 = i0 * specny, min(i1 * specny, nl)
+        if r1 <= r0:
+            raise NoPackage("the line scan has no rows for those samples")
+        f = factor if factor in (2, 4, 8) and chunksize % factor == 0 else 1
         c0, c1 = r0 // chunksize, min((r1 - 1) // chunksize, nchunks - 1)
         base = 64 + 4 * (nchunks + 1)
-        parts = []
+        parts = []; scale = 1.0
         for c in range(c0, c1 + 1):
             fh.seek(base + int(offs[c])); chunk = fh.read(int(offs[c + 1] - offs[c]))
+            # libjpeg scales only when asked for a size: min_factor alone leaves the chunk full size
+            img = decode_jpeg(chunk, colorspace="RGB", min_height=-(-chunksize // f), min_width=-(-ns // f), min_factor=f) if f > 1 else decode_jpeg(chunk, colorspace="RGB")
+            if c == c0:
+                scale = img.shape[0] / min(chunksize, nl - c * chunksize)   # what the decoder gave, not what was asked
             # TSG writes the chunks with the channels in BGR order: decoded as RGB, a pink label comes out blue
-            parts.append(np.ascontiguousarray(np.flipud(decode_jpeg(chunk, colorspace="RGB")[..., ::-1])))
-    img = np.concatenate(parts, axis=0)[r0 - c0 * chunksize: r1 - c0 * chunksize]
-    im = Image.fromarray(img)
+            parts.append(np.ascontiguousarray(np.flipud(img)[..., ::-1]))
+    a = (r0 - c0 * chunksize) * scale; b = (r1 - c0 * chunksize) * scale
+    return np.concatenate(parts, axis=0)[int(round(a)): max(int(round(b)), int(round(a)) + 1)]
+
+
+def specny_of(path: Path) -> int:
+    with open(path, "rb") as fh:
+        return int(struct.unpack(_CRAS_HEAD, fh.read(64))[6])
+
+
+def linescan(refs: list[str], dataset: str, lo: float, hi: float, width: int = 600) -> bytes:
+    """The line-scan rows of [lo, hi) as one JPEG strip `width` pixels across (the core runs top to bottom,
+    shallow at the top). Only the JPEG chunks covering those rows are decoded."""
+    d = package(refs, dataset); f = _files(d)
+    if "cras" not in f:
+        raise NoPackage("the package has no line-scan image")
+    sp = _spectra_of(d, dataset)
+    i0, i1, _ = _window(sp, lo, hi)
+    if i1 <= i0:
+        raise NoPackage("no samples in that window")
+    im = Image.fromarray(cras_rows(f["cras"], i0, i1))
     if width and width < im.width:
         im = im.resize((width, max(1, round(im.height * width / im.width))), Image.LANCZOS)
     buf = io.BytesIO(); im.save(buf, "JPEG", quality=86); return buf.getvalue()

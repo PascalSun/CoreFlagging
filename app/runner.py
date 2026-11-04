@@ -9,6 +9,7 @@ The package is plain data, so the platform can write it to its database without 
   metres      per metre, the same for every model: software minerals, logged rock, gold assay
   models      per model: per-metre outputs, auto log, summaries, timing
   spectral_log  group shares per 0.1 m and 1 m interval, SWIR and TIR (app/spectral.py), or None
+  samples     the TSG's own samples (a SampleID logged per spectrum): [{id, from_m, to_m, dataset}], [] when none
   tokens      path of the .npz with the 10 cm tokens (spectra as float16)
   arrays      path of the .npz with per-metre arrays per model: tir__<run> (rebuilt TIR), fp__<run> (fingerprint),
               and per-token arrays: anom__<run>, raw__<run>, core__<run> (unusual score and core type of every 10 cm token, in token order)
@@ -52,6 +53,7 @@ class Runner:
         self.ws = ws or Workspace(); self.models = Models(bundle or C.BUNDLE, self.ws)
         self.trays: dict[str, dict[str, list[dict]]] = {}        # per hole key: tray index of each dataset, from its last clean()
         self.logs: dict[str, dict | None] = {}                    # per hole key: the spectral log (group shares per interval), from its last clean()
+        self.samples: dict[str, list[dict]] = {}                  # per hole key: the TSG's own samples (SampleID), from its last clean()
 
     def clean(self, key: str, hole: str, folders: list[Path], meta: dict[str, dict] | None = None, ref: dict | None = None,
               source: str = "TSG files", progress: Progress = lambda *a: None, lenient: bool = False) -> dict:
@@ -60,7 +62,8 @@ class Runner:
         ws = self.ws; ws.remove(key)
         progress("reading", "Reading the TSG files", 0.0)
         hd = tsg.write_hole(key, folders, ws.raw, meta, source)
-        self.trays[key] = {d["name"]: d.get("trays", []) for d in json.loads((hd / "manifest.json").read_text())["datasets"]}
+        manifest = json.loads((hd / "manifest.json").read_text())["datasets"]
+        self.trays[key] = {d["name"]: d.get("trays", []) for d in manifest}
         try:
             out = preprocess_hole(hd, ws.proc, ref if ref is not None else ws.ref_for(hole), lambda msg, frac=None: progress("cleaning", "Cleaning and binning to 10 cm", frac), lenient=lenient)
             self.logs[key] = spectral.from_raw(hd)
@@ -68,6 +71,7 @@ class Runner:
             shutil.rmtree(hd, ignore_errors=True)
         kept = {d["dataset"] for d in out["report"]["datasets"] if d.get("kept")}
         self.trays[key] = {k: v for k, v in self.trays[key].items() if k in kept}
+        self.samples[key] = [r for d in manifest if d["name"] in kept for r in d.get("samples", [])]
         return out
 
     def forget(self, key: str) -> None:
@@ -129,4 +133,5 @@ class Runner:
         else:
             pkg = self.run_models(key, progress=progress)
         pkg["spectral_log"] = self.logs.pop(key, None)            # the platform stores it beside the result
+        pkg["samples"] = self.samples.pop(key, [])                # the platform keeps them as hole.meta["samples"]
         return pkg

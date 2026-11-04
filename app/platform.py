@@ -81,6 +81,18 @@ class Platform:
                     f.write(chunk)
         return True
 
+    def package_zip(self, key: str, dest: Path) -> bool:
+        """An uploaded hole's kept zip, written to `dest` (the line scan and spectra of an upload are read from it).
+        False when the platform has no such hole or did not keep its zip."""
+        with self.http.stream("GET", f"holes/{quote(key, safe='')}/package.zip") as r:
+            if r.status_code == 404:
+                return False
+            r.raise_for_status()
+            with open(dest, "wb") as f:
+                for chunk in r.iter_bytes(1 << 20):
+                    f.write(chunk)
+        return True
+
     def token_scores(self, key: str, arrays: Path) -> bool:
         """Hand the platform a hole's per-token unusual scores on their own (the backfill). False when the hole, or a result
         for these runs, is not on the platform."""
