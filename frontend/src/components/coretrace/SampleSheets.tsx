@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { Download, FileDown, Loader2, Upload } from "lucide-react";
+import { Download, FileDown, FileSpreadsheet, Loader2, Upload } from "lucide-react";
 import { CoreError, coreScan, safeName, saveBlob, type HoleDetail, type SheetInterval, type SheetsBody, type SpectralLog, type Tray } from "@/lib/coreScan";
 import type { Window } from "@/lib/depth";
 import { groupColor, groupName } from "@/components/coretrace/palette";
@@ -126,7 +126,7 @@ export function SampleSheets({ hole, trays, win, spectral }: { hole: HoleDetail;
   }, [pq.data]);
   const pErr = pq.error as CoreError | null;
 
-  const [making, setMaking] = useState<{ what: "sel" | "all"; part: number; of: number } | null>(null); const [err, setErr] = useState("");
+  const [making, setMaking] = useState<{ what: "sel" | "all" | "data"; part: number; of: number } | null>(null); const [err, setErr] = useState("");
   const readCsv = async (f: File | undefined) => {
     if (!f) return;
     const r = parseIntervalsCsv(await f.text()); setCsv({ name: f.name, ...r }); setErr(""); if (!r.error) setPicked("csv");
@@ -145,6 +145,22 @@ export function SampleSheets({ hole, trays, win, spectral }: { hole: HoleDetail;
         saveBlob(blob, `${base}${parts.length > 1 ? `_part${p + 1}of${parts.length}` : ""}.pdf`);
       }
     } catch (e) { setErr((e as Error).message || "The sheets could not be made."); }
+    finally { setMaking(null); }
+  };
+  // the ticked intervals' numbers as CSVs in a zip; more than one request holds goes as several zips, like the PDFs
+  const [allSpectra, setAllSpectra] = useState(false);
+  const downloadData = async () => {
+    if (!selected.length || making || !(swir || tir)) return;
+    const parts: Row[][] = []; for (let i = 0; i < selected.length; i += MAX_PAGES) parts.push(selected.slice(i, i + MAX_PAGES));
+    setErr("");
+    const base = `CoreFlagging_${safeName(hole.name)}${selected.length === 1 ? `_${safeName(selected[0].label)}` : ""}_sheets_data`;
+    try {
+      for (let p = 0; p < parts.length; p++) {
+        setMaking({ what: "data", part: p + 1, of: parts.length });
+        const blob = await coreScan.sheetsData(hole.key, { ...opts(minShare), all_spectra: allSpectra, intervals: parts[p].map(({ label, from_m, to_m }) => ({ label, from_m, to_m })) });
+        saveBlob(blob, `${base}${parts.length > 1 ? `_part${p + 1}of${parts.length}` : ""}.zip`);
+      }
+    } catch (e) { setErr((e as Error).message || "The data could not be made."); }
     finally { setMaking(null); }
   };
   const pagesTxt = (n: number) => `${n} page${n === 1 ? "" : "s"}`;
@@ -261,9 +277,18 @@ export function SampleSheets({ hole, trays, win, spectral }: { hole: HoleDetail;
             <button type="button" onClick={() => download("all")} disabled={!!making || !usable.length || !(swir || tir)} className="flex items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60 sm:py-2">
               {making?.what === "all" ? <Loader2 size={14} className="animate-spin" /> : <FileDown size={14} />}Download all ({pagesTxt(usable.length)})</button>
           </div>
-          <p className="text-[11px] leading-relaxed text-slate-500">{making ? `Making ${making.of > 1 ? `PDF ${making.part} of ${making.of}` : "the PDF"}… The pages are drawn from the scan package; a long list takes a minute or two.`
+          <div className="flex flex-col gap-1.5 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-3 sm:gap-y-1.5">
+            <button type="button" onClick={downloadData} disabled={!!making || !selected.length || !(swir || tir)} className="flex items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60 sm:py-2">
+              {making?.what === "data" ? <Loader2 size={14} className="animate-spin" /> : <FileSpreadsheet size={14} />}Download data (CSV, zip)</button>
+            <label className="flex cursor-pointer items-center gap-1.5 px-1 text-[11px] text-slate-600 pointer-coarse:py-1.5">
+              <input type="checkbox" checked={allSpectra} onChange={(e) => setAllSpectra(e.target.checked)} className="accent-slate-900" />
+              include every reading&rsquo;s spectrum (large)</label>
+          </div>
+          <p className="text-[11px] leading-relaxed text-slate-500">{making?.what === "data" ? `Making ${making.of > 1 ? `zip ${making.part} of ${making.of}` : "the zip"}… The numbers are read from the scan package; a long list takes a minute or two.`
+            : making ? `Making ${making.of > 1 ? `PDF ${making.part} of ${making.of}` : "the PDF"}… The pages are drawn from the scan package; a long list takes a minute or two.`
             : Math.max(selected.length, usable.length) > MAX_PAGES ? `A PDF holds at most ${MAX_PAGES} pages, so ${usable.length} pages come as ${nParts(usable.length)} PDFs, one after the other (the browser may ask to allow several downloads).`
             : "One PDF, a page per interval."}</p>
+          <p className="-mt-1.5 text-[11px] leading-relaxed text-slate-500">The data zip is the ticked intervals&rsquo; readings, group and mineral shares and mean spectra as CSVs, for making your own plots (Excel, Python, R){selected.length > MAX_PAGES ? `; ${selected.length} intervals come as ${nParts(selected.length)} zips` : ""}.</p>
           {err && <p className="text-[11px] text-red-600" role="alert">{err}</p>}
         </div>
       </div>

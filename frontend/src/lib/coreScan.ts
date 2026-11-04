@@ -226,6 +226,19 @@ export function saveBlob(blob: Blob, name: string) {
 /** A name safe in a file name. */
 export const safeName = (s: string) => s.replace(/[^A-Za-z0-9_.-]+/g, "_");
 
+/** The sentence a failed data export shows, from the platform's answer. A platform without the zip export answers
+ * 400 `bad_format` ("no_zip": not available yet); the service refuses every reading's spectrum past its cap with a 400
+ * that names the readings ("too_many"). */
+export function sheetsDataError(status: number, b: { error?: string; message?: string; detail?: string }): CoreError {
+  const why = b.message || b.detail || "";
+  if (status === 400 && b.error === "bad_format") return new CoreError(400, "Data export isn't available yet.", "no_zip");
+  if (status === 400 && /reading/i.test(why)) return new CoreError(400, `${why.replace(/\.?\s*$/, ".")} Pick fewer intervals, or untick \u201cinclude every reading\u2019s spectrum\u201d.`, "too_many");
+  if (status === 404) return new CoreError(404, "The data is not available for this hole (no package or line scan to read).", b.error);
+  if (status === 401 || status === 403) return new CoreError(status, `The platform did not allow this (${status}). Sign in if the scan is your own upload.`, b.error);
+  if (status >= 500) return new CoreError(status, "The sheet service is not answering right now; try again in a minute.", b.error);
+  return new CoreError(status, why || b.error || `request failed (${status})`, b.error);
+}
+
 /** The model's name as readers see it: HyFormer. The platform may still hold the names a worker announced before the
  * rename ("CoreTrace-MAE", "CoreTrace-MAE+DINO"…) until the worker announces its models again. */
 export const modelName = (name: string) => name.replace(/^CoreTrace-MAE/, "HyFormer");
@@ -257,6 +270,17 @@ export const coreScan = {
         : res.status >= 500 ? "The sheet service is not answering right now; try again in a minute." : `request failed (${res.status})`), b.error);
     }
     return res.blob();
+  },
+  /** The intervals' numbers as a zip of CSVs (readings, group / mineral shares, mean spectra, and every reading's
+   * spectrum with `all_spectra`), for making one's own plots. Same endpoint and limits as the PDF; errors are
+   * `sheetsDataError`'s. */
+  async sheetsData(key: string, body: SheetsBody & { all_spectra?: boolean }): Promise<Blob> {
+    const res = await call(`/holes/${enc(key)}/sheets.pdf`, { method: "POST", body: JSON.stringify({ ...body, format: "zip" }), headers: { "Content-Type": "application/json" } });
+    if (!res.ok) throw sheetsDataError(res.status, (await res.json().catch(() => ({}))) as { error?: string; message?: string; detail?: string });
+    const blob = await res.blob();
+    // a platform that ignored the format would send the PDF: not a data export
+    if ((res.headers.get("content-type") || blob.type).includes("pdf")) throw new CoreError(415, "Data export isn't available yet.", "no_zip");
+    return blob;
   },
   /** One sample sheet drawn as a PNG, for the Sample sheets tab's preview (the caller makes and revokes the object
    * URL). A platform or service that does not draw PNGs yet answers 400/422, or sends the PDF anyway: both are
