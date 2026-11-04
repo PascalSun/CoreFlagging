@@ -16,7 +16,7 @@ Built on the package cache of samples.py; the same request on another hole reads
 """
 from __future__ import annotations
 
-import io, re, threading, time
+import contextlib, io, re, threading, time
 from functools import lru_cache
 from pathlib import Path
 
@@ -25,6 +25,7 @@ import numpy as np
 from . import samples as smp
 
 MAX_INTERVALS, MAX_SPAN_M = 300, 20.0
+FORMATS, PNG_DPI, DPI_RANGE = ("pdf", "png"), 110, (60, 200)   # png: one page, ~910 px wide at 110 dpi
 MAX_GROUPS, MAX_MINERALS = 8, 3            # wedges per pie (with "Other"), minerals listed under a group
 NULL = -1e30
 NO_SWIR, NO_TIR, NO_RESULT, OTHER = "No SWIR-active minerals", "No TIR-active minerals", "Not classified", "Other"
@@ -68,7 +69,17 @@ def check(body: dict) -> dict:
     swir, tir = bool(body.get("swir", True)), bool(body.get("tir", True))
     if not (swir or tir):
         raise BadRequest("ask for SWIR, TIR or both")
-    return {"intervals": out, "results": results, "min_share": ms, "swir": swir, "tir": tir}
+    fmt = body.get("format") or "pdf"
+    if fmt not in FORMATS:
+        raise BadRequest("format is pdf or png")
+    if fmt == "png" and len(out) != 1:
+        raise BadRequest("a png preview is of exactly one interval")
+    try:
+        dpi = int(round(float(body["dpi"]))) if body.get("dpi") is not None else PNG_DPI
+    except (TypeError, ValueError):
+        raise BadRequest("dpi is a number")
+    dpi = min(max(dpi, DPI_RANGE[0]), DPI_RANGE[1])
+    return {"intervals": out, "results": results, "min_share": ms, "swir": swir, "tir": tir, "format": fmt, "dpi": dpi}
 
 
 # ---------------------------------------------------------------------------------------------- reading a file
@@ -473,7 +484,7 @@ def page(fig, *, label: str, hole: str, lo: float, hi: float, D: np.ndarray, img
 
 
 def render(refs: list[str], dataset: str, hole_name: str, req: dict) -> bytes:
-    """The PDF for a checked request (see check())."""
+    """The PDF for a checked request (see check()), or with format png the one interval's page as a PNG."""
     import matplotlib
     matplotlib.use("Agg")
     from matplotlib.backends.backend_pdf import PdfPages
@@ -501,9 +512,9 @@ def render(refs: list[str], dataset: str, hole_name: str, req: dict) -> bytes:
     mask_txt = "Final Mask" if sw.mask is not None else "none (all spectra)"
     foot = (f"Data: {dataset}   ·   Classification: {foot_run}   ·   Mask: {mask_txt}   ·   Min share {req['min_share'] * 100:g} %   ·   "
             f"CoreFlagging · coreflagging.nlp-tlp.org   ·   {time.strftime('%Y-%m-%d')}")
-    buf = io.BytesIO()
+    buf = io.BytesIO(); png = req.get("format") == "png"
     with _lock, matplotlib.rc_context({"pdf.fonttype": 42, "font.family": "DejaVu Sans", "axes.linewidth": 0.6}):
-        with PdfPages(buf, metadata={"Title": f"{hole_name} sample sheets", "Creator": "CoreFlagging"}) as pdf:
+        with (contextlib.nullcontext() if png else PdfPages(buf, metadata={"Title": f"{hole_name} sample sheets", "Creator": "CoreFlagging"})) as pdf:
             for iv in req["intervals"]:
                 i0, i1 = window(D, iv["from_m"], iv["to_m"]); idx = np.arange(i0, i1)
                 fig = Figure(figsize=A4)
@@ -538,5 +549,8 @@ def render(refs: list[str], dataset: str, hole_name: str, req: dict) -> bytes:
                     if cras:
                         kw["img"] = strip(cras, i0, i1, specny, cras_w)
                 page(fig, label=iv["label"], hole=hole_name or dataset, lo=iv["from_m"], hi=iv["to_m"], D=D[i0:i1], pal=pal, foot=foot, **kw)
-                pdf.savefig(fig)
+                if png:
+                    fig.savefig(buf, format="png", dpi=req.get("dpi", PNG_DPI), facecolor="white")
+                else:
+                    pdf.savefig(fig)
     return buf.getvalue()
