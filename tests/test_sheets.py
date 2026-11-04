@@ -240,3 +240,94 @@ def test_the_endpoint_returns_a_png_for_one_interval_and_400_for_two(tmp_path, m
     assert abs(_png_size(r.content)[0] - 827) <= 2
     body["intervals"] = body["intervals"] * 2
     r = c.post("/api/v1/sheets.pdf", json=body); assert r.status_code == 400 and "one interval" in r.json()["detail"]
+
+
+# ---------------------------------------------------------------------------------------------- the v2 layout
+
+def test_a_table_never_runs_past_its_box_minerals_give_way_first():
+    data = [{"group": f"G{k}", "share": 0.1, "minerals": [(f"m{k}{j}", 0.03) for j in range(3)] + [("+2 more", 0.01)]} for k in range(10)]
+    rows, rh = sheets._table_layout(data, 4.0)                  # 50 rows wanted, ~25 fit at ROW_MIN
+    n = sum(1 + len(d["minerals"]) for d in rows)
+    assert n * rh <= 4.0 + 1e-9 and rh >= sheets.ROW_MIN
+    assert all(len(d["minerals"]) < 4 for d in rows) and rows[0]["minerals"][-1][0].startswith("+")
+    rows, rh = sheets._table_layout(data, 0.6)                   # not even the group rows fit: rows shrink further
+    assert sum(1 + len(d["minerals"]) for d in rows) * rh <= 0.6 + 1e-9 and all(not d["minerals"] for d in rows)
+    assert sheets._trim([("a", 0.5), ("b", 0.2), ("c", 0.1), ("+2 more", 0.05)], 1) == [("a", 0.5), ("+4 more", pytest.approx(0.35))]
+
+
+def test_one_panel_pages_and_the_run_names_geologists_quote(tmp_path, monkeypatch):
+    swir, _ = _toy_package(tmp_path, monkeypatch)
+    for opt in ({"tir": False}, {"swir": False}):
+        pdf = sheets.render(["x"], "DS", "HOLE", sheets.check({"intervals": [{"label": "A", "from_m": 5.0, "to_m": 6.0}], **opt}))
+        assert pdf.startswith(b"%PDF")
+    r = sheets.Run(swir, None, ("TSAS",), "auto")
+    assert r.label == "sTSAS" and r.who == "system" and r.name == "TSA705"
+
+
+# ---------------------------------------------------------------------------------------------- the data zip
+
+def _zip(b: bytes) -> dict[str, str]:
+    import io
+    with zipfile.ZipFile(io.BytesIO(b)) as z:
+        return {n: z.read(n).decode() for n in z.namelist()}
+
+
+def test_breakdown_folds_nothing_and_its_groups_sum_to_one():
+    G, M, W = _ranks([[("CHLORITE", "Chlorite-Fe", 0.7), ("WHITE-MICA", "Muscovite", 0.3)]] * 6 + [[("WHITE-MICA", "Phengite", 1.0)]] * 3 +
+                     [[("INVALID", "Aspectral", 1.0)]] + [[("SULPHATE", "Gypsum", 0.4)]])
+    out = sheets.breakdown(G, M, W, np.arange(11), sheets.NO_SWIR)
+    groups = [(g, round(s * 11, 6), n) for g, m, s, n in out if not m]
+    assert groups == [("WHITE-MICA", 4.8, 9), ("CHLORITE", 4.2, 6), ("SULPHATE", 0.4, 1), (sheets.NO_SWIR, 1.0, 1), (sheets.NO_RESULT, 0.6, 1)]
+    assert abs(sum(s for _, m, s, _ in out if not m) - 1) < 1e-9
+    assert [(m, n) for g, m, s, n in out if g == "WHITE-MICA" and m] == [("Phengite", 3), ("Muscovite", 6)]
+
+
+def test_the_zip_has_a_row_per_reading_shares_and_mean_spectra(tmp_path, monkeypatch):
+    import csv, io
+    _toy_package(tmp_path, monkeypatch)
+    ivs = [{"label": "A", "from_m": 5.0, "to_m": 5.2}, {"label": "B", "from_m": 5.2, "to_m": 6.0}, {"label": "none", "from_m": 50, "to_m": 51}]
+    req = sheets.check({"intervals": ivs, "format": "zip"}); assert req["all_spectra"] is False
+    f = _zip(sheets.export(["x"], "DS", "HOLE", req))
+    assert sorted(f) == ["README.txt", "readings.csv", "spectra_swir_mean.csv", "spectra_tir_mean.csv", "summary.csv"]
+    rd = list(csv.DictReader(io.StringIO(f["readings.csv"])))
+    assert [sum(r["label"] == k for r in rd) for k in "AB"] == [25, 35] and len(rd) == 60       # 5.0 + 25 * 8 mm, then the gap
+    r0 = rd[0]
+    assert r0["reading_index"] == "0" and r0["depth_m"] == "5.0000" and r0["tray"] == "0001" and r0["in_final_mask"] == "1"
+    assert (r0["swir_group_1"], r0["swir_mineral_1"], r0["swir_weight_1"]) == ("CHLORITE", "Chlorite-Fe", "1") and r0["tir_mineral_1"] == "Quartz"
+    assert rd[9]["in_final_mask"] == "0" and rd[5]["swir_group_1"] == "" and rd[7]["swir_mineral_1"] == "Aspectral"
+    sm = list(csv.DictReader(io.StringIO(f["summary.csv"])))
+    for lab in "AB":
+        for panel in ("SWIR", "TIR"):
+            g = [r for r in sm if r["label"] == lab and r["panel"] == panel and not r["mineral"]]
+            assert abs(sum(float(r["share"]) for r in g) - 1) < 1e-5 and len({r["of_readings"] for r in g}) == 1
+    assert {r["label"] for r in sm} == {"A", "B"}
+    mean = list(csv.reader(io.StringIO(f["spectra_swir_mean.csv"])))
+    assert mean[0] == ["wavelength", "A mean", "A p10", "A p90", "B mean", "B p10", "B p90", "none mean", "none p10", "none p90"]
+    assert len(mean) == 51 and mean[1][-1] == "" and 0.1 <= float(mean[1][1]) <= 0.4
+    assert "Final Mask" in f["README.txt"] and "sTSAS" in f["README.txt"]
+
+
+def test_every_spectrum_on_request_and_capped(tmp_path, monkeypatch):
+    import csv, io
+    _toy_package(tmp_path, monkeypatch)
+    req = sheets.check({"intervals": [{"label": "A", "from_m": 5.0, "to_m": 6.0}], "format": "zip", "all_spectra": True, "tir": False})
+    f = _zip(sheets.export(["x"], "DS", "HOLE", req))
+    assert "spectra_tir_mean.csv" not in f and "spectra_tir_readings.csv" not in f
+    rows = list(csv.reader(io.StringIO(f["spectra_swir_readings.csv"])))
+    assert len(rows) == 61 and len(rows[0]) == 52 and rows[0][:3] == ["label", "depth_m", "380"]
+    monkeypatch.setattr(sheets, "MAX_SPECTRA", 59)
+    with pytest.raises(sheets.BadRequest):
+        sheets.export(["x"], "DS", "HOLE", req)
+
+
+def test_the_endpoint_returns_the_zip_as_an_attachment(tmp_path, monkeypatch):
+    from fastapi.testclient import TestClient
+    from app.main import app
+    _toy_package(tmp_path, monkeypatch)
+    c = TestClient(app)
+    body = {"dataset": "DS", "refs": ["x"], "hole_name": "H 1", "format": "zip", "intervals": [{"label": "a", "from_m": 5.0, "to_m": 5.3}] * 3}
+    r = c.post("/api/v1/sheets.pdf", json=body)
+    assert r.status_code == 200 and r.headers["content-type"] == "application/zip"
+    assert r.headers["content-disposition"] == 'attachment; filename="CoreFlagging_H_1_sheets_data.zip"' and "readings.csv" in _zip(r.content)
+    monkeypatch.setattr(sheets, "MAX_SPECTRA", 10)
+    r = c.post("/api/v1/sheets.pdf", json={**body, "all_spectra": True}); assert r.status_code == 400 and "10" in r.json()["detail"]

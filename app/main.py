@@ -131,19 +131,21 @@ class Sheets(BaseModel):
     tir: bool = True
     results: str = "auto"         # auto | system | user
     min_share: float = 0.05
-    format: str = "pdf"           # pdf | png (png: exactly one interval, that page as an image)
+    format: str = "pdf"           # pdf | png (png: exactly one interval, that page as an image) | zip (the data as CSV)
     dpi: float | None = None      # png only; clamped to 60..200, default 110 (~910 px wide)
+    all_spectra: bool = False     # zip only: every reading's spectrum too (up to 20,000 readings)
 
 
 @app.post("/api/v1/sheets.pdf")
 def sample_sheets(body: Sheets):
     """One A4 sample sheet per interval as a PDF: line scan with SWIR and TIR columns, group pies, mean spectra.
-    With format png, one interval's page as a PNG (the live preview)."""
+    With format png, one interval's page as a PNG (the live preview); with format zip, the numbers behind the
+    sheets as CSV files (readings, summary, mean spectra, and every reading's spectrum when all_spectra)."""
     from . import samples as smp, sheets
     from fastapi.responses import Response as RawResponse
     try:
         req = sheets.check(body.model_dump())
-        pdf = sheets.render(body.refs, body.dataset, body.hole_name, req)
+        pdf = (sheets.export if req["format"] == "zip" else sheets.render)(body.refs, body.dataset, body.hole_name, req)
     except sheets.BadRequest as e:
         raise HTTPException(400, str(e))
     except smp.NoPackage as e:
@@ -151,6 +153,8 @@ def sample_sheets(body: Sheets):
     if req["format"] == "png":
         return RawResponse(pdf, media_type="image/png")
     name = "".join(c if c.isalnum() or c in "-_." else "_" for c in (body.hole_name or body.dataset))
+    if req["format"] == "zip":
+        return RawResponse(pdf, media_type="application/zip", headers={"Content-Disposition": f'attachment; filename="CoreFlagging_{name}_sheets_data.zip"'})
     return RawResponse(pdf, media_type="application/pdf", headers={"Content-Disposition": f'inline; filename="CoreFlagging_{name}_sheets.pdf"'})
 
 

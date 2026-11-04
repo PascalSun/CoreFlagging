@@ -1,7 +1,10 @@
-"""Sample sheets: one A4 page per depth interval of a hole, as a PDF.
+"""Sample sheets: one A4 page per depth interval of a hole, as a PDF (or one page as a PNG preview), and the same
+intervals' numbers as a zip of CSV files.
 
-A page shows the interval's line-scan photograph with a SWIR-group and a TIR-group column beside it, one reading
-(about 8 mm) per row; SWIR and TIR group pies with their minerals; and the interval's mean SWIR and TIR spectra.
+A page is laid out like the GSNSW TSG sample sheets geologists know: the interval's line scan full height down the
+left with thin SWIR- and TIR-group columns beside it, one reading (about 8 mm) per row; on the right a results box
+with the SWIR and TIR group pies side by side, each over its group -> mineral table; below it the interval's mean
+SWIR and TIR spectra and a few facts (mask, classification, min share, data source).
 
 Alignment: the line scan has exactly `specny` image rows per spectrum sample, in sample order, while sample depths
 are not linear in index (tray and section breaks, gaps). So the strip and the columns are both laid out by sample
@@ -25,7 +28,8 @@ import numpy as np
 from . import samples as smp
 
 MAX_INTERVALS, MAX_SPAN_M = 300, 20.0
-FORMATS, PNG_DPI, DPI_RANGE = ("pdf", "png"), 110, (60, 200)   # png: one page, ~910 px wide at 110 dpi
+FORMATS, PNG_DPI, DPI_RANGE = ("pdf", "png", "zip"), 110, (60, 200)   # png: one page, ~910 px wide at 110 dpi
+MAX_SPECTRA = 20_000                       # zip with every reading's spectrum: readings over all intervals
 MAX_GROUPS, MAX_MINERALS = 8, 3            # wedges per pie (with "Other"), minerals listed under a group
 NULL = -1e30
 NO_SWIR, NO_TIR, NO_RESULT, OTHER = "No SWIR-active minerals", "No TIR-active minerals", "Not classified", "Other"
@@ -71,7 +75,7 @@ def check(body: dict) -> dict:
         raise BadRequest("ask for SWIR, TIR or both")
     fmt = body.get("format") or "pdf"
     if fmt not in FORMATS:
-        raise BadRequest("format is pdf or png")
+        raise BadRequest("format is pdf, png or zip")
     if fmt == "png" and len(out) != 1:
         raise BadRequest("a png preview is of exactly one interval")
     try:
@@ -79,7 +83,8 @@ def check(body: dict) -> dict:
     except (TypeError, ValueError):
         raise BadRequest("dpi is a number")
     dpi = min(max(dpi, DPI_RANGE[0]), DPI_RANGE[1])
-    return {"intervals": out, "results": results, "min_share": ms, "swir": swir, "tir": tir, "format": fmt, "dpi": dpi}
+    return {"intervals": out, "results": results, "min_share": ms, "swir": swir, "tir": tir, "format": fmt, "dpi": dpi,
+            "all_spectra": bool(body.get("all_spectra", False))}
 
 
 # ---------------------------------------------------------------------------------------------- reading a file
@@ -181,6 +186,14 @@ class Run:
             self.mask = (m.to_numpy("f8") == 1) if m.dtype.kind in "fiu" else np.array([str(x).strip().lower() in ("on", "1", "1.0") for x in m])
         cn = _class_number(sp, cols["Grp1"]) if cols else None
         self.colours = class_colours(tsg).get(cn, {}) if cn is not None else {}
+        self.who = {"s": "system", "u": "user"}.get(self.label[:1], "")
+        # the name TSG gives the run, as geologists quote it: "S_SWIR_TSA705 Groups" -> TSA705, the user's -> uTSA705
+        cname = ""
+        if cn is not None:
+            ch = sp.classes.get(cn) if isinstance(sp.classes, dict) else (sp.classes[cn] if cn < len(sp.classes) else None)
+            cname = str(getattr(ch, "name", "") or "")
+        core = re.sub(r"^(?:[SU]_)?(?:SWIR_|TIR_|VNIR_)?|\s+Groups$", "", cname).strip()
+        self.name = ((("u" if self.who == "user" else "") + core) if core else self.label)
         self.D = sp.sampleheaders["D"].astype(float).to_numpy()
 
     def rows(self, idx: np.ndarray) -> tuple[np.ndarray, bool]:
@@ -297,7 +310,7 @@ def window(D: np.ndarray, lo: float, hi: float) -> tuple[int, int]:
 
 # ---------------------------------------------------------------------------------------------- the line scan
 
-STRIP_W, STRIP_MAX_H = 260, 1600
+STRIP_W, STRIP_MAX_H = 260, 2000
 
 
 def strip(cras: Path | None, i0: int, i1: int, specny: int, width: int | None = None) -> np.ndarray | None:
@@ -318,13 +331,100 @@ def strip(cras: Path | None, i0: int, i1: int, specny: int, width: int | None = 
     return np.asarray(Image.fromarray(a).resize((w, max(1, h)), Image.BILINEAR))
 
 
+
+
+# ---------------------------------------------------------------------------------------------- reading a hole once
+
+class Hole:
+    """What one request reads from a package, once for all its intervals: the SWIR and TIR runs, depths, trays,
+    the TIR pairing, and the line-scan file."""
+
+    def __init__(self, refs: list[str], dataset: str, req: dict):
+        d = smp.package(refs, dataset); f = smp._files(d); self.files = f
+        self.sp = smp._spectra_of(d, dataset)
+        self.tir = smp._tir_of(d, dataset) if req["tir"] else None
+        self.sw = Run(self.sp, f.get("tsg"), ("TSAS",), req["results"])
+        self.tw = Run(self.tir, f.get("tir_tsg"), ("jCLST", "TSAT"), req["results"]) if self.tir is not None else None
+        self.pal = Palette(self.sw.colours, self.tw.colours if self.tw else {})
+        self.D = self.sw.D
+        self.tmap = nearest(self.D, self.tw.D) if self.tw is not None else None
+        sh = self.sp.sampleheaders
+        self.trays = sh["T"].astype(str).to_numpy() if "T" in sh.columns else None
+        self.swl = np.asarray(self.sp.wavelength, float)
+        self.twl = np.asarray(self.tir.wavelength, float) / 1000.0 if self.tir is not None else None
+        self.cras = f.get("cras"); self.specny = smp.specny_of(self.cras) if self.cras else 0; self.cras_w = None
+        if self.cras:
+            import struct
+            with open(self.cras, "rb") as fh:
+                self.cras_w = struct.unpack(smp._CRAS_HEAD, fh.read(64))[1]
+
+    def interval(self, lo: float, hi: float) -> dict:
+        """The samples of [lo, hi): idx (all), rows (the masked-on SWIR ones, used: whether the mask chose them),
+        tk (the TIR samples paired with idx) and trows / tused likewise."""
+        i0, i1 = window(self.D, lo, hi); idx = np.arange(i0, i1)
+        rows, used = self.sw.rows(idx)
+        out = {"i0": i0, "i1": i1, "idx": idx, "rows": rows, "used": used, "k": None, "tk": np.array([], int), "trows": np.array([], int), "tused": False}
+        if self.tw is not None and len(idx):
+            k = self.tmap[idx]; tk = np.unique(k[k >= 0]); trows, tused = self.tw.rows(tk)
+            out.update(k=k, tk=tk, trows=trows, tused=tused)
+        return out
+
+    def tray_text(self, idx: np.ndarray) -> str:
+        if self.trays is None or not len(idx):
+            return ""
+        t = sorted({x for x in self.trays[idx] if x.strip()})
+        return (f"tray {t[0]}" if len(t) == 1 else f"trays {t[0]}–{t[-1]}") if t else ""
+
+
+def _valid(X: np.ndarray) -> np.ndarray:
+    """The rows of a spectra block that are real readings (TSG marks a missing one with NaN or a huge null)."""
+    return np.isfinite(X).all(axis=1) & (np.abs(X) < 1e3).all(axis=1) if len(X) else np.array([], bool)
+
+
 # ---------------------------------------------------------------------------------------------- rendering
 
 A4 = (8.27, 11.69)
 INK, NAVY, BAND, RULE = "#1d1d1f", "#1f3a5f", "#e8edf3", "#c8d0da"
+MARGIN, HEAD_H, GAP, BAND_H = 0.3, 0.66, 0.12, 0.27
+ROW_H, ROW_MIN = 0.158, 0.118              # table row height (in): wanted, and the least before minerals give way
 
 
-def _ticks(D: np.ndarray, n: int, want: int = 11) -> tuple[list[float], list[str]]:
+def _rect(fig, x, y, w, h, **kw):
+    """A rectangle in inches from the page's lower left."""
+    from matplotlib.patches import Rectangle
+    W, H = A4
+    fig.patches.append(Rectangle((x / W, y / H), w / W, h / H, transform=fig.transFigure, **kw))
+
+
+def _text(fig, x, y, s, **kw):
+    W, H = A4
+    return fig.text(x / W, y / H, s, **kw)
+
+
+def _axes(fig, x, y, w, h, **kw):
+    W, H = A4
+    return fig.add_axes([x / W, y / H, w / W, h / H], **kw)
+
+
+def _box(fig, x, y, w, h, title: str = "", right: str = ""):
+    """A bordered box with a title band (the sheet's sections); the content top in inches."""
+    _rect(fig, x, y, w, h, facecolor="white", edgecolor=NAVY, lw=1.0, zorder=-2)
+    if not title:
+        return y + h
+    _rect(fig, x, y + h - BAND_H, w, BAND_H, facecolor=BAND, edgecolor=NAVY, lw=1.0, zorder=-1)
+    _text(fig, x + 0.1, y + h - BAND_H / 2, title, fontsize=9.5, fontweight="bold", color=NAVY, va="center")
+    if right:
+        _text(fig, x + w - 0.1, y + h - BAND_H / 2, right, fontsize=6.8, color="#555", va="center", ha="right")
+    return y + h - BAND_H
+
+
+def _fits(s: str, width_in: float, fs: float, bold: bool = False) -> str:
+    """`s` cut with an ellipsis to about `width_in` inches at `fs` points (DejaVu Sans averages ~0.6 em a letter)."""
+    n = max(4, int(width_in * 72 / (fs * (0.66 if bold else 0.6))))
+    return s if len(s) <= n else s[:n - 1] + "…"
+
+
+def _ticks(D: np.ndarray, n: int, want: int = 18) -> tuple[list[float], list[str]]:
     """Depth labels at sample positions (index units), about `want` of them, at round depths where possible."""
     if n == 0:
         return [], []
@@ -333,73 +433,95 @@ def _ticks(D: np.ndarray, n: int, want: int = 11) -> tuple[list[float], list[str
     pos, lab = [], []
     for t in np.arange(np.ceil(D[0] / step - 1e-6) * step, D[-1] + 1e-9, step):
         k = int(np.argmin(np.abs(D - t)))
-        if pos and k - pos[-1] < n * 0.05:
+        if pos and k - pos[-1] < n * 0.035:
             continue
         pos.append(k + 0.5); lab.append(f"{D[k]:.2f}")
     return pos, lab
-
-
-def _pie(fig, rect, data: list[dict], pal: Palette, empty: str):
-    ax = fig.add_axes(rect); ax.set_aspect("equal")
-    if not data:
-        ax.text(0.5, 0.5, empty, ha="center", va="center", fontsize=7.5, color="#666", wrap=True); ax.axis("off"); return
-    ax.pie([d["share"] for d in data], colors=[pal(d["group"]) for d in data], startangle=90, counterclock=False,
-           wedgeprops={"linewidth": 0.6, "edgecolor": "white"}, normalize=True)
 
 
 def _pct(s: float) -> str:
     return "<1%" if s < 0.005 else f"{s * 100:.0f}%"
 
 
-def _table(fig, x: float, y_top: float, w: float, h: float, data: list[dict], pal: Palette):
-    """Group rows (swatch, name, share) with their minerals beneath, fitted into h inches."""
-    from matplotlib.patches import Rectangle
-    W, H = A4
-    mins = MAX_MINERALS
-    while True:
-        rows = sum(1 + min(len(d["minerals"]), mins) for d in data)
-        rh = min(0.17, h / max(rows, 1))
-        if rh >= 0.115 or mins == 0:
-            break
-        mins -= 1
-    fs = max(5.5, min(7.5, rh * 50))
+def _trim(minerals: list, keep: int) -> list:
+    """A group's mineral rows cut to `keep` named minerals, the rest (and any "+N more") folded into one "+N more"."""
+    named = [(k, v) for k, v in minerals if not k.startswith("+")]
+    more = next(((int(k[1:].split()[0]), v) for k, v in minerals if k.startswith("+")), (0, 0.0))
+    if len(named) <= keep:
+        return minerals
+    if keep == 0:
+        return []
+    drop = named[keep:]
+    return named[:keep] + [(f"+{more[0] + len(drop)} more", more[1] + sum(v for _, v in drop))]
+
+
+def _table_layout(data: list[dict], h: float) -> tuple[list[dict], float]:
+    """The table's rows and row height fitted into h inches: rows shrink to ROW_MIN, then minerals give way (three,
+    two, one, none per group), then rows shrink further. It never runs past h."""
+    for keep in (MAX_MINERALS, 2, 1, 0):
+        rows = [dict(d, minerals=_trim(d["minerals"], keep)) for d in data]
+        n = sum(1 + len(d["minerals"]) for d in rows)
+        rh = min(ROW_H, h / max(n, 1))
+        if rh >= ROW_MIN or keep == 0:
+            return rows, rh
+    return rows, rh
+
+
+def _table(fig, x: float, y_top: float, w: float, rows: list[dict], rh: float, pal: Palette):
+    """Group rows (colour square, bold name, share) with their minerals indented beneath, as on the GSNSW sheets;
+    `rows` and `rh` from _table_layout."""
+    fs = max(4.0, min(7.2, rh * 46)); sq = min(0.13, rh * 0.75)
     y = y_top
-    for d in data:
+    for d in rows:
         y -= rh
-        fig.patches.append(Rectangle(((x) / W, (y + rh * 0.2) / H), 0.13 / W, rh * 0.6 / H, transform=fig.transFigure,
-                                     facecolor=pal(d["group"]), edgecolor="#777", lw=0.4))
-        fig.text((x + 0.2) / W, (y + rh / 2) / H, d["group"], fontsize=fs, fontweight="bold", va="center", color=INK)
-        fig.text((x + w) / W, (y + rh / 2) / H, _pct(d['share']), fontsize=fs, fontweight="bold", va="center", ha="right", color=INK)
-        for name, s in d["minerals"][:mins]:
+        _rect(fig, x, y + (rh - sq * 0.75) / 2, sq, sq * 0.75, facecolor=pal(d["group"]), edgecolor="#777", lw=0.4)
+        _text(fig, x + sq + 0.07, y + rh / 2, _fits(d["group"], w - sq - 0.5, fs, True), fontsize=fs, fontweight="bold", va="center", color=INK)
+        _text(fig, x + w, y + rh / 2, _pct(d["share"]), fontsize=fs, fontweight="bold", va="center", ha="right", color="#33475e")
+        for name, s in d["minerals"]:
             y -= rh
-            fig.text((x + 0.32) / W, (y + rh / 2) / H, name, fontsize=fs - 0.6, va="center", color="#444")
-            fig.text((x + w) / W, (y + rh / 2) / H, _pct(s), fontsize=fs - 0.6, va="center", ha="right", color="#666")
+            _text(fig, x + sq + 0.2, y + rh / 2, _fits(name, w - sq - 0.6, fs - 0.6), fontsize=fs - 0.6, va="center", color="#444")
+            _text(fig, x + w, y + rh / 2, _pct(s), fontsize=fs - 0.6, va="center", ha="right", color="#666")
 
 
-def _section(fig, x: float, y: float, w: float, h: float, title: str, sub: str, data: list[dict], pal: Palette, empty: str):
-    from matplotlib.patches import Rectangle
-    W, H = A4
-    fig.patches.append(Rectangle((x / W, y / H), w / W, h / H, transform=fig.transFigure, facecolor="white", edgecolor=RULE, lw=0.8, zorder=-2))
-    fig.patches.append(Rectangle((x / W, (y + h - 0.28) / H), w / W, 0.28 / H, transform=fig.transFigure, facecolor=BAND, edgecolor=RULE, lw=0.8, zorder=-1))
-    fig.text((x + 0.1) / W, (y + h - 0.14) / H, title, fontsize=9, fontweight="bold", color=NAVY, va="center")
-    fig.text((x + w - 0.1) / W, (y + h - 0.14) / H, sub, fontsize=7, color="#555", va="center", ha="right")
-    d = min(1.75, h - 0.5, w * 0.38)
-    _pie(fig, [(x + 0.12) / W, (y + h - 0.4 - d) / H, d / W, d / H], data, pal, empty)
-    tx = x + 0.12 + d + 0.22
-    _table(fig, tx, y + h - 0.4, x + w - 0.12 - tx, h - 0.52, data, pal)
+def _pie(fig, x: float, y: float, d: float, data: list[dict], pal: Palette, empty: str):
+    ax = _axes(fig, x, y, d, d); ax.set_aspect("equal")
+    if not data:
+        ax.text(0.5, 0.5, empty, ha="center", va="center", fontsize=7.5, color="#666"); ax.axis("off"); return
+    ax.pie([p["share"] for p in data], colors=[pal(p["group"]) for p in data], startangle=90, counterclock=False,
+           wedgeprops={"linewidth": 0.6, "edgecolor": "white"}, normalize=True)
 
 
-def _spectrum(fig, rect, wl: np.ndarray, X: np.ndarray, title: str, xlabel: str, marks, bands=()):
-    ax = fig.add_axes(rect)
-    ok = np.isfinite(X).all(axis=1) & (np.abs(X) < 1e3).all(axis=1) if len(X) else np.array([], bool)
-    X = X[ok]
-    ax.set_title(title, fontsize=8.5, color=NAVY, loc="left", fontweight="bold")
-    ax.tick_params(labelsize=6.5, length=2); ax.set_xlabel(xlabel, fontsize=7); ax.set_ylabel("Reflectance", fontsize=7)
+def _results(fig, x: float, y: float, w: float, h: float, title: str, panels: list[dict], pal: Palette):
+    """The results box: one column per panel, side by side, each a title, its pie and its table beneath. One panel
+    alone takes the whole box: a bigger pie over a table centred under it."""
+    from matplotlib.lines import Line2D
+    top = _box(fig, x, y, w, h, title)
+    cw = w / len(panels)
+    need = max(max(sum(1 + len(q["minerals"]) for q in p["data"]), 1) for p in panels) * ROW_H   # one pie size, tables level
+    d = float(np.clip(h - BAND_H - 0.62 - need - 0.15, 1.2, min(1.75 if len(panels) > 1 else 2.6, cw - 0.5)))
+    ty = top - 0.5 - d - 0.08
+    fitted = [_table_layout(p["data"], ty - (y + 0.08)) for p in panels]
+    rh = min(f[1] for f in fitted)                # one row height (and type size) for both tables
+    for j, p in enumerate(panels):
+        cx = x + j * cw
+        if j:
+            fig.lines.append(Line2D([cx / A4[0]] * 2, [(y + 0.1) / A4[1], (top - 0.1) / A4[1]], transform=fig.transFigure, color=RULE, lw=0.8))
+        _text(fig, cx + cw / 2, top - 0.2, p["title"], fontsize=9, fontweight="bold", color=NAVY, ha="center", va="center")
+        _text(fig, cx + cw / 2, top - 0.38, p["sub"], fontsize=6.5, color="#666", ha="center", va="center")
+        _pie(fig, cx + (cw - d) / 2, top - 0.5 - d, d, p["data"], pal, p["empty"])
+        tw = min(cw - 0.4, 3.6)
+        _table(fig, cx + (cw - tw) / 2, ty, tw, fitted[j][0], rh, pal)
+
+
+def _spectrum(ax, wl: np.ndarray, X: np.ndarray, title: str, xlabel: str, marks, bands=()):
+    X = X[_valid(X)]
+    ax.set_title(title, fontsize=8, color=NAVY, loc="left", fontweight="bold", pad=3)
+    ax.tick_params(labelsize=6, length=2, pad=1.5); ax.set_xlabel(xlabel, fontsize=6.5, labelpad=1); ax.set_ylabel("Reflectance", fontsize=6.5, labelpad=2)
     for s in ("top", "right"):
         ax.spines[s].set_visible(False)
     for a, b, name in bands:
         ax.axvspan(a, b, color="#f2e6c9", lw=0, zorder=0)
-        ax.text((a + b) / 2, 0.03, name, transform=ax.get_xaxis_transform(), fontsize=5.5, ha="center", va="bottom", color="#8a6d2b",
+        ax.text((a + b) / 2, 0.03, name, transform=ax.get_xaxis_transform(), fontsize=5.3, ha="center", va="bottom", color="#8a6d2b",
                 rotation=90 if b - a < 0.6 else 0)
     if not len(X):
         ax.text(0.5, 0.5, "No valid spectra", transform=ax.transAxes, ha="center", va="center", fontsize=7.5, color="#666"); return
@@ -410,11 +532,11 @@ def _spectrum(fig, rect, wl: np.ndarray, X: np.ndarray, title: str, xlabel: str,
     for m, name in marks:
         ax.axvline(m, color="#b03a2e", lw=0.5, ls=(0, (3, 2)), zorder=1)
         if name:
-            ax.text(m, 0.98, name, transform=ax.get_xaxis_transform(), fontsize=5.5, rotation=90, ha="right", va="top", color="#b03a2e")
-    ax.legend(fontsize=6, frameon=False, loc="lower right", bbox_to_anchor=(1.0, 1.0), ncol=2, borderaxespad=0.1, handlelength=1.4)
+            ax.text(m, 0.98, name, transform=ax.get_xaxis_transform(), fontsize=5.3, rotation=90, ha="right", va="top", color="#b03a2e")
+    ax.legend(fontsize=5.8, frameon=False, loc="lower right", bbox_to_anchor=(1.0, 1.0), ncol=2, borderaxespad=0.1, handlelength=1.4)
 
 
-def _colour_column(ax, groups: np.ndarray, faded: np.ndarray, pal: Palette, title: str):
+def _colour_column(ax, groups: np.ndarray, faded: np.ndarray, pal: Palette):
     from matplotlib.colors import to_rgb
     n = len(groups)
     rgb = np.array([to_rgb(pal(g) if g else NONE_C) for g in groups]).reshape(n, 1, 3)
@@ -422,65 +544,77 @@ def _colour_column(ax, groups: np.ndarray, faded: np.ndarray, pal: Palette, titl
         rgb[faded] = 1 - (1 - rgb[faded]) * 0.3                     # masked-off readings drawn pale
     ax.imshow(rgb, aspect="auto", interpolation="nearest", extent=(0, 1, n, 0))
     # never set_yticks here: the column shares its y axis with the line scan, whose depth ticks it would clear
-    ax.set_xticks([]); ax.tick_params(axis="y", left=False, labelleft=False); ax.set_title(title, fontsize=6.5, color=NAVY, pad=3)
+    ax.set_xticks([]); ax.tick_params(axis="y", left=False, labelleft=False)
     for s in ax.spines.values():
         s.set_linewidth(0.5); s.set_color("#888")
 
 
-def page(fig, *, label: str, hole: str, lo: float, hi: float, D: np.ndarray, img, swir_col, tir_col, swir_faded, tir_faded,
-         swir_data, tir_data, swir_spec, tir_spec, pal: Palette, notes: dict, foot: str, trays: str):
-    """Draw one sheet on an A4 figure."""
-    from matplotlib.patches import Rectangle
-    W, H = A4; m = 0.35; n = len(D)
-    # header
-    fig.patches.append(Rectangle((m / W, (H - m - 0.62) / H), (W - 2 * m) / W, 0.62 / H, transform=fig.transFigure, facecolor=NAVY, lw=0))
-    fig.text((m + 0.15) / W, (H - m - 0.24) / H, label, fontsize=15, fontweight="bold", color="white", va="center")
-    fig.text((m + 0.15) / W, (H - m - 0.48) / H, f"{hole}   ·   {lo:.2f}–{hi:.2f} m" + (f"   ·   {trays}" if trays else ""), fontsize=8.5, color="#dfe6ee", va="center")
-    fig.text((W - m - 0.15) / W, (H - m - 0.24) / H, f"{n} samples", fontsize=10, color="white", va="center", ha="right", fontweight="bold")
-    fig.text((W - m - 0.15) / W, (H - m - 0.48) / H, notes.get("mask_line", ""), fontsize=7.5, color="#dfe6ee", va="center", ha="right")
-    top = H - m - 0.62 - 0.2
-    # footer
-    fig.text(m / W, 0.3 / H, foot, fontsize=6.3, color="#555", va="center")
-    if n == 0:
-        fig.text(0.5, 0.55, f"No spectrum samples between {lo:.2f} and {hi:.2f} m", fontsize=12, ha="center", color="#555")
-        return
-    spec_h = 2.35 if (swir_spec or tir_spec) else 0.0
-    body_lo = 0.45 + (spec_h + 0.45 if spec_h else 0.1)
-    # left: line scan + columns, all in sample-index units
-    ys, yh = body_lo, top - body_lo - 0.18
-    x = m + 0.55; iw = 1.35; cw = 0.26
-    ax = fig.add_axes([x / W, ys / H, iw / W, yh / H])
+def _strip_box(fig, x: float, y: float, h: float, D: np.ndarray, img, cols: list[tuple[str, np.ndarray, np.ndarray]], pal: Palette) -> float:
+    """The left column, full height: the line scan with the colour columns right beside it, all in sample-index
+    units (each reading the same height), depth ticks on the left. Returns its width."""
+    n = len(D); lab, iw, cw, g = 0.38, 1.12, 0.12, 0.025
+    w = 0.05 + lab + iw + len(cols) * (g + cw) + 0.06
+    _box(fig, x, y, w, h)
+    ix = x + 0.05 + lab; iy = y + 0.44; ih = h - 0.44 - 0.34
+    ax = _axes(fig, ix, iy, iw, ih)
     if img is not None:
         ax.imshow(img, aspect="auto", extent=(0, 1, n, 0), interpolation="bilinear")
     else:
-        ax.set_xlim(0, 1); ax.set_ylim(n, 0); ax.text(0.5, n / 2, "No line scan", ha="center", va="center", fontsize=8, color="#666", rotation=90)
-    pos, lab = _ticks(D, n)
-    ax.set_yticks(pos); ax.set_yticklabels(lab, fontsize=6.5); ax.set_xticks([]); ax.tick_params(axis="y", length=2.5, pad=1.5)
-    ax.set_title("Line scan", fontsize=6.5, color=NAVY, pad=3); ax.set_ylabel("Depth (m)", fontsize=7, labelpad=2)
+        ax.set_xlim(0, 1); ax.text(0.5, n / 2, "No line scan", ha="center", va="center", fontsize=8, color="#666", rotation=90)
+    pos, labs = _ticks(D, n)
+    ax.set_yticks(pos); ax.set_yticklabels(labs, fontsize=5.6); ax.set_xticks([]); ax.tick_params(axis="y", length=2.2, pad=1.2, width=0.5)
     for s in ax.spines.values():
         s.set_linewidth(0.5); s.set_color("#888")
-    cx = x + iw + 0.06
-    if swir_col is not None:
-        _colour_column(fig.add_axes([cx / W, ys / H, cw / W, yh / H], sharey=ax), swir_col, swir_faded, pal, "SWIR"); cx += cw + 0.05
-    if tir_col is not None:
-        _colour_column(fig.add_axes([cx / W, ys / H, cw / W, yh / H], sharey=ax), tir_col, tir_faded, pal, "TIR"); cx += cw + 0.05
+    _text(fig, ix + iw / 2, iy + ih + 0.09, "Line scan", fontsize=6.3, color=NAVY, ha="center", va="bottom", fontweight="bold")
+    _text(fig, x + 0.07, iy + ih + 0.09, "Depth\n(m)", fontsize=5.3, color="#555", ha="left", va="bottom", linespacing=1.05)
+    cx = ix + iw + g
+    for name, groups, faded in cols:
+        _colour_column(_axes(fig, cx, iy, cw, ih, sharey=ax), groups, faded, pal)
+        _text(fig, cx + cw / 2, iy + ih + 0.05, name, fontsize=5.3, color=NAVY, ha="center", va="bottom", rotation=90, fontweight="bold")
+        cx += cw + g
     ax.set_ylim(n, 0)
-    fig.text((x - 0.0) / W, (ys - 0.13) / H, "One row per reading (~8 mm), not to depth scale.\nPale: outside the Final Mask.",
-             fontsize=5.6, color="#666", va="top")
-    # right: pies
-    rx = cx + 0.15; rw = W - m - rx
-    secs = [s for s in (("SWIR groups", notes.get("swir_run", ""), swir_data, "No SWIR results") if swir_col is not None else None,
-                        ("TIR groups", notes.get("tir_run", ""), tir_data, "No TIR results") if tir_col is not None else None) if s]
-    if secs:
-        gap = 0.15; sh = (top - body_lo - gap * (len(secs) - 1)) / len(secs); y = top
-        for title, sub, data, empty in secs:
-            y -= sh; _section(fig, rx, y, rw, sh, title, sub, data, pal, empty); y -= gap
-    # bottom: spectra
-    specs = [s for s in (swir_spec, tir_spec) if s]
+    _text(fig, x + 0.07, y + 0.37, "One row per reading (~8 mm),\nnot to depth scale. Columns:\nheaviest group; pale = outside\nthe Final Mask.",
+          fontsize=4.9, color="#666", va="top", linespacing=1.1)
+    return w
+
+
+def page(fig, *, label: str, hole: str, lo: float, hi: float, D: np.ndarray, img, cols, panels, specs, facts: list[str],
+         results_title: str, pal: Palette, foot: str, trays: str):
+    """Draw one sheet on an A4 figure."""
+    W, H = A4; m = MARGIN; n = len(D)
+    # header: dark band, centred title, a small line of what the interval is
+    _rect(fig, m, H - m - HEAD_H, W - 2 * m, HEAD_H, facecolor=NAVY, lw=0)
+    title = f"SAMPLE SHEET - {label}   ({hole})"
+    _text(fig, W / 2, H - m - 0.25, title, fontsize=min(14.0, (W - 2 * m - 0.4) * 72 / (len(title) * 0.68)), fontweight="bold",
+          color="white", ha="center", va="center")
+    _text(fig, W / 2, H - m - 0.5, "   ·   ".join(x for x in (f"{lo:.2f}–{hi:.2f} m", f"{n} readings", trays) if x), fontsize=8,
+          color="#dfe6ee", ha="center", va="center")
+    _text(fig, m, 0.24, foot, fontsize=6.0, color="#555", va="center")
+    if n == 0:
+        _text(fig, W / 2, H * 0.55, f"No spectrum readings between {lo:.2f} and {hi:.2f} m", fontsize=12, ha="center", color="#555")
+        return
+    top, bottom = H - m - HEAD_H - GAP, 0.42
+    sw = _strip_box(fig, m, bottom, top - bottom, D, img, cols, pal)
+    rx = m + sw + GAP + 0.02; rw = W - m - rx
+    # below the results, smallest first from the bottom: the facts, then the spectra
+    fh = BAND_H + 0.16 + 0.135 * len(facts)
+    ftop = _box(fig, rx, bottom, rw, fh, "ABOUT THIS SHEET")
+    for j, line in enumerate(facts):
+        _text(fig, rx + 0.12, ftop - 0.09 - 0.135 * j, _fits(line, rw - 0.2, 6.6), fontsize=6.6, color=INK, va="top")
+    y = bottom + fh + GAP
     if specs:
-        sw = (W - 2 * m - 0.6 * (len(specs) - 1) - 0.5) / len(specs); sx = m + 0.45
-        for s in specs:
-            _spectrum(fig, [sx / W, 0.8 / H, sw / W, (spec_h - 0.55) / H], **s); sx += sw + 0.6
+        slot = 1.62; sh = BAND_H + slot * len(specs) + 0.04
+        stop = _box(fig, rx, y, rw, sh, "MEAN SPECTRA", "masked-on readings")
+        for j, s in enumerate(specs):
+            sy = stop - (j + 1) * slot
+            _spectrum(_axes(fig, rx + 0.55, sy + 0.36, rw - 0.72, slot - 0.66), **s)
+        y += sh + GAP
+    if panels:
+        _results(fig, rx, y, rw, top - y, results_title, panels, pal)
+
+
+def _run_title(kind: str, r: Run) -> str:
+    return f"{kind} group ({r.name})" if r.name else f"{kind} group"
 
 
 def render(refs: list[str], dataset: str, hole_name: str, req: dict) -> bytes:
@@ -490,25 +624,11 @@ def render(refs: list[str], dataset: str, hole_name: str, req: dict) -> bytes:
     from matplotlib.backends.backend_pdf import PdfPages
     from matplotlib.figure import Figure
 
-    d = smp.package(refs, dataset); f = smp._files(d)
-    sp = smp._spectra_of(d, dataset)
-    tir = smp._tir_of(d, dataset) if req["tir"] else None
-    sw = Run(sp, f.get("tsg"), ("TSAS",), req["results"])
-    tw = Run(tir, f.get("tir_tsg"), ("jCLST", "TSAT"), req["results"]) if tir is not None else None
-    pal = Palette(sw.colours, tw.colours if tw else {})
-    cras = f.get("cras"); specny = smp.specny_of(cras) if cras else 0
-    cras_w = None
-    if cras:
-        import struct
-        with open(cras, "rb") as fh:
-            cras_w = struct.unpack(smp._CRAS_HEAD, fh.read(64))[1]
-    D = sw.D
-    tmap = nearest(D, tw.D) if tw is not None else None
-    trays = sp.sampleheaders["T"].astype(str).to_numpy() if "T" in sp.sampleheaders.columns else None
-    swl = np.asarray(sp.wavelength, float); twl = np.asarray(tir.wavelength, float) / 1000.0 if tir is not None else None
-    who = lambda r: {"s": "system", "u": "user"}.get(r.label[:1], "") if r and r.label else ""   # noqa: E731
-    foot_run = ", ".join(x for x in (f"SWIR {sw.label} ({who(sw)})" if req["swir"] and sw.label else "",
-                                     f"TIR {tw.label} ({who(tw)})" if tw is not None and tw.label else "") if x) or "none"
+    h = Hole(refs, dataset, req); sw, tw, pal = h.sw, h.tw, h.pal
+    runs = [(k, r) for k, r in (("SWIR", sw if req["swir"] else None), ("TIR", tw)) if r is not None and r.label]
+    foot_run = ", ".join(f"{k} {r.label} ({r.who})" for k, r in runs) or "none"
+    whos = {r.who for _, r in runs}
+    results_title = {frozenset({"system"}): "SYSTEM RESULTS", frozenset({"user"}): "USER RESULTS"}.get(frozenset(whos), "RESULTS")
     mask_txt = "Final Mask" if sw.mask is not None else "none (all spectra)"
     foot = (f"Data: {dataset}   ·   Classification: {foot_run}   ·   Mask: {mask_txt}   ·   Min share {req['min_share'] * 100:g} %   ·   "
             f"CoreFlagging · coreflagging.nlp-tlp.org   ·   {time.strftime('%Y-%m-%d')}")
@@ -516,41 +636,232 @@ def render(refs: list[str], dataset: str, hole_name: str, req: dict) -> bytes:
     with _lock, matplotlib.rc_context({"pdf.fonttype": 42, "font.family": "DejaVu Sans", "axes.linewidth": 0.6}):
         with (contextlib.nullcontext() if png else PdfPages(buf, metadata={"Title": f"{hole_name} sample sheets", "Creator": "CoreFlagging"})) as pdf:
             for iv in req["intervals"]:
-                i0, i1 = window(D, iv["from_m"], iv["to_m"]); idx = np.arange(i0, i1)
+                t = h.interval(iv["from_m"], iv["to_m"]); idx, rows = t["idx"], t["rows"]
                 fig = Figure(figsize=A4)
-                kw: dict = {"swir_col": None, "tir_col": None, "swir_faded": None, "tir_faded": None, "swir_data": [], "tir_data": [],
-                            "swir_spec": None, "tir_spec": None, "img": None, "trays": "", "notes": {}}
+                kw: dict = {"img": None, "cols": [], "panels": [], "specs": [], "facts": [], "trays": h.tray_text(idx)}
                 if len(idx):
-                    rows, used = sw.rows(idx)
-                    kw["notes"]["mask_line"] = (f"{len(rows)} inside the Final Mask" if used else
-                                                ("Final Mask keeps none here: all spectra used" if sw.mask is not None else "no Final Mask: all spectra used"))
-                    if trays is not None:
-                        t = sorted({x for x in trays[idx] if x.strip()})
-                        kw["trays"] = (f"tray {t[0]}" if len(t) == 1 else f"trays {t[0]}–{t[-1]}") if t else ""
+                    f = kw["facts"]
+                    mrun, mrows, mused = (sw, rows, t["used"]) if req["swir"] or tw is None else (tw, t["trows"], t["tused"])
+                    f.append(f"Readings: {len(idx)} in the interval; " + (f"{len(mrows)} inside the Final Mask, and the pies and spectra use those." if mused else
+                             ("the Final Mask keeps none here, so all are used." if mrun.mask is not None else "the file has no Final Mask, so all are used.")))
                     if req["swir"]:
-                        kw["swir_col"] = dominant(sw.G, sw.W, idx)
-                        kw["swir_faded"] = ~sw.mask[idx] if sw.mask is not None else np.zeros(len(idx), bool)
-                        kw["swir_data"] = shares(sw.G, sw.M, sw.W, rows, req["min_share"], NO_SWIR)
-                        kw["notes"]["swir_run"] = f"{sw.label} ({who(sw)}), {len(rows)} spectra" if sw.label else "no TSA run"
-                        kw["swir_spec"] = {"wl": swl, "X": np.asarray(sp.spectra[rows], float), "title": "Mean SWIR reflectance", "xlabel": "Wavelength (nm)",
-                                           "marks": [(w_, f"{w_}") for w_ in SWIR_MARKS if swl[0] <= w_ <= swl[-1]]}
+                        faded = ~sw.mask[idx] if sw.mask is not None else np.zeros(len(idx), bool)
+                        kw["cols"].append(("SWIR", dominant(sw.G, sw.W, idx), faded))
+                        kw["panels"].append({"title": _run_title("SWIR", sw), "sub": f"{sw.label} ({sw.who}) · {len(rows)} spectra" if sw.label else "no TSA run in the file",
+                                             "data": shares(sw.G, sw.M, sw.W, rows, req["min_share"], NO_SWIR), "empty": "No SWIR results"})
+                        kw["specs"].append({"wl": h.swl, "X": np.asarray(h.sp.spectra[rows], float), "title": "Mean SWIR reflectance", "xlabel": "Wavelength (nm)",
+                                            "marks": [(w_, f"{w_}") for w_ in SWIR_MARKS if h.swl[0] <= w_ <= h.swl[-1]]})
+                        f.append(f"SWIR classification: {sw.name} ({sw.who}), columns Grp1–3 / Min1–3 / Wt1–3 {sw.label}." if sw.label else "SWIR classification: the file has no TSA run.")
                     if tw is not None:
-                        k = tmap[idx]; has = k >= 0
-                        kw["tir_col"] = np.where(has, dominant(tw.G, tw.W, np.where(has, k, 0)), "")
-                        kw["tir_faded"] = (~tw.mask[np.where(has, k, 0)] | ~has) if tw.mask is not None else ~has
-                        tk = np.unique(k[has])
-                        trows, tused = tw.rows(tk)
-                        kw["tir_data"] = shares(tw.G, tw.M, tw.W, trows, req["min_share"], NO_TIR)
-                        kw["notes"]["tir_run"] = f"{tw.label} ({who(tw)}), {len(trows)} spectra" if tw.label else "no jCLST run"
+                        k = t["k"]; has = k >= 0; trows = t["trows"]
+                        faded = (~tw.mask[np.where(has, k, 0)] | ~has) if tw.mask is not None else ~has
+                        kw["cols"].append(("TIR", np.where(has, dominant(tw.G, tw.W, np.where(has, k, 0)), ""), faded))
+                        kw["panels"].append({"title": _run_title("TIR", tw), "sub": f"{tw.label} ({tw.who}) · {len(trows)} spectra" if tw.label else "no jCLST run in the file",
+                                             "data": shares(tw.G, tw.M, tw.W, trows, req["min_share"], NO_TIR), "empty": "No TIR results"})
                         if len(trows):
-                            kw["tir_spec"] = {"wl": twl, "X": np.asarray(tir.spectra[trows], float), "title": "Mean TIR reflectance", "xlabel": "Wavelength (µm)",
-                                              "marks": [(8.2, "8.2"), (8.6, "8.6"), (9.2, "9.2")],
-                                              "bands": [(8.0, 9.4, "quartz doublet"), (9.6, 10.0, "feldspar")]}
-                    if cras:
-                        kw["img"] = strip(cras, i0, i1, specny, cras_w)
-                page(fig, label=iv["label"], hole=hole_name or dataset, lo=iv["from_m"], hi=iv["to_m"], D=D[i0:i1], pal=pal, foot=foot, **kw)
+                            kw["specs"].append({"wl": h.twl, "X": np.asarray(h.tir.spectra[trows], float), "title": "Mean TIR reflectance", "xlabel": "Wavelength (µm)",
+                                                "marks": [(8.2, "8.2"), (8.6, "8.6"), (9.2, "9.2")],
+                                                "bands": [(8.0, 9.4, "quartz doublet"), (9.6, 10.0, "feldspar")]})
+                        f.append(f"TIR classification: {tw.name} ({tw.who}), columns {tw.label}; {int(has.sum())} readings paired within 5 mm." if tw.label else
+                                 "TIR classification: the TIR file has no jCLST or TSAT run.")
+                    f.append(f"Min share: {req['min_share'] * 100:g} %. Smaller groups fold into Other, smaller minerals into \"+N more\".")
+                    f.append(f"Data source: {dataset}, the HyLogger TSG package of {hole_name or dataset}.")
+                    if h.cras:
+                        kw["img"] = strip(h.cras, t["i0"], t["i1"], h.specny, h.cras_w)
+                page(fig, label=iv["label"], hole=hole_name or dataset, lo=iv["from_m"], hi=iv["to_m"], D=h.D[t["i0"]:t["i1"]], pal=pal, foot=foot,
+                     results_title=results_title, **kw)
                 if png:
                     fig.savefig(buf, format="png", dpi=req.get("dpi", PNG_DPI), facecolor="white")
                 else:
                     pdf.savefig(fig)
+    return buf.getvalue()
+
+
+# ---------------------------------------------------------------------------------------------- the data behind the sheets
+
+def breakdown(G: np.ndarray, M: np.ndarray, W: np.ndarray, rows: np.ndarray, inactive: str) -> list[tuple[str, str, float, int]]:
+    """Every group and mineral of the spectra `rows`, nothing folded: [(group, mineral or "", share, readings)].
+    Shares are as in shares() (each spectrum split over its minerals by weight, over len(rows), so a panel's group
+    rows sum to 1 with "Not classified" making up what the run left unread); readings is how many of `rows` have
+    that group or mineral at any of the three ranks. Groups heaviest first, each followed by its minerals."""
+    n = len(rows)
+    if n == 0:
+        return []
+    acc: dict[str, dict] = {}
+    for i in rows:
+        seen: set = set()
+        for r in range(G.shape[0]):
+            g, m, w = G[r, i], M[r, i], float(W[r, i])
+            if w <= 0 or not (g or m):
+                continue
+            if g.upper() in NOT_ACTIVE or m.upper() in NOT_ACTIVE:
+                g, m = inactive, ""
+            e = acc.setdefault(g or "?", {"w": 0.0, "n": 0, "min": {}})
+            e["w"] += w
+            if (g or "?") not in seen:
+                e["n"] += 1; seen.add(g or "?")
+            if m:
+                mm = e["min"].setdefault(m, [0.0, 0]); mm[0] += w
+                if (g, m) not in seen:
+                    mm[1] += 1; seen.add((g, m))
+    total = sum(e["w"] for e in acc.values())
+    if n - total > 1e-6 * n:       # the readings the run left (partly) unread
+        acc[NO_RESULT] = {"w": n - total, "n": int((W[:, rows].clip(0).sum(axis=0) < 1 - 1e-6).sum()), "min": {}}
+    special = (inactive, NO_RESULT)
+    order = sorted((g for g in acc if g not in special), key=lambda g: -acc[g]["w"]) + [g for g in special if g in acc]
+    out = []
+    for g in order:
+        e = acc[g]; out.append((g, "", e["w"] / n, e["n"]))
+        out += [(g, m, v[0] / n, v[1]) for m, v in sorted(e["min"].items(), key=lambda x: -x[1][0])]
+    return out
+
+
+def _num(v, nd: int = 5) -> str:
+    return "" if v is None or not np.isfinite(v) else f"{v:.{nd}g}"
+
+
+README = """CoreFlagging sample-sheet data
+==============================
+
+Hole: {hole}
+Data source: {dataset} (HyLogger TSG package, as mirrored or uploaded)
+Made: {date} by CoreFlagging (coreflagging.nlp-tlp.org)
+Intervals: {n_iv}
+SWIR classification: {swir}
+TIR classification: {tir}
+Mask: {mask}
+
+These are the numbers behind the PDF sample sheets of the same intervals, for making your own plots (Excel,
+Python, R). Every file is comma-separated UTF-8 text with a header row. An interval's readings are those whose
+depth is at least from_m and less than to_m. A reading is one HyLogger spectrum, about 8 mm of core.
+
+readings.csv
+  One row per reading in each interval (a reading in two intervals is listed under each).
+  label, from_m, to_m     the interval
+  reading_index           the reading's position in the TSG file (0 = first)
+  depth_m                 depth of the reading (m)
+  tray, section, x_mm     where it lies: tray number, section (row) in the tray, mm along the section
+  in_final_mask           1 if the TSG Final Mask keeps the reading, 0 if not (empty: the file has no Final Mask)
+  laser_height_mm         laser profile height of the core surface (empty when the package has none)
+  swir_group_1..3, swir_mineral_1..3, swir_weight_1..3
+                          the SWIR TSA result: up to three minerals per reading, heaviest first, with their groups
+                          and weights (the weights of a reading sum to 1 when the run read it fully)
+  tir_group_1..3, tir_mineral_1..3, tir_weight_1..3
+                          the same for TIR, from the TIR reading measured within 5 mm of this one (empty when none)
+
+summary.csv
+  The group and mineral shares of each interval, as in the sheet's pies and tables but with nothing folded into
+  "Other" or "+N more" (the min share of the sheets is not applied here).
+  label            the interval
+  panel            SWIR or TIR
+  group, mineral   a group's own row has mineral empty; its minerals follow it
+  share            0-1: the TSA weight of that group or mineral summed over the readings used, over their number.
+                   A panel's group rows sum to 1. "{no_swir}" / "{no_tir}" are Aspectral or
+                   INVALID readings; "{no_result}" is weight the run left unassigned.
+  n_readings       how many of the readings used have that group or mineral at any of the three ranks
+  of_readings      the readings used: those inside the Final Mask (all of the interval's when the mask keeps none
+                   there, or the file has none); for TIR, the TIR readings paired with the interval's readings
+
+spectra_swir_mean.csv, spectra_tir_mean.csv
+  wavelength       nm (SWIR file, 380-2500 nm) or micrometres (TIR file)
+  "<label> mean", "<label> p10", "<label> p90"
+                   per interval: the mean reflectance of the readings used, and the 10th and 90th percentiles
+                   (the envelope drawn on the sheet). Empty for an interval with no valid readings.
+{all_spectra}"""
+
+ALL_SPECTRA = """
+spectra_swir_readings.csv, spectra_tir_readings.csv
+  Every reading's spectrum, one row per reading (all readings, inside the mask or not).
+  label, depth_m, then one column per wavelength (the column names are the wavelengths, nm or micrometres).
+  The TIR file lists the TIR readings paired with each interval's readings, at their own depth.
+"""
+
+
+def export(refs: list[str], dataset: str, hole_name: str, req: dict) -> bytes:
+    """The zip of CSV files for a checked request (format zip): readings, summary, mean spectra, and with
+    all_spectra every reading's spectrum. BadRequest when all_spectra would be over MAX_SPECTRA readings."""
+    import csv, zipfile
+    h = Hole(refs, dataset, req); sw, tw = h.sw, h.tw
+    ivs = [(iv, h.interval(iv["from_m"], iv["to_m"])) for iv in req["intervals"]]
+    total = sum(len(t["idx"]) for _, t in ivs)
+    if req.get("all_spectra") and total > MAX_SPECTRA:
+        raise BadRequest(f"every reading's spectrum is for up to {MAX_SPECTRA:,} readings; these intervals have {total:,}")
+    sh = h.sp.sampleheaders
+    T, L, X = (sh[c].to_numpy() if c in sh.columns else None for c in ("T", "L", "X"))
+    height = None
+    if "hires" in h.files:
+        from pytsg import parse_tsg as p
+        try:
+            height = np.asarray(p.read_hires_dat(str(h.files["hires"]), per_spectra=True), float)
+        except Exception:        # noqa: BLE001 - a damaged profile loses the height column, not the export
+            height = None
+    swir_on, tir_on = req["swir"], tw is not None
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED, compresslevel=6) as z:
+        def table(name: str):
+            info = zipfile.ZipInfo(name, date_time=time.localtime()[:6]); info.compress_type = zipfile.ZIP_DEFLATED
+            return io.TextIOWrapper(z.open(info, "w", force_zip64=True), encoding="utf-8", newline="")
+
+        def ranks(run: Run | None, i: int | None) -> list:
+            if run is None or i is None or i < 0:
+                return [""] * 9
+            out = []
+            for r in range(3):
+                g, m, w = run.G[r, i], run.M[r, i], run.W[r, i]
+                out += [g, m, _num(w, 4) if (w > 0 or g or m) else ""]
+            return out
+
+        with table("readings.csv") as fh:
+            wr = csv.writer(fh)
+            wr.writerow(["label", "from_m", "to_m", "reading_index", "depth_m", "tray", "section", "x_mm", "in_final_mask", "laser_height_mm"]
+                        + [f"swir_{k}_{r}" for r in (1, 2, 3) for k in ("group", "mineral", "weight")]
+                        + [f"tir_{k}_{r}" for r in (1, 2, 3) for k in ("group", "mineral", "weight")])
+            for iv, t in ivs:
+                for j, i in enumerate(t["idx"]):
+                    k = int(t["k"][j]) if t["k"] is not None else None
+                    wr.writerow([iv["label"], f"{iv['from_m']:g}", f"{iv['to_m']:g}", int(i), f"{h.D[i]:.4f}",
+                                 "" if T is None else str(T[i]).strip(), "" if L is None else str(L[i]).strip(), "" if X is None else _num(float(X[i]), 6),
+                                 "" if sw.mask is None else int(sw.mask[i]),
+                                 "" if height is None or i >= len(height) else _num(float(height[i]), 4)]
+                                + (ranks(sw, int(i)) if swir_on else [""] * 9) + (ranks(tw, k) if tir_on else [""] * 9))
+        with table("summary.csv") as fh:
+            wr = csv.writer(fh)
+            wr.writerow(["label", "panel", "group", "mineral", "share", "n_readings", "of_readings"])
+            for iv, t in ivs:
+                for panel, run, rows, inactive, on in (("SWIR", sw, t["rows"], NO_SWIR, swir_on), ("TIR", tw, t["trows"], NO_TIR, tir_on)):
+                    if on:
+                        for g, m, s, n in breakdown(run.G, run.M, run.W, rows, inactive):
+                            wr.writerow([iv["label"], panel, g, m, f"{s:.6f}", n, len(rows)])
+        for panel, on, wl, spectra, key in (("swir", swir_on, h.swl, h.sp.spectra if swir_on else None, "rows"),
+                                            ("tir", tir_on, h.twl, h.tir.spectra if tir_on else None, "trows")):
+            if not on:
+                continue
+            cols, head = [wl], ["wavelength"]
+            for iv, t in ivs:
+                X_ = np.asarray(spectra[t[key]], float) if len(t[key]) else np.zeros((0, len(wl)))
+                X_ = X_[_valid(X_)]
+                if len(X_):
+                    cols += [X_.mean(axis=0), np.percentile(X_, 10, axis=0), np.percentile(X_, 90, axis=0)]
+                else:
+                    cols += [np.full(len(wl), np.nan)] * 3
+                head += [f"{iv['label']} mean", f"{iv['label']} p10", f"{iv['label']} p90"]
+            with table(f"spectra_{panel}_mean.csv") as fh:
+                wr = csv.writer(fh); wr.writerow(head)
+                for row in np.column_stack(cols):
+                    wr.writerow([_num(row[0], 6)] + [_num(v) for v in row[1:]])
+            if req.get("all_spectra"):
+                with table(f"spectra_{panel}_readings.csv") as fh:
+                    wr = csv.writer(fh); wr.writerow(["label", "depth_m"] + [_num(w, 6) for w in wl])
+                    Dk = h.D if panel == "swir" else tw.D
+                    for iv, t in ivs:
+                        for i in (t["idx"] if panel == "swir" else t["tk"]):
+                            v = np.asarray(spectra[i], float)
+                            wr.writerow([iv["label"], f"{Dk[i]:.4f}"] + ["" if not np.isfinite(x) or abs(x) >= 1e3 else f"{x:.5g}" for x in v])
+        def who(r: Run | None) -> str:
+            return f"{r.name} ({r.who}), columns Grp/Min/Wt 1-3 {r.label}" if r is not None and r.label else "none"
+        z.writestr("README.txt", README.format(
+            hole=hole_name or dataset, dataset=dataset, date=time.strftime("%Y-%m-%d"), n_iv=len(ivs),
+            swir=who(sw) if swir_on else "not asked for", tir=who(tw) if tir_on else ("not asked for" if not req["tir"] else "the package has no TIR file"),
+            mask=("Final Mask (readings it keeps; all readings of an interval where it keeps none)" if sw.mask is not None else "none: the file has no Final Mask, all readings used"),
+            no_swir=NO_SWIR, no_tir=NO_TIR, no_result=NO_RESULT, all_spectra=ALL_SPECTRA if req.get("all_spectra") else ""))
     return buf.getvalue()
