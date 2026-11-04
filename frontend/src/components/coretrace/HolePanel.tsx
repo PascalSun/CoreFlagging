@@ -5,7 +5,7 @@ import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-quer
 import { AlertTriangle, ArrowRight, Box, Check, ChevronLeft, ChevronRight, Download, ExternalLink, FileDown, FileText, HelpCircle, Link2, Loader2, Maximize2, Minimize2, Trash2, X } from "lucide-react";
 import { downloadReportPdf } from "@/components/coretrace/pdf";
 import { PAGE_W, ReportDocument } from "@/components/coretrace/ReportDocument";
-import { ACTIVE, inferred, TARGET_SOURCE_LABEL, abstractParts, commodityName, coreScan, readDate, sourceLabel, surveyOf, type SimilarScope, type CoreModelInfo, type HoleDetail, type HoleDocuments, type MetreView, type ModelView, type Tray } from "@/lib/coreScan";
+import { ACTIVE, inferred, TARGET_SOURCE_LABEL, abstractParts, commodityName, coreScan, readDate, safeName, saveBlob, sourceLabel, surveyOf, type SimilarScope, type CoreModelInfo, type HoleDetail, type HoleDocuments, type MetreView, type ModelView, type Tray } from "@/lib/coreScan";
 import { STATUS_LABEL, fmt, groupColor, groupName, issueLabel, mineralName, pct, coreTypeBg } from "@/components/coretrace/palette";
 import { LINE, SpectraChart } from "@/components/coretrace/SpectraChart";
 import { StripKeyBar, StripLog, groupOrder } from "@/components/coretrace/StripLog";
@@ -16,6 +16,7 @@ import { SimilarHoles } from "@/components/coretrace/SimilarHoles";
 import { Nearby } from "@/components/coretrace/Nearby";
 import { QualityChecks } from "@/components/coretrace/QualityChecks";
 import { DepthLens, levelOf, type Window, WindowStart } from "@/components/coretrace/DepthLens";
+import { SampleSheets } from "@/components/coretrace/SampleSheets";
 import { cn } from "@/lib/utils";
 import { PLATFORM_URL } from "@ntlp/geodata-web/fetch";
 
@@ -137,12 +138,10 @@ function HoleDocumentsCard({ docs, loading }: { docs: HoleDocuments | undefined;
 const th = "border-b border-slate-200 px-2 py-1.5 text-left text-[11px] font-medium text-slate-500";
 const td = "border-b border-slate-100 px-2 py-1.5 align-top text-xs text-slate-700";
 
-function save(blob: Blob, name: string) {
-  const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
-}
+const save = saveBlob;
 const csv = (rows: (string | number | null)[][]) => new Blob(["﻿" + rows.map((r) => r.map((c) => `"${String(c ?? "").replace(/"/g, '""')}"`).join(",")).join("\n")], { type: "text/csv" });
 /** A TSG mineral ("Chlorite-FeMg", "Aspectral") or group ("WHITE-MICA") as a reader would write it. */
-const safe = (s: string) => s.replace(/[^A-Za-z0-9_.-]+/g, "_");
+const safe = safeName;
 
 /** The TSG software's SWIR mineral group down the hole, for a hole no model has read. */
 function GroupStrip({ groups }: { groups: string[] }) {
@@ -293,7 +292,7 @@ function MetreTab({ hole, metre, previewing, mv, loading, trays, onMetre, typeNa
   );
 }
 
-function Report({ hole, models, mvw, run, trays }: { hole: HoleDetail; models: CoreModelInfo[]; mvw: ModelView | undefined; run: string; trays: Tray[] }) {
+function Report({ hole, models, mvw, run, trays, win }: { hole: HoleDetail; models: CoreModelInfo[]; mvw: ModelView | undefined; run: string; trays: Tray[]; win: Window | null }) {
   const docRef = useRef<HTMLDivElement>(null);
   const frameRef = useRef<HTMLDivElement>(null);
   // the page is A4 at its own width; on a narrower panel it is shown scaled down, never reflowed
@@ -320,6 +319,7 @@ function Report({ hole, models, mvw, run, trays }: { hole: HoleDetail; models: C
         <button type="button" onClick={exportIssues} className="flex items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 sm:justify-start"><Download size={14} />Quality issues (CSV)</button>
         <span className="col-span-2 text-[11px] text-slate-500">The PDF is this page, as shown.</span>
       </div>
+      <SampleSheets hole={hole} trays={trays} win={win} />
       <div ref={frameRef} className="w-full">
         <div className="overflow-hidden rounded-md shadow-[0_1px_3px_rgba(15,23,42,0.12),0_8px_28px_rgba(15,23,42,0.08)] ring-1 ring-slate-200" style={{ width: PAGE_W * scale, height: docH * scale || undefined }}>
           <div style={{ transform: `scale(${scale})`, transformOrigin: "top left", width: PAGE_W }}>
@@ -585,7 +585,7 @@ export function HolePanel({ holeKey, tab: tabProp, onTab, models, run, metre, on
                 </div>);
             })()}
             {tab === "quality" && <QualityChecks issues={hole.issues} datasets={hole.datasets} jump={jump} />}
-            {tab === "report" && <Report hole={hole} models={models} mvw={mvw} run={useRun} trays={trays} />}
+            {tab === "report" && <Report hole={hole} models={models} mvw={mvw} run={useRun} trays={trays} win={win} />}
           </div>
         </div>
       </div>

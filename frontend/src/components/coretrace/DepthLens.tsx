@@ -1,9 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { ChevronLeft, ChevronRight, Maximize2 } from "lucide-react";
-import { coreScan, type HoleDetail, type ModelView, type SpectralLog, type Tray } from "@/lib/coreScan";
+import { ChevronLeft, ChevronRight, FileDown, Loader2, Maximize2 } from "lucide-react";
+import { coreScan, safeName, saveBlob, type HoleDetail, type ModelView, type Sample, type SpectralLog, type Tray } from "@/lib/coreScan";
 import { LINE, SpectraChart } from "@/components/coretrace/SpectraChart";
 import { TrayPhoto } from "@/components/coretrace/TrayPhoto";
 import { fmt, groupColor, groupName, mineralName, pct, coreTypeBg } from "@/components/coretrace/palette";
@@ -100,6 +100,7 @@ export function DepthLens({ hole, mv, win, onWindow, trays, metre, onMetre, type
             </section>
           )}
           {level === "1m" && metreDetail}
+          {span <= 2.5 && <SampleLevel hole={hole} from={from} to={to} />}
           <section>
             <H4>Every 10 cm: what the scanner read</H4>
             {bq.data ? (
@@ -188,6 +189,135 @@ function TenMetres({ hole, mv, spectral, from, to, typeName, onWindow }: {
       <p className="pt-1 text-[10.5px] text-slate-400">SWIR and TIR: the share of each mineral group the scanner&rsquo;s TSG software reads, over the 10 m. Rock Classification: the class HyFormer reads in most of its metres, and in what share of them.</p>
     </section>
   );
+}
+
+/** The finest level: the window's line-scan photograph beside every ~8 mm sample's SWIR and TIR group, from the
+ * mirrored package through the service (the first look at a hole unpacks it: a few seconds).
+ *
+ * Laid out by sample INDEX, not depth. The line scan holds the same number of image rows for every spectrum
+ * sample, in index order, but the samples' depths are not linear in index (tray and section breaks, gaps). So each
+ * sample gets the same height in every column, the image is stretched to the columns' height (which is then exact:
+ * its rows map one-to-one onto the samples), and depth is shown by tick labels taken from the samples themselves.
+ * Placing the image by depth (the old column) drifted against the mineral ticks at every break. */
+function SampleLevel({ hole, from, to }: { hole: HoleDetail; from: number; to: number }) {
+  const lo = Math.floor(from * 100) / 100, hi = Math.ceil(to * 100) / 100;
+  const sq = useQuery({ queryKey: ["core-samples", hole.key, lo, hi], queryFn: () => coreScan.samples(hole.key, lo, hi), staleTime: 60 * 60_000, retry: false });
+  const samples = useMemo(() => sq.data?.samples ?? [], [sq.data]);
+  const n = samples.length;
+  // the photograph, fetched (an upload's needs the session) once the samples say there is something to show
+  // keyed by the window, so a new window reads as loading without resetting state inside the effect
+  const id = `${hole.key}:${lo}:${hi}`;
+  const [shot, setShot] = useState<{ id: string; url: string | null; state: "loading" | "ok" | "none"; w: number; h: number } | null>(null);
+  const img = shot?.id === id ? shot : { id, url: null, state: "loading" as const, w: 0, h: 0 };
+  const setImg = (f: (v: typeof img) => typeof img) => setShot((v) => f(v?.id === id ? v : img));
+  useEffect(() => {
+    if (!n) return;
+    let url: string | null = null, gone = false;
+    coreScan.linescanImage(hole.key, lo, hi, 400).then((u) => { if (gone) URL.revokeObjectURL(u); else { url = u; setShot({ id: `${hole.key}:${lo}:${hi}`, url: u, state: "loading", w: 0, h: 0 }); } })
+      .catch(() => { if (!gone) setShot({ id: `${hole.key}:${lo}:${hi}`, url: null, state: "none", w: 0, h: 0 }); });
+    return () => { gone = true; if (url) URL.revokeObjectURL(url); };
+  }, [hole.key, lo, hi, n]);
+  const [hov, setHov] = useState<number | null>(null);
+  const [making, setMaking] = useState(false); const [err, setErr] = useState("");
+  const sheet = async () => {
+    setMaking(true); setErr("");
+    try {
+      const blob = await coreScan.sheetsPdf(hole.key, { intervals: [{ label: `${lo}–${hi} m`, from_m: lo, to_m: hi }], swir: true, tir: true, results: "auto", min_share: 0.05 });
+      saveBlob(blob, `CoreFlagging_${safeName(hole.name)}_${lo}-${hi}m_sheet.pdf`);
+    } catch (e) { setErr((e as Error).message || "The sheet could not be made."); }
+    finally { setMaking(false); }
+  };
+  // every sample the same height: at least the old 420 px for the window, at least 3 px a sample (a 2.5 m window
+  // of ~300 samples runs ~900 px and scrolls); the image's width follows the core's own width at that height
+  const H = n ? Math.max(420, n * 3) : 420; const hp = n ? H / n : 0;
+  const colW = img.w && img.h ? Math.max(56, Math.min(180, Math.round((H * img.w) / img.h))) : 120;
+  const ticks = useMemo(() => sampleTicks(samples, hi - lo, hp ? Math.ceil(14 / hp) : 1), [samples, hi, lo, hp]);
+  const breaks = useMemo(() => samples.flatMap((s, k) => k && (s.tray !== samples[k - 1].tray || s.section !== samples[k - 1].section) ? [{ k, label: s.tray !== samples[k - 1].tray ? `tray ${s.tray}` : `section ${s.section}` }] : []), [samples]);
+  // pointer move reads with a mouse; pointer down is a tap on a phone
+  const readAt = (e: React.PointerEvent<HTMLDivElement>) => { const y = e.clientY - e.currentTarget.getBoundingClientRect().top; setHov(Math.max(0, Math.min(n - 1, Math.floor(y / hp)))); };
+  const hs: Sample | null = hov !== null ? samples[hov] ?? null : null;
+  const status = (sq.error as { status?: number } | null)?.status;
+  const col = (g: string | undefined, m: string | undefined) => (m ? groupColor(g) : "#e2e8f0");
+  return (
+    <section>
+      <div className="flex flex-wrap items-center gap-2 pb-1.5">
+        <h4 className="font-display text-[14px] font-semibold text-slate-900">Every sample ({sq.data?.step_mm ? `${Math.round(sq.data.step_mm)} mm` : "~8 mm"}): the line scan, SWIR and TIR</h4>
+        {n > 0 && <button type="button" onClick={sheet} disabled={making} className="ml-auto flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 pointer-coarse:py-2 text-[11px] font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60">
+          {making ? <Loader2 size={13} className="animate-spin" /> : <FileDown size={13} />}{making ? "Making the sheet…" : "Sheet for this window (PDF)"}</button>}
+      </div>
+      {err && <p className="pb-2 text-[11px] text-red-600">{err}</p>}
+      {sq.isError ? (
+        <p className="rounded-lg border border-dashed border-slate-200 px-3 py-4 text-center text-[11px] text-slate-500">{status === 404
+          ? hole.source === "upload" ? "This scan's package is not kept on the platform, so it cannot be read sample by sample. Upload it again to see the line scan here." : "This hole has no package to read at sample level."
+          : "The sample level is not available right now (the service may be unpacking the package; try again in a moment)."}</p>
+      ) : !n ? <p className="text-[11px] text-slate-500">{sq.isPending ? "Reading the samples…" : "No samples in this window."}</p> : (
+        <div className="flex flex-col gap-3 @md:flex-row">
+          {/* the reading: above the strip on a narrow panel (so a tap reads without scrolling away), beside it on a wide one */}
+          <div className="text-xs text-slate-700 @md:order-2 @md:min-w-0 @md:flex-1">
+            <div className="rounded-lg border border-slate-200 bg-white p-3 @md:sticky @md:top-0">
+              {hs ? <SampleCard s={hs} /> : <p className="text-[11px] leading-relaxed text-slate-500">{n} samples in this window. Move over the strip (or tap it) to read one.</p>}
+              <p className="mt-2 text-[10.5px] leading-relaxed text-slate-400">Each sample is the same height here, in the order it was scanned, so the photograph and the columns line up reading for reading; the depths on the left are the samples&rsquo; own, and jump where a tray or section breaks. The model does not read at this scale: this is the scanner&rsquo;s TSG reading and its photograph.</p>
+            </div>
+          </div>
+          <div className="max-h-[70vh] flex-none overflow-y-auto overscroll-contain rounded-md @md:order-1">
+            <div className="relative flex gap-1" style={{ height: H }} onMouseLeave={() => setHov(null)}
+              onPointerMove={(e) => readAt(e)} onPointerDown={(e) => readAt(e)}>
+              <div className="relative w-12 flex-none font-mono text-[9px] text-slate-400">
+                {ticks.map((t) => <span key={t.k} className={cn("absolute right-1 whitespace-nowrap", t.k ? "-translate-y-1/2" : "")} style={{ top: t.k * hp }}>{t.d}</span>)}
+              </div>
+              <div className="relative flex-none overflow-hidden bg-slate-100" style={{ width: colW, height: H }}>
+                {/* stretched to the columns' height on purpose: its rows are the samples, one block each */}
+                {/* eslint-disable-next-line @next/next/no-img-element -- an object URL of a fetched strip, no optimising to do */}
+                {img.url && <img src={img.url} alt={`Line scan, ${lo}–${hi} m`} onLoad={(e) => { const t = e.currentTarget; setImg((v) => ({ ...v, state: "ok", w: t.naturalWidth, h: t.naturalHeight })); }} onError={() => setImg((v) => ({ ...v, state: "none" }))} className="block h-full w-full object-fill" draggable={false} />}
+                {img.state === "loading" && <div className="absolute inset-0 grid place-items-center text-[10px] text-slate-400">reading the line scan…</div>}
+                {img.state === "none" && <div className="absolute inset-0 grid place-items-center px-2 text-center text-[10px] text-slate-400">no line scan for this window</div>}
+              </div>
+              {(["swir", "tir"] as const).map((side) => (
+                <div key={side} className="relative w-6 flex-none bg-slate-50" title={side.toUpperCase()}>
+                  {samples.map((s, k) => <div key={s.i} className="absolute inset-x-0" style={{ top: k * hp, height: Math.max(hp, 1), background: side === "swir" ? col(s.group, s.mineral) : col(s.tir_group, s.tir_mineral) }} />)}
+                </div>))}
+              {breaks.map((b) => <div key={b.k} className="pointer-events-none absolute left-12 right-0 border-t border-dashed border-slate-900/50" style={{ top: b.k * hp }} title={b.label} />)}
+              {hov !== null && <>
+                <div className="pointer-events-none absolute left-12 right-0 bg-cyan/25" style={{ top: hov * hp, height: Math.max(hp, 1) }} />
+                <div className="pointer-events-none absolute left-10 right-0 border-t border-cyan" style={{ top: (hov + 0.5) * hp }} />
+              </>}
+            </div>
+            <div className="sticky bottom-0 flex gap-1 bg-white pt-1 text-[9px] font-medium text-slate-500"><span className="w-12" /><span className="text-center" style={{ width: colW }}>line scan</span><span className="w-6 text-center">SWIR</span><span className="w-6 text-center">TIR</span></div>
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
+/** What the scanner read at one sample. */
+function SampleCard({ s }: { s: Sample }) {
+  const side = (label: string, g: string | undefined, m: string | undefined, none: string) => (
+    <div className="flex items-center gap-1.5"><span className="w-8 flex-none text-[10px] font-medium text-slate-500">{label}</span>
+      <i className="inline-block h-2.5 w-2.5 flex-none rounded-[2px]" style={{ background: m ? groupColor(g) : "#e2e8f0" }} />
+      <span className="min-w-0 truncate">{m ? <>{mineralName(m)}{g ? <span className="text-slate-500"> · {groupName(g)}</span> : null}</> : <span className="text-slate-400">{none}</span>}</span></div>);
+  return (
+    <div className="flex flex-col gap-1">
+      <div className="font-mono font-semibold text-slate-900">{s.depth.toFixed(3)} m</div>
+      {side("SWIR", s.group, s.mineral, "no SWIR mineral read")}
+      {side("TIR", s.tir_group, s.tir_mineral, s.tir_group === undefined ? "not in this reading" : "no TIR reading here")}
+      <div className="text-[11px] text-slate-500">tray {s.tray}{s.section !== null ? `, section ${s.section}` : ""}, {s.x_mm.toFixed(0)} mm along{s.height_mm !== null ? ` · laser height ${s.height_mm.toFixed(1)} mm` : ""}{s.weight !== null ? ` · SWIR weight ${s.weight}` : ""}</div>
+    </div>
+  );
+}
+
+/** Depth labels for an index-laid strip: the first sample, then the first sample at or past each round depth,
+ * labelled with its own depth; a label closer than `gap` samples to the last is left out (the dashed lines mark
+ * the breaks). */
+function sampleTicks(samples: Sample[], span: number, gap: number): { k: number; d: string }[] {
+  const step = span <= 0.3 ? 0.05 : span <= 1.2 ? 0.1 : 0.25; const out: { k: number; d: string }[] = [];
+  let next = -Infinity, last = -Infinity;
+  samples.forEach((s, k) => {
+    if (s.depth + 1e-6 < next) return;
+    next = (Math.floor((s.depth + 1e-6) / step) + 1) * step;
+    if (k - last >= gap) { out.push({ k, d: s.depth.toFixed(2) }); last = k; }
+  });
+  return out;
 }
 
 /** One photograph per tray the window touches: the first metre of the window on each tray (a tray holds ~3.5 m). */
