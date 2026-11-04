@@ -306,6 +306,10 @@ def samples(refs: list[str], dataset: str, lo: float, hi: float, spectra: bool =
 _CRAS_HEAD = "20s2I8h4I2h"
 
 
+def _resize(img: np.ndarray, w: int, h: int) -> np.ndarray:
+    return np.asarray(Image.fromarray(img).resize((w, h), Image.BILINEAR))
+
+
 def cras_rows(path: Path, i0: int, i1: int, factor: int = 1) -> np.ndarray:
     """The line-scan rows of samples [i0, i1) as an RGB array, top = sample i0. Each sample is `specny` image rows
     in the file, so the strip is linear in sample index (not in depth). Only the chunks covering those rows are
@@ -328,9 +332,14 @@ def cras_rows(path: Path, i0: int, i1: int, factor: int = 1) -> np.ndarray:
         for c in range(c0, c1 + 1):
             fh.seek(base + int(offs[c])); chunk = fh.read(int(offs[c + 1] - offs[c]))
             # libjpeg scales only when asked for a size: min_factor alone leaves the chunk full size
-            img = decode_jpeg(chunk, colorspace="RGB", min_height=-(-chunksize // f), min_width=-(-ns // f), min_factor=f) if f > 1 else decode_jpeg(chunk, colorspace="RGB")
+            # Ask for this chunk's own row count: the last chunk is short, and asking it for a full chunk's height makes
+            # libjpeg give up scaling, so it came back full width and would not stack with the others.
+            rows = min(chunksize, nl - c * chunksize)
+            img = decode_jpeg(chunk, colorspace="RGB", min_height=-(-rows // f), min_width=-(-ns // f), min_factor=f) if f > 1 else decode_jpeg(chunk, colorspace="RGB")
             if c == c0:
-                scale = img.shape[0] / min(chunksize, nl - c * chunksize)   # what the decoder gave, not what was asked
+                scale = img.shape[0] / rows   # what the decoder gave, not what was asked
+            elif img.shape[1] != parts[0].shape[1]:   # still a different scale: bring it to the first chunk's
+                img = _resize(img, parts[0].shape[1], max(1, int(round(img.shape[0] * parts[0].shape[1] / img.shape[1]))))
             # TSG writes the chunks with the channels in BGR order: decoded as RGB, a pink label comes out blue
             parts.append(np.ascontiguousarray(np.flipud(img)[..., ::-1]))
     a = (r0 - c0 * chunksize) * scale; b = (r1 - c0 * chunksize) * scale
