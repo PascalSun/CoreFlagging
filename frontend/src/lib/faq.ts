@@ -63,7 +63,7 @@ export const FAQ: Faq[] = [
   {
     id: "report",
     q: "Can I download a report for a drillhole?",
-    a: "Yes. Open a hole on the [map](/map) and its Report tab makes a PDF report. For a hole the model has read, it covers the data-quality problems found in the scan, the intervals that stand out and why, the metres most worth assaying, the rock classification down the hole and the domain boundaries. The data-quality problems also download as a CSV file, so the relevant parties can review them.",
+    a: "Yes. Open a hole on the [map](/map) and its Report tab makes a PDF report. For a hole the model has read, it covers the data-quality problems found in the scan, the intervals that stand out and why, the metres most worth assaying, the rock classification down the hole and the domain boundaries. The data-quality problems also download as a CSV file, so the relevant parties can review them. The Sample sheets tab makes one A4 page per TSG sample, tray or interval of your own CSV: the HyLogger line scan beside its SWIR and TIR mineral groups, with the mean spectra.",
   },
   {
     id: "licence",
