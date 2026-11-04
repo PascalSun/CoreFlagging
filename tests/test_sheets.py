@@ -200,3 +200,43 @@ def test_the_endpoint_answers_400_on_a_bad_request_and_404_without_a_package(tmp
     body.update(dataset="DS", refs=["x"], intervals=[{"label": "a", "from_m": 5.0, "to_m": 5.3}])
     r = c.post("/api/v1/sheets.pdf", json=body)
     assert r.status_code == 200 and r.headers["content-type"] == "application/pdf" and r.content.startswith(b"%PDF")
+
+
+# ---------------------------------------------------------------------------------------------- the png preview
+
+def _png_size(b: bytes) -> tuple[int, int]:
+    assert b.startswith(b"\x89PNG\r\n\x1a\n")
+    return struct.unpack(">II", b[16:24])
+
+
+def test_png_is_checked_one_interval_and_the_dpi_clamped():
+    iv = [{"from_m": 1, "to_m": 2}]
+    assert sheets.check({"intervals": iv})["format"] == "pdf"
+    r = sheets.check({"intervals": iv, "format": "png"}); assert r["format"] == "png" and r["dpi"] == sheets.PNG_DPI
+    assert sheets.check({"intervals": iv, "format": "png", "dpi": 10})["dpi"] == 60
+    assert sheets.check({"intervals": iv, "format": "png", "dpi": 999})["dpi"] == 200
+    for bad in ({"intervals": iv * 2, "format": "png"}, {"intervals": iv, "format": "svg"}, {"intervals": iv, "format": "png", "dpi": "x"}):
+        with pytest.raises(sheets.BadRequest):
+            sheets.check(bad)
+
+
+def test_a_png_is_the_one_page_at_about_900_px(tmp_path, monkeypatch):
+    _toy_package(tmp_path, monkeypatch)
+    png = sheets.render(["x"], "DS", "HOLE", sheets.check({"intervals": [{"label": "A", "from_m": 5.0, "to_m": 6.0}], "format": "png"}))
+    w, h = _png_size(png)
+    assert 880 <= w <= 940 and abs(h / w - sheets.A4[1] / sheets.A4[0]) < 0.01
+    w2, _ = _png_size(sheets.render(["x"], "DS", "HOLE", sheets.check({"intervals": [{"from_m": 50, "to_m": 51}], "format": "png", "dpi": 60})))
+    assert abs(w2 - 8.27 * 60) <= 2                             # an empty interval still gives its page
+
+
+def test_the_endpoint_returns_a_png_for_one_interval_and_400_for_two(tmp_path, monkeypatch):
+    from fastapi.testclient import TestClient
+    from app.main import app
+    _toy_package(tmp_path, monkeypatch)
+    c = TestClient(app)
+    body = {"dataset": "DS", "refs": ["x"], "hole_name": "H", "format": "png", "dpi": 100, "intervals": [{"label": "a", "from_m": 5.0, "to_m": 5.3}]}
+    r = c.post("/api/v1/sheets.pdf", json=body)
+    assert r.status_code == 200 and r.headers["content-type"] == "image/png" and "content-disposition" not in r.headers
+    assert abs(_png_size(r.content)[0] - 827) <= 2
+    body["intervals"] = body["intervals"] * 2
+    r = c.post("/api/v1/sheets.pdf", json=body); assert r.status_code == 400 and "one interval" in r.json()["detail"]

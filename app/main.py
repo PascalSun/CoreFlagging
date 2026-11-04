@@ -131,11 +131,14 @@ class Sheets(BaseModel):
     tir: bool = True
     results: str = "auto"         # auto | system | user
     min_share: float = 0.05
+    format: str = "pdf"           # pdf | png (png: exactly one interval, that page as an image)
+    dpi: float | None = None      # png only; clamped to 60..200, default 110 (~910 px wide)
 
 
 @app.post("/api/v1/sheets.pdf")
 def sample_sheets(body: Sheets):
-    """One A4 sample sheet per interval as a PDF: line scan with SWIR and TIR columns, group pies, mean spectra."""
+    """One A4 sample sheet per interval as a PDF: line scan with SWIR and TIR columns, group pies, mean spectra.
+    With format png, one interval's page as a PNG (the live preview)."""
     from . import samples as smp, sheets
     from fastapi.responses import Response as RawResponse
     try:
@@ -145,6 +148,8 @@ def sample_sheets(body: Sheets):
         raise HTTPException(400, str(e))
     except smp.NoPackage as e:
         raise HTTPException(404, str(e))
+    if req["format"] == "png":
+        return RawResponse(pdf, media_type="image/png")
     name = "".join(c if c.isalnum() or c in "-_." else "_" for c in (body.hole_name or body.dataset))
     return RawResponse(pdf, media_type="application/pdf", headers={"Content-Disposition": f'inline; filename="CoreFlagging_{name}_sheets.pdf"'})
 
