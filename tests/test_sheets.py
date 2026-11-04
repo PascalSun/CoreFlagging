@@ -91,6 +91,17 @@ def test_the_strip_is_linear_in_sample_index_at_every_decode_scale(tmp_path, fac
     assert np.all(np.abs(mids - 8 * np.arange(5, 17)) <= 4)
 
 
+@pytest.mark.parametrize("factor", [2, 4, 8])
+def test_the_last_short_chunk_decodes_at_the_same_scale(tmp_path, factor):
+    # 29 samples x 16 rows = 464 rows in chunks of 64: the last chunk holds 16 rows. Asked for a full chunk's height,
+    # libjpeg left it full width and the strip to the end of the hole would not stack (a 502 on the live site).
+    p = tmp_path / "H_tsg_cras.bip"; _cras(p, 29, 16, 64)
+    a = smp.cras_rows(p, 20, 29, factor)
+    per = 16 // factor
+    assert a.shape[:2] == (9 * per, 64 // factor)
+    assert np.all(np.abs(a[per // 2::per, a.shape[1] // 2, 1].astype(int) - 8 * np.arange(20, 29)) <= 4)
+
+
 # ---------------------------------------------------------------------------------------------- upload refs
 
 def _zipped(tmp: Path, members: dict[str, bytes]) -> bytes:
