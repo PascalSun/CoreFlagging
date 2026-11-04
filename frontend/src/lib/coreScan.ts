@@ -47,7 +47,12 @@ export type Review = { run: string; kind: ReviewKind; from_m: number; to_m: numb
 export type ReviewKind = "log" | "flag" | "domain" | "unit";
 export type ReviewBody = { run: string; kind: ReviewKind; from_m: number; to_m: number; verdict: "agree" | "disagree"; note?: string };
 
-export type Sample = { i: number; depth: number; tray: string; section: number | null; x_mm: number; mineral: string; group: string; weight: number | null; height_mm: number | null; swir?: number[] };
+/** One TSG reading: [group, mineral, weight] ranked by the software's Wt1–3. */
+export type TsaRank = [string, string, number | null];
+/** One ~8 mm spectrum sample. `i` is its index in the dataset: the line scan holds `specny` image rows per index, so
+ * samples, not depths, are what the image lines up with. The TIR fields are the TIR sample within 5 mm, "" without one. */
+export type Sample = { i: number; depth: number; tray: string; section: number | null; x_mm: number; mineral: string; group: string; weight: number | null; height_mm: number | null; swir?: number[];
+  swir_mix?: TsaRank[]; tir_mineral?: string; tir_group?: string; tir_mix?: TsaRank[] };
 export type SampleView = { dataset: string; from_m: number; to_m: number; n: number; step_mm: number | null; samples: Sample[]; swir_wl?: number[] };
 
 export type TracePoint = { m: number; e: number; n: number; u: number; lon: number; lat: number; z: number | null; k: number | null };
@@ -133,7 +138,17 @@ export type HoleDetail = HoleRow & {
   meta: Record<string, unknown> & { tsg?: Record<string, unknown>; n_tokens?: number; seen_in_training?: boolean };
   report: { funnel?: Record<string, number>; rules?: { step: string; rule: string }[] };
   strip: number[]; datasets: DatasetRow[]; issues: Issue[]; metres: Metres; results: ResultSummary[];
+  /** the TSG's own SampleID intervals, in dataset order ([] or absent when the TSG names none) */
+  samples?: TsgSample[];
 };
+export type TsgSample = { id: string; from_m: number; to_m: number; dataset: string };
+
+/** One page of a sample sheet PDF. */
+export type SheetInterval = { label: string; from_m: number; to_m: number };
+/** What the sheets proxy takes: the intervals themselves, or where the platform should take them from (the hole's
+ * trays, or the TSG's SampleIDs). `results`: which TSA run to colour by (auto = system where there is one). */
+export type SheetsBody = ({ intervals: SheetInterval[] } | { source: "trays" | "samples" }) & {
+  swir: boolean; tir: boolean; results: "auto" | "system" | "user"; min_share: number };
 
 export type Segment = {
   seg: number; from_m: number; to_m: number; core_type: number; length_m: number; core_type_name: string; boundary: number | null;
@@ -204,6 +219,13 @@ async function json<T>(path: string, init?: RequestInit): Promise<T> {
 
 const enc = encodeURIComponent;
 
+/** Hands a blob to the browser as a download. */
+export function saveBlob(blob: Blob, name: string) {
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+}
+/** A name safe in a file name. */
+export const safeName = (s: string) => s.replace(/[^A-Za-z0-9_.-]+/g, "_");
+
 /** The model's name as readers see it: HyFormer. The platform may still hold the names a worker announced before the
  * rename ("CoreTrace-MAE", "CoreTrace-MAE+DINO"…) until the worker announces its models again. */
 export const modelName = (name: string) => name.replace(/^CoreTrace-MAE/, "HyFormer");
@@ -216,6 +238,25 @@ export const coreScan = {
   package: (key: string) => json<HolePackage>(`/holes/${enc(key)}/package/`),
   /** Every ~8 mm sample of a window (up to 20 m), from the mirrored package; 404 for an upload, 503 when the service is away. */
   samples: (key: string, from: number, to: number, spectra = false) => json<SampleView>(`/holes/${enc(key)}/samples/?from=${from}&to=${to}${spectra ? "&spectra=1" : ""}`),
+  /** The line-scan photograph of a window (up to 5 m) as an object URL (the caller revokes it). Fetched, not linked,
+   * so a private upload's image carries the session. Its rows are the window's samples in index order. */
+  async linescanImage(key: string, from: number, to: number, width = 600): Promise<string> {
+    const res = await call(`/holes/${enc(key)}/linescan.jpg?from=${from}&to=${to}&width=${width}`);
+    if (!res.ok) throw new CoreError(res.status, "line scan not available");
+    return URL.createObjectURL(await res.blob());
+  },
+  /** One A4 page per interval: the line scan beside its SWIR / TIR group columns, pies and mean spectra. Up to 300
+   * intervals of up to 20 m; the platform renders them through the service, so a long list takes a while. */
+  async sheetsPdf(key: string, body: SheetsBody): Promise<Blob> {
+    const res = await call(`/holes/${enc(key)}/sheets.pdf`, { method: "POST", body: JSON.stringify(body), headers: { "Content-Type": "application/json" } });
+    if (!res.ok) {
+      const b = (await res.json().catch(() => ({}))) as { error?: string; message?: string; detail?: string };
+      const why = b.message || b.detail || b.error;
+      throw new CoreError(res.status, why || (res.status === 404 ? "The sample sheets are not available for this hole (no package or line scan to read)."
+        : res.status >= 500 ? "The sheet service is not answering right now; try again in a minute." : `request failed (${res.status})`), b.error);
+    }
+    return res.blob();
+  },
   /** The full-resolution line-scan photograph of a window (up to 5 m), as an image URL. */
   linescanUrl: (key: string, from: number, to: number, width = 600) => `${CORE_BASE}/holes/${enc(key)}/linescan.jpg?from=${from}&to=${to}&width=${width}`,
   /** The hole as a line in space, with the holes within `km` and what to highlight. */
