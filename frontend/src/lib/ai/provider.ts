@@ -1,6 +1,7 @@
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import type { LanguageModel } from "ai";
+import { pickLocalModel } from "./localModel";
 
 // The assistant's model. OpenRouter by default: Gemini Flash (thinking) — thinking is on by
 // default for these models, so no special config is needed; `sendReasoning: true` on the
@@ -13,6 +14,7 @@ import type { LanguageModel } from "ai";
 const DEFAULT_MODEL = "google/gemini-2.5-flash";
 const OLLAMA_BASE_URL = "https://ollama.ai4wa.com/v1";
 const OLLAMA_MODEL = "qwen3-8b-32k";
+const OLLAMA_FALLBACK = "qwen3.5-4b";
 
 export type ChatProvider = "openrouter" | "ollama";
 /** What a person picks in the chat bar: the cloud model (OpenRouter) or the local one (Ollama). */
@@ -36,10 +38,22 @@ function providerFor(choice?: unknown): ChatProvider {
 
 const cloudModel = () => process.env.CHAT_MODEL || DEFAULT_MODEL;
 const localModel = () => process.env.OLLAMA_MODEL || OLLAMA_MODEL;
+// The smaller local model a chat goes to while the main one's GPU is busy (OLLAMA_FALLBACK_MODEL; empty: never), and
+// how long a person may wait for the main one before that (LOCAL_MAX_WAIT_S).
+const fallbackModel = () => process.env.OLLAMA_FALLBACK_MODEL ?? OLLAMA_FALLBACK;
+const maxWaitS = () => Number(process.env.LOCAL_MAX_WAIT_S) || 20;
+
+/** The local model that answers this chat now: the main one, or the smaller one while the main one's queue is deep
+ *  (undefined when the chat goes to the cloud). Pass it to chatModel / chatModelId / chatTag. */
+export async function localModelNow(choice?: unknown): Promise<string | undefined> {
+  if (providerFor(choice) !== "ollama") return undefined;
+  const { model } = await pickLocalModel({ primary: localModel(), fallback: fallbackModel(), queueUrl: queueFor, maxWaitS: maxWaitS() });
+  return model;
+}
 
 /** The model id the usage log records. */
-export function chatModelId(choice?: unknown): string {
-  return providerFor(choice) === "ollama" ? `ollama/${localModel()}` : cloudModel();
+export function chatModelId(choice?: unknown, local?: string): string {
+  return providerFor(choice) === "ollama" ? `ollama/${local ?? localModel()}` : cloudModel();
 }
 
 /** "google/gemini-3.1-flash-lite" → "Gemini 3.1 Flash Lite", "qwen3-8b-32k" → "Qwen3 8B",
@@ -57,25 +71,28 @@ export function modelLabel(id: string): string {
 // long a new one would wait (/queue?model=…, open to any page): the chat bar shows it beside the local model.
 const GATEWAYS = (process.env.LLM_GATEWAYS || "https://gateway.ai4wa.com,https://llm.nlp-tlp.org").split(",").map((g) => g.trim().replace(/\/$/, "")).filter(Boolean);
 
-/** The gateway's queue for the local model, when the local model is reached through the gateway (else undefined). */
-function localQueue(): string | undefined {
+/** The gateway's queue for a local model, when the local model is reached through the gateway (else undefined). */
+function queueFor(model: string): string | undefined {
   const base = (process.env.OLLAMA_BASE_URL || OLLAMA_BASE_URL).replace(/\/$/, "");
   const root = GATEWAYS.find((g) => base === g || base.startsWith(g + "/"));
-  return root ? `${root}/queue?model=${encodeURIComponent(localModel())}` : undefined;
+  return root ? `${root}/queue?model=${encodeURIComponent(model)}` : undefined;
 }
+const localQueue = () => queueFor(localModel());
 
-type Choice = { id: ChatChoice; label: string; model: string; queue?: string };
+/** `fallback`: the smaller local model a chat goes to while this one is busy. */
+type Choice = { id: ChatChoice; label: string; model: string; queue?: string; fallback?: string };
 
 /** What the chat bar offers: the cloud model always, the local one when Ollama is configured (with its queue). */
 export function chatChoices(): { default: ChatChoice; options: Choice[] } {
   const options: Choice[] = [{ id: "cloud", label: "Cloud", model: modelLabel(cloudModel()) }];
-  if (ollamaReady()) options.push({ id: "local", label: "Local", model: modelLabel(localModel()), queue: localQueue() });
+  if (ollamaReady()) options.push({ id: "local", label: "Local", model: modelLabel(localModel()), queue: localQueue(),
+    ...(fallbackModel() && fallbackModel() !== localModel() ? { fallback: modelLabel(fallbackModel()) } : {}) });
   return { default: providerFor() === "ollama" ? "local" : "cloud", options };
 }
 
 /** What an answer is labelled with in the chat: which side served it and the model's name. */
-export function chatTag(choice?: unknown): { llm: ChatChoice; model: string } {
-  return providerFor(choice) === "ollama" ? { llm: "local", model: modelLabel(localModel()) } : { llm: "cloud", model: modelLabel(cloudModel()) };
+export function chatTag(choice?: unknown, local?: string): { llm: ChatChoice; model: string } {
+  return providerFor(choice) === "ollama" ? { llm: "local", model: modelLabel(local ?? localModel()) } : { llm: "cloud", model: modelLabel(cloudModel()) };
 }
 
 const openrouter = createOpenRouter({
@@ -86,7 +103,7 @@ const openrouter = createOpenRouter({
   },
 });
 
-export function chatModel(choice?: unknown): LanguageModel {
+export function chatModel(choice?: unknown, local?: string): LanguageModel {
   if (providerFor(choice) === "ollama") {
     const ollama = createOpenAICompatible({
       name: "ollama",
@@ -94,7 +111,7 @@ export function chatModel(choice?: unknown): LanguageModel {
       apiKey: process.env.OLLAMA_API_KEY || undefined,
       headers: { "X-Priority": "interactive" },               // a person waits on a chat: the gateway puts it first
     });
-    return ollama(localModel());
+    return ollama(local ?? localModel());
   }
   return openrouter(cloudModel());
 }

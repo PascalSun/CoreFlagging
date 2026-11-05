@@ -4,6 +4,7 @@ import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, useSy
 import type { KeyboardEvent, RefObject } from "react";
 import { createPortal } from "react-dom";
 import { Check, ChevronDown, Cloud, Cpu } from "lucide-react";
+import { busy as deep } from "@/lib/ai/localModel";
 
 // Cloud (OpenRouter) or local (our own GPU's Ollama) for the assistant, picked in the assistant's header
 // (`compact`: an icon button among the header's icons) or, where a page has no header, as a pill.
@@ -12,7 +13,7 @@ import { Check, ChevronDown, Cloud, Cpu } from "lucide-react";
 // The list is our own menu (a popover by the button; a small sheet on phones), not the device's select.
 
 export type ChatChoice = "cloud" | "local";
-type Option = { id: ChatChoice; label: string; model: string; queue?: string };
+type Option = { id: ChatChoice; label: string; model: string; queue?: string; fallback?: string };
 type Queue = { available: boolean; ahead?: { interactive: number }; eta_s?: { interactive: number }; running?: number; parallel?: number; waiting?: number };
 
 /** The local model's queue on our GPU (the LLM gateway's estimate), read every 5 s while it is shown. */
@@ -61,8 +62,10 @@ export function useChatModel() {
 }
 
 /** Our GPU's state in words, from the gateway's queue (the same phrases as the button's tooltip). */
-function gpuState(q: Queue | null, sending: boolean) {
+function gpuState(q: Queue | null, sending: boolean, fallback?: string) {
   if (!q) return { busy: false, ahead: 0, text: "" };
+  // too deep to wait on (the server's own test, lib/ai/localModel): the smaller model answers instead
+  if (fallback && !sending && deep(q, 20)) return { busy: true, ahead: 0, text: `${q.available === false ? "our big GPU is not answering" : "our big GPU is busy"}; ${fallback} answers instead` };
   const ahead = q.ahead?.interactive ?? 0, eta = q.eta_s?.interactive ?? 0, busy = !sending && (ahead > 0 || eta >= 10);
   // "ahead": people's calls before this one (a batch run waits behind it); none ahead but every slot taken: it is next
   const text = !q.available ? "our GPU is not answering" : sending ? "your message is with our GPU" : !busy ? "our GPU is free"
@@ -93,7 +96,7 @@ export function ModelPicker({ options, choice, onChange, disabled, compact }: {
   if (options.length < 2 || !choice || !cur) return null;
 
   const Icon = cur.id === "local" ? Cpu : Cloud;
-  const mine = cur.id === "local" ? gpuState(q, !!disabled) : { busy: false, ahead: 0, text: "" };
+  const mine = cur.id === "local" ? gpuState(q, !!disabled, local?.fallback) : { busy: false, ahead: 0, text: "" };
   const tip = `Model: ${cur.label} · ${cur.model}${mine.text ? ` · ${mine.text}` : ""}`;
   const dot = cur.id === "local" && q && <span aria-hidden className={`size-1.5 shrink-0 rounded-full ${!q.available ? "bg-rose-500" : disabled ? "animate-pulse bg-sky-500" : mine.busy ? "bg-amber-500" : "bg-emerald-500"}`} />;
   const toggle = () => { if (!disabled) setOpen((o) => !o); };
@@ -182,7 +185,7 @@ function ModelMenu({ anchor, options, choice, queue, sending, onPick, onClose }:
 
   const rows = options.map((o, i) => {
     const RowIcon = o.id === "local" ? Cpu : Cloud;
-    const g = o.id === "local" ? gpuState(queue, sending && o.id === choice) : null;
+    const g = o.id === "local" ? gpuState(queue, sending && o.id === choice, o.fallback) : null;
     const tone = !g || !queue ? "" : !queue.available ? "text-rose-600" : g.busy ? "text-amber-700" : "text-emerald-700";
     const selected = o.id === choice;
     return (
