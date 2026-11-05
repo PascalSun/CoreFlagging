@@ -1,6 +1,6 @@
 import { convertToModelMessages, stepCountIs, streamText, type UIMessage } from "ai";
 
-import { chatModel, chatModelId, chatTag } from "@/lib/ai/provider";
+import { chatModel, chatModelId, chatTag, localModelNow } from "@/lib/ai/provider";
 import { coretracePrompt, coretraceTools } from "@/lib/ai/coretrace-tools";
 
 // The CoreFlagging assistant. Same sign-in rule and usage log as the platform's assistant
@@ -39,13 +39,15 @@ export async function POST(req: Request) {
   let body: { messages?: UIMessage[]; llm?: string; context?: { hole?: string | null; m?: number | null; model?: string | null } };
   try { body = await req.json(); } catch { return Response.json({ error: "invalid_json" }, { status: 400 }); }
   const messages = body.messages;
-  const modelId = chatModelId(body.llm);   // cloud or local, as picked in the chat bar
+  // cloud or local, as picked in the chat bar; local is the smaller model while the 5090's queue is deep
+  const local = await localModelNow(body.llm);
+  const modelId = chatModelId(body.llm, local);
   if (!Array.isArray(messages) || messages.length === 0) return Response.json({ error: "no_messages" }, { status: 400 });
   const last = [...messages].reverse().find((m) => m.role === "user");
   const question = (last?.parts ?? []).filter((p) => p.type === "text").map((p) => (p as { text: string }).text).join("").slice(0, 8000);
   const tools = coretraceTools(token);
   const result = streamText({
-    model: chatModel(body.llm),
+    model: chatModel(body.llm, local),
     system: coretracePrompt(body.context ?? {}, req.headers.get("x-locale") ?? undefined),
     messages: await convertToModelMessages(messages.map((m) => ({ ...m, parts: m.parts.filter((p) => p.type !== "reasoning") })), { tools }),
     tools,
@@ -61,7 +63,7 @@ export async function POST(req: Request) {
   });
   return result.toUIMessageStreamResponse({
     // which model wrote this answer, shown beside it (and kept with the saved conversation)
-    messageMetadata: ({ part }) => (part.type === "start" ? chatTag(body.llm) : undefined),
+    messageMetadata: ({ part }) => (part.type === "start" ? chatTag(body.llm, local) : undefined),
     onError: (error) => {
       const msg = error instanceof Error ? error.message : String(error);
       return /rate.?limit|quota|credit|402|429|503|unavailable|overloaded|timeout|fetch failed|econn|api key|unauthor/i.test(msg) ? "provider_unavailable" : "error";
