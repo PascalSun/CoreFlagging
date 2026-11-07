@@ -5,7 +5,7 @@
 // speech recognition (Web Speech API: Safari on iPhone/iPad from iOS 14.5, Chrome, Edge; not Firefox). Either way the
 // words stay in the field for the user to read and send: nothing is sent by itself. A pause ends it.
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { authToken } from "@/lib/auth";
+import { authToken, refreshAccessToken } from "@/lib/auth";
 
 /** The UI language as a recognition language (regional defaults; the recogniser accepts the base tag too). */
 export const SPEECH_LANG: Record<string, string> = {
@@ -135,12 +135,18 @@ const QUEUE_MAX = 100;
 type Session = { url: string; exp: number };
 const sessions = new Map<string, { s?: Session; pending?: Promise<Session | null> }>();
 
-async function fetchSession(lang: string, token: string): Promise<Session | null> {
+async function fetchSession(lang: string, token: string, retried = false): Promise<Session | null> {
   try {
     const res = await fetch(SESSION_PATH, {
       method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
       body: JSON.stringify({ lang }),
     });
+    // the saved access token has expired (it lives minutes; the page may be open for hours): refresh it once and ask
+    // again, or every tap fell back to the browser's recogniser without saying so
+    if (res.status === 401 && !retried) {
+      const fresh = await refreshAccessToken();
+      return fresh ? fetchSession(lang, fresh, true) : null;
+    }
     if (!res.ok) return null;
     const j = (await res.json()) as { url?: string; expires_in?: number };
     if (!j.url) return null;
