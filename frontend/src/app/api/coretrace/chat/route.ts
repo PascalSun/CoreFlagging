@@ -1,4 +1,5 @@
 import { convertToModelMessages, stepCountIs, streamText, type UIMessage } from "ai";
+import { cleanHistory, describeOpen, noteSelections } from "@/lib/ai/history";
 
 import { chatModel, chatModelId, chatTag, localModelNow } from "@/lib/ai/provider";
 import { coretracePrompt, coretraceTools } from "@/lib/ai/coretrace-tools";
@@ -46,10 +47,13 @@ export async function POST(req: Request) {
   const last = [...messages].reverse().find((m) => m.role === "user");
   const question = (last?.parts ?? []).filter((p) => p.type === "text").map((p) => (p as { text: string }).text).join("").slice(0, 8000);
   const tools = coretraceTools(token);
+  const open = describeOpen(body.context);
   const result = streamText({
     model: chatModel(body.llm, local),
-    system: coretracePrompt(body.context ?? {}, req.headers.get("x-locale") ?? undefined),
-    messages: await convertToModelMessages(messages.map((m) => ({ ...m, parts: m.parts.filter((p) => p.type !== "reasoning") })), { tools }),
+    system: coretracePrompt(body.context ?? {}, req.headers.get("x-locale") ?? undefined) + (open ? " An earlier question asked while something else was open starts with a note of what was open; its answer was about that, not this." : ""),
+    // past reasoning, unanswered repeats and tool calls without a result go; an earlier question says what was open
+    // when it was asked, if that was not what is open now
+    messages: await convertToModelMessages(noteSelections(cleanHistory(messages), open), { tools }),
     tools,
     stopWhen: stepCountIs(12),
     onFinish: async (e) => {

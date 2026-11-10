@@ -13,6 +13,7 @@ import { ReportPdf } from "@/components/coretrace/ReportPdf";
 import { authToken, refreshAccessToken, refreshToken } from "@/lib/auth";
 import { PLATFORM_URL, platformFetch } from "@ntlp/geodata-web/fetch";
 import { cn } from "@/lib/utils";
+import { canRetry, describeOpen } from "@/lib/ai/history";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -137,7 +138,7 @@ export function CoreChat({ context, onOpen, signedIn, onSignIn }: {
     }) as typeof fetch,
   }), [llmRef]);
 
-  const { messages, sendMessage, status, setMessages, addToolOutput, error, stop } = useChat({
+  const { messages, sendMessage, regenerate, status, setMessages, addToolOutput, error, stop } = useChat({
     transport,
     sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithToolCalls,
     onToolCall: async ({ toolCall }) => {
@@ -177,7 +178,16 @@ export function CoreChat({ context, onOpen, signedIn, onSignIn }: {
   };
   useEffect(() => { endRef.current?.scrollIntoView({ block: "end" }); }, [messages, status]);
 
-  const send = (text: string) => { const t = text.trim(); if (!t || busy) return; setInput(""); sendMessage({ text: t }); };
+  // a question carries what was open when it was asked: the server notes it on the question once something else is
+  // open, so an old answer is read as about its own hole, not the one open now
+  const send = (text: string) => {
+    const t = text.trim(); if (!t || busy) return; setInput("");
+    const open = describeOpen(ctxRef.current);
+    sendMessage(open ? { text: t, metadata: { context: open } } : { text: t });
+  };
+  // a failed turn is asked again in place (the answer that broke off goes, the question stays), not typed again: the
+  // model then saw the same question two or three times in a row with no answer between
+  const retryable = !busy && !!error && canRetry(messages);
   const components: Partial<Components> = useMemo(() => ({
     ...MD_COMPONENTS,
     a: ({ href, children }: any) => {
@@ -261,7 +271,17 @@ export function CoreChat({ context, onOpen, signedIn, onSignIn }: {
           </div>
         ))}
         {status === "submitted" && <div className="flex items-center gap-2 py-2 text-xs text-slate-500"><Loader2 size={13} className="animate-spin" />Reading the scans…</div>}
-        {error && <div className="my-2 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-800">{/provider_unavailable/.test(error.message) ? "The language model is busy or unavailable. Try again in a minute." : "That did not work. Try again, or ask it differently."}</div>}
+        {error && (
+          <div className="my-2 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-800">
+            <span>{/provider_unavailable/.test(error.message) ? "The language model is busy or unavailable. Try again in a minute." : "That did not work. Try again, or ask it differently."}</span>
+            {retryable && (
+              <button type="button" onClick={() => void regenerate()}
+                className="inline-flex items-center gap-1 rounded-md border border-red-200 bg-white px-1.5 py-0.5 font-medium text-red-800 transition-colors hover:bg-red-100">
+                <RotateCcw size={11} />Retry
+              </button>
+            )}
+          </div>
+        )}
         <div ref={endRef} />
       </div>
       <form className="p-3" onSubmit={(e) => { e.preventDefault(); send(input); }}>
