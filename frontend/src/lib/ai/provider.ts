@@ -1,6 +1,6 @@
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
-import type { LanguageModel } from "ai";
+import { extractReasoningMiddleware, wrapLanguageModel, type LanguageModel } from "ai";
 import { pickLocalModel } from "./localModel";
 
 // The assistant's model. OpenRouter by default: Gemini Flash (thinking) — thinking is on by
@@ -111,7 +111,10 @@ export function chatModel(choice?: unknown, local?: string): LanguageModel {
       apiKey: process.env.OLLAMA_API_KEY || undefined,
       headers: { "X-Priority": "interactive" },               // a person waits on a chat: the gateway puts it first
     });
-    return ollama(local ?? localModel());
+    // vLLM's qwen3 reasoning parser sends the thinking apart (`reasoning`), which the provider turns into reasoning
+    // parts. Should a model or server not split it, the thinking comes inline as <think>…</think> in the answer:
+    // the middleware lifts it out, so it shows as thinking, not as the answer (and is not sent back as history).
+    return wrapLanguageModel({ model: ollama(local ?? localModel()), middleware: extractReasoningMiddleware({ tagName: "think" }) });
   }
   return openrouter(cloudModel());
 }
