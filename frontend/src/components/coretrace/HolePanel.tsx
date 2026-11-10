@@ -15,6 +15,7 @@ import { LookAgain } from "@/components/coretrace/LookAgain";
 import { SimilarHoles } from "@/components/coretrace/SimilarHoles";
 import { Nearby } from "@/components/coretrace/Nearby";
 import { QualityChecks } from "@/components/coretrace/QualityChecks";
+import { hub3DFor } from "@/lib/hub3d";
 import { DepthLens, levelOf, type Window, WindowStart } from "@/components/coretrace/DepthLens";
 import { SampleSheets } from "@/components/coretrace/SampleSheets";
 import { cn } from "@/lib/utils";
@@ -419,6 +420,7 @@ export function HolePanel({ holeKey, tab: tabProp, onTab, models, run, metre, on
         </div>
         <p className="truncate text-xs text-slate-500">{hole ? [hole.operator, hole.project, hole.region].filter(Boolean).join(" · ") || "No collar details in the scan" : "Loading…"}</p>
         {hole?.target && <p className="truncate text-[11px] text-slate-600" title={`What the hole was drilled for, ${TARGET_SOURCE_LABEL[hole.target_source] || "from the record"}${hole.commodities.length > 1 ? `: ${hole.commodities.map(commodityName).join(", ")}` : ""}`}>{inferred(hole.target_source) ? <>Likely drilled for <b className="font-semibold text-slate-800">{commodityName(hole.target)}</b> <span className="text-slate-400">({hole.target_source === "deposit" ? "nearest deposit" : "the report"})</span></> : <>Drilled for <b className="font-semibold text-slate-800">{commodityName(hole.target)}</b></>}{hole.commodities.length > 1 ? <span className="text-slate-500"> · also {hole.commodities.filter((c) => c !== hole.target).map(commodityName).join(", ")}</span> : null}</p>}
+        {hole && hub3DFor(hole) && <a href={hub3DFor(hole)!} target="_blank" rel="noopener" title="Every drillhole around this one on the Geo Research Platform: company assays, rock logs and open-file collars, in 3D" className="mt-0.5 inline-flex items-center gap-1 text-[11px] font-medium text-slate-600 underline decoration-slate-300 underline-offset-2 hover:text-slate-900 hover:decoration-slate-900">All drillholes here in 3D: assays and rock logs<ExternalLink size={10} /></a>}
       </div>
       <div className="flex flex-none items-center gap-1">
         {hole && <button type="button" onClick={copyLink} aria-label="Copy the link to this hole" title={copied ? "Link copied" : "Copy the link to this hole"} className={cn("grid h-8 w-8 place-items-center rounded-lg hover:bg-slate-100", copied ? "text-emerald-700" : "text-slate-500 hover:text-slate-900")}>{copied ? <Check size={15} /> : <Link2 size={15} />}</button>}
