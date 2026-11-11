@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useQueries, useQuery } from "@tanstack/react-query";
-import { ArrowLeft, ChevronDown, Compass, HelpCircle, Ruler } from "lucide-react";
+import { ArrowLeft, ChevronDown, Compass, ExternalLink, HelpCircle, Ruler } from "lucide-react";
 import { coreScan, type Trace, type TraceView } from "@/lib/coreScan";
 import { groupColor, groupName, lithColor, SERIES } from "@/components/coretrace/palette";
 import { fine, logged, mixed, pieces, STEP, type Mix } from "@/components/coretrace/sceneColour";
@@ -15,6 +15,7 @@ import { Tour, useViewTour, type TourId } from "@/components/coretrace/Tour";
 import { TOUR_READY, viewTour } from "@/components/coretrace/tours";
 import { useIsMobile } from "@/lib/useIsMobile";
 import { cn } from "@/lib/utils";
+import { hub3DFor, stateOfKey } from "@/lib/hub3d";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -225,6 +226,12 @@ export function Scene() {
           {q.isPending && <span className="text-xs text-slate-500">Loading…</span>}
           {q.isError && <span className="text-xs text-rose-700">no collar position</span>}
         </div>
+        {d && hub3DFor({ ...d.hole.collar, state: stateOfKey(key) }, km) && (
+          // the platform's 3D of every hole here (assays, rock logs, open-file collars), not just the scanned ones
+          <a href={hub3DFor({ ...d.hole.collar, state: stateOfKey(key) }, km)!} target="_blank" rel="noopener"
+            title="Every drillhole around this one on the Geo Research Platform: company assays, rock logs and open-file collars, in 3D"
+            className={cn(glass, "pointer-events-auto flex h-11 flex-none items-center gap-1.5 rounded-full px-3.5 text-xs font-semibold text-slate-700 hover:bg-white hover:text-slate-900 max-sm:hidden")}>All drillholes here in 3D: assays and rock logs<ExternalLink size={12} /></a>
+        )}
         <div data-tour="scene-view" className="pointer-events-auto"><Pill value={view} onChange={setView} items={[["3d", "3D", "The holes as lines in space, to turn and zoom"], ["section", "Section", "A vertical slice through this collar: the nearby holes projected onto one plane, as a geologist draws a cross-section"]] as const} label="View" /></div>
         <div className="pointer-events-auto max-sm:hidden"><Pill value={km} onChange={setKm} items={RINGS.map((r) => [r, `${r} km`, `Draw the scanned holes within ${r} km of this collar`] as const)} label="Neighbours within" /></div>
         <div data-tour="scene-paint" className="pointer-events-auto max-sm:hidden"><Pill value={paint} onChange={setChosen} items={[
