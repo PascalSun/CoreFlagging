@@ -12,7 +12,7 @@ export default function NotFound() {
       <meta httpEquiv="refresh" content={`0;url=${GEO}`} />
       <h1 className="text-2xl font-semibold">Page not found</h1>
       <p className="max-w-md text-slate-600">
-        CoreFlagging has no page at this address. Taking you to <a href={GEO} className="font-semibold text-slate-900 underline underline-offset-4">the NTLP Geo Data Platform</a>.
+        CoreFlagging has no page at this address. Taking you to <a href={GEO} className="font-semibold text-slate-900 underline underline-offset-4">AgenticGeoMate</a>.
       </p>
     </main>
   );

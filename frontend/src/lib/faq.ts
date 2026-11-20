@@ -53,7 +53,7 @@ export const FAQ: Faq[] = [
   {
     id: "is-it-free",
     q: "Is CoreFlagging free, and do I need an account?",
-    a: `Yes, it is free to use, as part of a research platform in beta run by The University of Western Australia. Browsing holes on the [map](/map) needs no account. Signing in, through the Geo Research Platform, is needed to upload your own scan and to use the assistant; the [terms of use](${PLATFORM_SITE}/terms) cover CoreFlagging.`,
+    a: `Yes, it is free to use, as part of a research platform in beta run by The University of Western Australia. Browsing holes on the [map](/map) needs no account. Signing in, through AgenticGeoMate, is needed to upload your own scan and to use the assistant; the [terms of use](${PLATFORM_SITE}/terms) cover CoreFlagging.`,
   },
   {
     id: "upload",
@@ -68,12 +68,12 @@ export const FAQ: Faq[] = [
   {
     id: "licence",
     q: "Where does the data come from, and what licence does it have?",
-    a: `The core scans come from the AuScope National Virtual Core Library, and the tray photographs from the Geological Survey of Western Australia are published under CC BY 4.0. What CoreFlagging shows comes from the Geo Research Platform's public API, documented at [platform.nlp-tlp.org/api/docs](https://platform.nlp-tlp.org/api/docs/). The [HyLogger core scans](${PLATFORM_SITE}/data/hylogger-core-scans) page in the platform's data library gives the source, licence and citation.`,
+    a: `The core scans come from the AuScope National Virtual Core Library, and the tray photographs from the Geological Survey of Western Australia are published under CC BY 4.0. What CoreFlagging shows comes from AgenticGeoMate's public API, documented at [platform.nlp-tlp.org/api/docs](https://platform.nlp-tlp.org/api/docs/). The [HyLogger core scans](${PLATFORM_SITE}/data/hylogger-core-scans) page in the platform's data library gives the source, licence and citation.`,
   },
   {
     id: "who-built-it",
     q: "Who built CoreFlagging?",
-    a: "CoreFlagging is built by the UWA Centre for Natural and Technical Language Processing (NLP-TLP) at The University of Western Australia, with the ARC Training Centre in Critical Resources for the Future and the Geological Survey of Western Australia. The team is Wei Liu (leader), Yihao Ding, Pascal Sun, Daniel Su and Yiran (Grant) Zhang. It runs on the [Geo Research Platform](https://geo.nlp-tlp.org).",
+    a: "CoreFlagging is built by the UWA Centre for Natural and Technical Language Processing (NLP-TLP) at The University of Western Australia, with the ARC Training Centre in Critical Resources for the Future and the Geological Survey of Western Australia. The team is Wei Liu (leader), Yihao Ding, Pascal Sun, Daniel Su and Yiran (Grant) Zhang. It runs on [AgenticGeoMate](https://geo.nlp-tlp.org).",
   },
 ];
 

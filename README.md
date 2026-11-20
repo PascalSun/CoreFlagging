@@ -1,6 +1,6 @@
 # CoreFlagging
 
-The **core-scan service** behind the Geo Research Platform ([Groundwork](../Groundwork)).
+The **core-scan service** behind AgenticGeoMate ([Groundwork](../Groundwork)).
 It reads HyLogger drill-core scans (TSG files), cleans them into 10 cm bins, runs the
 core-spectra models over them and hands the platform everything it found:
 

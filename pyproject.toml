@@ -1,7 +1,7 @@
 [project]
 name = "coretrace"
 version = "0.1.0"
-description = "CoreTrace: reads HyLogger core scans and runs the core-spectra models for the Geo Research Platform"
+description = "CoreTrace: reads HyLogger core scans and runs the core-spectra models for AgenticGeoMate"
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
 # Versions are the ones the model bundle was built and verified with. bundle/models/*/heads.pkl
