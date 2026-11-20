@@ -229,7 +229,7 @@ export function Scene() {
         {d && hub3DFor({ ...d.hole.collar, state: stateOfKey(key) }, km) && (
           // the platform's 3D of every hole here (assays, rock logs, open-file collars), not just the scanned ones
           <a href={hub3DFor({ ...d.hole.collar, state: stateOfKey(key) }, km)!} target="_blank" rel="noopener"
-            title="Every drillhole around this one on the Geo Research Platform: company assays, rock logs and open-file collars, in 3D"
+            title="Every drillhole around this one on AgenticGeoMate: company assays, rock logs and open-file collars, in 3D"
             className={cn(glass, "pointer-events-auto flex h-11 flex-none items-center gap-1.5 rounded-full px-3.5 text-xs font-semibold text-slate-700 hover:bg-white hover:text-slate-900 max-sm:hidden")}>All drillholes here in 3D: assays and rock logs<ExternalLink size={12} /></a>
         )}
         <div data-tour="scene-view" className="pointer-events-auto"><Pill value={view} onChange={setView} items={[["3d", "3D", "The holes as lines in space, to turn and zoom"], ["section", "Section", "A vertical slice through this collar: the nearby holes projected onto one plane, as a geologist draws a cross-section"]] as const} label="View" /></div>

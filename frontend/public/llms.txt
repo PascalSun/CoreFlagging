@@ -28,8 +28,8 @@ Geologists and exploration teams who log drill core, and anyone reviewing scanne
 ## How to use it
 
 - Open the [map](https://coreflagging.nlp-tlp.org/map) in a browser; browsing holes needs no account.
-- Signing in (through the Geo Research Platform) is needed to upload your own scan and to use the assistant.
-- The data CoreFlagging shows comes from the Geo Research Platform's public API: https://platform.nlp-tlp.org/api/docs/
+- Signing in (through AgenticGeoMate) is needed to upload your own scan and to use the assistant.
+- The data CoreFlagging shows comes from AgenticGeoMate's public API: https://platform.nlp-tlp.org/api/docs/
 
 ## Data
 
@@ -40,7 +40,7 @@ Geologists and exploration teams who log drill core, and anyone reviewing scanne
 
 - UWA Centre for Natural and Technical Language Processing (NLP-TLP), The University of Western Australia: https://nlp-tlp.org/
 - With the ARC Training Centre in Critical Resources for the Future and the Geological Survey of Western Australia.
-- Related: [Geo Research Platform](https://geo.nlp-tlp.org)
+- Related: [AgenticGeoMate](https://geo.nlp-tlp.org)
 
 ## Contact
 

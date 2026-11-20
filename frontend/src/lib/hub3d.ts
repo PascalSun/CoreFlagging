@@ -1,4 +1,4 @@
-// The Geo Research Platform's 3D view of every drillhole around a point (Groundwork #677): company assays, rock
+// AgenticGeoMate's 3D view of every drillhole around a point (Groundwork #677): company assays, rock
 // logs, open-file collars and the scanned holes, on the hub map at geo.nlp-tlp.org. CoreFlagging stays the place
 // for minerals, trays and spectra; this is the way across for the rest of what is known about the ground there.
 

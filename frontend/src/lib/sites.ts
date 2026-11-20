@@ -49,7 +49,7 @@ export function coretraceChrome(base: string): Chrome {
       { label: "FAQ", href: `${base}/faq` },
       // the drillhole pages: linked from the footer, the sitemaps and llms.txt only, never from the header
       { label: "Drillholes", href: `${base}/states/wa` },
-      { label: "Geo Research Platform", href: "https://geo.nlp-tlp.org" },
+      { label: "AgenticGeoMate", href: "https://geo.nlp-tlp.org" },
     ],
     socials: footerSocials,
     contact: footerContact,

@@ -132,7 +132,7 @@ export function CoreMap({ holes, colour, card, selected, onSelect, padRight, pad
       map.once("remove", () => ro?.disconnect());
       const corner = map.getContainer().querySelector(".mapboxgl-ctrl-bottom-left") as HTMLElement | null;
       if (corner) corner.style.left = `${padLeftRef.current}px`;
-      // A deep link from another app (the Geo Data Platform's "Explore in CoreFlagging"): ?lon&lat(&r km)(&bbox=w,s,e,n).
+      // A deep link from another app (AgenticGeoMate's "Explore in CoreFlagging"): ?lon&lat(&r km)(&bbox=w,s,e,n).
       // The map opens on that place, marked (and its radius drawn), close enough to click the holes around it.
       const q = new URLSearchParams(window.location.search);
       const aLon = Number(q.get("lon")), aLat = Number(q.get("lat")), aKm = Number(q.get("r"));
