@@ -176,7 +176,7 @@ const ZH: Dict = {
   "about.af.chris": "西澳大学 研究员 · CCRF 与 CET",
   // ── research hub ──
   "research.eyebrow": "研究", "research.title": "研究",
-  "research.intro": "我们的研究连接数据、证据与推理，涵盖成矿潜力评估、文档智能和数据库自然语言查询。GeoPlatform 提供地学应用环境，让这些研究方法可以被使用和检验。",
+  "research.intro": "我们的研究连接数据、证据与推理，涵盖成矿潜力评估、文档智能和数据库自然语言查询。AgenticGeoMate 提供地学应用环境，让这些研究方法可以被使用和检验。",
   "research.ladder": "由此生长出来的",
   "research.st.retrieval.t": "检索", "research.st.retrieval.b": "找到那条记录、那一页或那个数值。例如：面向结构化数据的文本到 SQL，面向文档的检索增强阅读。",
   "research.st.reasoning.t": "推理", "research.st.reasoning.b": "把证据整合成始终可回溯的判断。例如：MineTrace 的成矿潜力评估。",
@@ -439,7 +439,7 @@ const FR: Dict = {
   "about.af.chris": "Chercheur (Research Fellow), CCRF & CET, UWA",
   // ── research hub ──
   "research.eyebrow": "Recherche", "research.title": "Recherche",
-  "research.intro": "Nos recherches relient données, preuves et raisonnement : prospectivité minérale, intelligence documentaire et accès aux bases de données en langage naturel. GeoPlatform offre un environnement géoscientifique pour explorer ces méthodes.",
+  "research.intro": "Nos recherches relient données, preuves et raisonnement : prospectivité minérale, intelligence documentaire et accès aux bases de données en langage naturel. AgenticGeoMate offre un environnement géoscientifique pour explorer ces méthodes.",
   "research.ladder": "Ce qui en découle",
   "research.st.retrieval.t": "Recherche", "research.st.retrieval.b": "Trouver l'enregistrement, la page ou la valeur. Par exemple : text-to-SQL sur les données structurées, lecture augmentée par la recherche sur les documents.",
   "research.st.reasoning.t": "Raisonnement", "research.st.reasoning.b": "Combiner les preuves en un jugement traçable. Par exemple : la prospectivité minérale avec MineTrace.",
@@ -715,7 +715,7 @@ const ES: Dict = {
   "about.af.chris": "Investigador (Research Fellow), CCRF & CET, UWA",
   // ── research hub ──
   "research.eyebrow": "Investigación", "research.title": "Investigación",
-  "research.intro": "Nuestra investigación conecta datos, evidencia y razonamiento: prospectividad mineral, inteligencia documental y acceso a bases de datos en lenguaje natural. GeoPlatform ofrece un entorno geocientífico para explorar estos métodos.",
+  "research.intro": "Nuestra investigación conecta datos, evidencia y razonamiento: prospectividad mineral, inteligencia documental y acceso a bases de datos en lenguaje natural. AgenticGeoMate ofrece un entorno geocientífico para explorar estos métodos.",
   "research.ladder": "Lo que crece a partir de ahí",
   "research.st.retrieval.t": "Recuperación", "research.st.retrieval.b": "Encontrar el registro, la página o el valor. Por ejemplo: text-to-SQL sobre los datos estructurados, lectura aumentada por recuperación sobre los documentos.",
   "research.st.reasoning.t": "Razonamiento", "research.st.reasoning.b": "Combinar la evidencia en un juicio que siga siendo trazable. Por ejemplo: la prospectividad mineral con MineTrace.",
@@ -993,7 +993,7 @@ const PT: Dict = {
   "about.af.chris": "Pesquisador (Research Fellow), CCRF & CET, UWA",
   // ── research hub ──
   "research.eyebrow": "Pesquisa", "research.title": "Pesquisa",
-  "research.intro": "A nossa investigação liga dados, evidências e raciocínio: prospetividade mineral, inteligência documental e acesso a bases de dados em linguagem natural. GeoPlatform oferece um ambiente geocientífico para explorar estes métodos.",
+  "research.intro": "A nossa investigação liga dados, evidências e raciocínio: prospetividade mineral, inteligência documental e acesso a bases de dados em linguagem natural. AgenticGeoMate oferece um ambiente geocientífico para explorar estes métodos.",
   "research.ladder": "O que cresce a partir daí",
   "research.st.retrieval.t": "Recuperação", "research.st.retrieval.b": "Encontrar o registo, a página ou o valor. Por exemplo: text-to-SQL sobre os dados estruturados, leitura aumentada por recuperação sobre os documentos.",
   "research.st.reasoning.t": "Raciocínio", "research.st.reasoning.b": "Combinar a evidência num juízo que permaneça rastreável. Por exemplo: a prospectividade mineral com o MineTrace.",
@@ -1271,7 +1271,7 @@ const ID: Dict = {
   "about.af.chris": "Research Fellow, CCRF & CET, UWA",
   // ── research hub ──
   "research.eyebrow": "Riset", "research.title": "Riset",
-  "research.intro": "Riset kami menghubungkan data, bukti, dan penalaran: prospektivitas mineral, kecerdasan dokumen, dan akses basis data dengan bahasa alami. GeoPlatform menyediakan lingkungan geosains untuk mengeksplorasi metode ini.",
+  "research.intro": "Riset kami menghubungkan data, bukti, dan penalaran: prospektivitas mineral, kecerdasan dokumen, dan akses basis data dengan bahasa alami. AgenticGeoMate menyediakan lingkungan geosains untuk mengeksplorasi metode ini.",
   "research.ladder": "Yang tumbuh darinya",
   "research.st.retrieval.t": "Pencarian", "research.st.retrieval.b": "Menemukan rekaman, halaman, atau nilainya. Misalnya: text-to-SQL atas data terstruktur, pembacaan berbasis pencarian atas dokumen.",
   "research.st.reasoning.t": "Penalaran", "research.st.reasoning.b": "Menggabungkan bukti menjadi penilaian yang tetap dapat ditelusuri. Misalnya: prospektivitas mineral dengan MineTrace.",
