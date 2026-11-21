@@ -207,7 +207,7 @@ const EN = {
   "about.af.chris": "Research Fellow, CCRF & CET, UWA",
   // ── research hub ──
   "research.eyebrow": "Research", "research.title": "Research",
-  "research.intro": "Our research connects data, evidence and reasoning. We develop methods for mineral prospectivity, document intelligence and natural-language access to databases. GeoPlatform provides a working geoscience environment in which these methods can be explored.",
+  "research.intro": "Our research connects data, evidence and reasoning. We develop methods for mineral prospectivity, document intelligence and natural-language access to databases. AgenticGeoMate provides a working geoscience environment in which these methods can be explored.",
   "research.ladder": "What grows out of it",
   "research.st.retrieval.t": "Retrieval", "research.st.retrieval.b": "Find the record, the page or the value. For example: text-to-SQL over the structured data, retrieval-augmented reading over the documents.",
   "research.st.reasoning.t": "Reasoning", "research.st.reasoning.b": "Combine the evidence into a judgement that stays traceable. For example: mineral prospectivity with MineTrace.",
