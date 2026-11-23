@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { chatChoices, chatModelId, chatTag, localModelNow } from "./provider";
+import { chatChoices, chatModel, chatModelId, chatTag, localModelNow } from "./provider";
 
 const ENV = { ...process.env };
 afterEach(() => { process.env = { ...ENV }; });
@@ -35,5 +35,16 @@ describe("the coding model", () => {
     expect(chatChoices().options.map((o) => o.id)).toEqual(["cloud", "local"]);
     expect(await localModelNow("code")).toBeUndefined();
     expect(chatTag("code").llm).toBe("cloud");
+  });
+
+  test("the model a chat is sent to: the coder for Code, the local model for Local, the cloud one for Cloud", async () => {
+    gateway(); process.env.OLLAMA_MODEL = "qwen3-6-35b-a3b-32k"; process.env.OLLAMA_FALLBACK_MODEL = "";   // no fallback: no queue read
+    const id = (m: unknown) => (m as { modelId: string }).modelId;
+    expect(id(chatModel("code", await localModelNow("code")))).toBe("qwen3-coder-30b");
+    expect(id(chatModel("code"))).toBe("qwen3-coder-30b");
+    expect(await localModelNow("local")).toBe("qwen3-6-35b-a3b-32k");
+    expect(id(chatModel("local"))).toBe("qwen3-6-35b-a3b-32k");
+    process.env.CHAT_MODEL = "google/gemini-2.5-flash";
+    expect(id(chatModel("cloud"))).toBe("google/gemini-2.5-flash");
   });
 });
