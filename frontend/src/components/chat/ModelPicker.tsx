@@ -3,16 +3,16 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { KeyboardEvent, RefObject } from "react";
 import { createPortal } from "react-dom";
-import { Check, ChevronDown, Cloud, Cpu } from "lucide-react";
+import { Check, ChevronDown, Cloud, Code, Cpu } from "lucide-react";
 import { busy as deep } from "@/lib/ai/localModel";
 
-// Cloud (OpenRouter) or local (our own GPU's Ollama) for the assistant, picked in the assistant's header
-// (`compact`: an icon button among the header's icons) or, where a page has no header, as a pill.
+// Cloud (OpenRouter), local or code (our own GPUs, through the LLM gateway) for the assistant, picked in the assistant's
+// header (`compact`: an icon button among the header's icons) or, where a page has no header, as a pill.
 // The server lists what it can serve (/api/chat-models); the choice is kept per browser and
-// travels with each message as `llm`. On the local model the button shows our GPU's queue (the LLM gateway's).
+// travels with each message as `llm`. On a model of ours the button shows its GPU's queue (the LLM gateway's).
 // The list is our own menu (a popover by the button; a small sheet on phones), not the device's select.
 
-export type ChatChoice = "cloud" | "local";
+export type ChatChoice = "cloud" | "local" | "code";
 type Option = { id: ChatChoice; label: string; model: string; queue?: string; fallback?: string };
 type Queue = { available: boolean; ahead?: { interactive: number }; eta_s?: { interactive: number }; running?: number; parallel?: number; waiting?: number };
 
@@ -29,6 +29,10 @@ function useQueue(url?: string): Queue | null {
   }, [url]);
   return url && got?.url === url ? got.q : null;
 }
+
+/** Served by our own GPUs (a queue to show), not the cloud. */
+const ours = (id?: ChatChoice) => id === "local" || id === "code";
+const ICON = { cloud: Cloud, local: Cpu, code: Code } as const;
 
 const wait = (s: number) => (s < 90 ? `~${Math.max(5, Math.round(s / 5) * 5)} s` : `~${Math.round(s / 60)} min`);
 
@@ -89,16 +93,18 @@ export function ModelPicker({ options, choice, onChange, disabled, compact }: {
   const [open, setOpen] = useState(false);
   const button = useRef<HTMLButtonElement>(null);
   const cur = options.find((o) => o.id === choice) ?? options[0];
-  const local = options.find((o) => o.id === "local");
-  // the local model's queue: while it is the one picked (the button's dot), and while the list is open (its row)
-  const q = useQueue(local && (open || cur?.id === "local") ? local.queue : undefined);
+  const local = options.find((o) => o.id === "local"), code = options.find((o) => o.id === "code");
+  // each of our models' queue: while it is the one picked (the button's dot), and while the list is open (its row)
+  const qLocal = useQueue(local && (open || cur?.id === "local") ? local.queue : undefined);
+  const qCode = useQueue(code && (open || cur?.id === "code") ? code.queue : undefined);
+  const q = cur?.id === "code" ? qCode : qLocal;
   const close = useCallback((refocus = true) => { setOpen(false); if (refocus) button.current?.focus(); }, []);
   if (options.length < 2 || !choice || !cur) return null;
 
-  const Icon = cur.id === "local" ? Cpu : Cloud;
-  const mine = cur.id === "local" ? gpuState(q, !!disabled, local?.fallback) : { busy: false, ahead: 0, text: "" };
+  const Icon = ICON[cur.id] ?? Cloud;
+  const mine = ours(cur.id) ? gpuState(q, !!disabled, cur.fallback) : { busy: false, ahead: 0, text: "" };
   const tip = `Model: ${cur.label} · ${cur.model}${mine.text ? ` · ${mine.text}` : ""}`;
-  const dot = cur.id === "local" && q && <span aria-hidden className={`size-1.5 shrink-0 rounded-full ${!q.available ? "bg-rose-500" : disabled ? "animate-pulse bg-sky-500" : mine.busy ? "bg-amber-500" : "bg-emerald-500"}`} />;
+  const dot = ours(cur.id) && q && <span aria-hidden className={`size-1.5 shrink-0 rounded-full ${!q.available ? "bg-rose-500" : disabled ? "animate-pulse bg-sky-500" : mine.busy ? "bg-amber-500" : "bg-emerald-500"}`} />;
   const toggle = () => { if (!disabled) setOpen((o) => !o); };
   const onKey = (e: KeyboardEvent) => {
     if (disabled) return;
@@ -116,18 +122,18 @@ export function ModelPicker({ options, choice, onChange, disabled, compact }: {
           className="relative grid h-7 w-7 shrink-0 place-items-center rounded-lg text-slate-400 hover:bg-white/70 hover:text-slate-600 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-sky-500 disabled:cursor-not-allowed aria-expanded:bg-white/80 aria-expanded:text-slate-700">
           <Icon size={15} aria-hidden />
           {dot && <span className="absolute right-1 top-1 grid place-items-center">{dot}</span>}
-          {cur.id === "local" && mine.busy && <span aria-hidden className="absolute -bottom-0.5 -right-0.5 rounded-full bg-amber-500 px-1 text-[9px] font-semibold leading-[13px] text-white">{mine.ahead || "1"}</span>}
+          {ours(cur.id) && mine.busy && <span aria-hidden className="absolute -bottom-0.5 -right-0.5 rounded-full bg-amber-500 px-1 text-[9px] font-semibold leading-[13px] text-white">{mine.ahead || "1"}</span>}
         </button>
       ) : (
         <button {...common}
           className="relative flex h-7 max-w-[10rem] shrink-0 items-center gap-1 rounded-lg border border-slate-200 bg-white/80 pl-2 pr-1.5 text-xs text-slate-600 hover:border-slate-300 hover:text-slate-800 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-sky-500 disabled:cursor-not-allowed">
           <Icon size={13} className="shrink-0" aria-hidden />
           {dot}
-          <span className="truncate"><span className="font-medium">{cur.label}</span>{cur.id === "local" && mine.busy && <span className="text-amber-700"> · {mine.ahead ? `${mine.ahead} ahead` : "next"}</span>}</span>
+          <span className="truncate"><span className="font-medium">{cur.label}</span>{ours(cur.id) && mine.busy && <span className="text-amber-700"> · {mine.ahead ? `${mine.ahead} ahead` : "next"}</span>}</span>
           <ChevronDown size={12} className="shrink-0 text-slate-400" aria-hidden />
         </button>
       )}
-      {open && <ModelMenu anchor={button} options={options} choice={cur.id} queue={q} sending={!!disabled}
+      {open && <ModelMenu anchor={button} options={options} choice={cur.id} queues={{ local: qLocal, code: qCode }} sending={!!disabled}
         onPick={(c) => { onChange(c); close(); }} onClose={close} />}
     </>
   );
@@ -135,8 +141,8 @@ export function ModelPicker({ options, choice, onChange, disabled, compact }: {
 
 /** The list: a glass popover by the button, or a small sheet at the foot of a phone's screen. A listbox: arrows, Home,
  *  End, Enter or Space to pick; Esc, a tap outside or Tab to close; focus goes back to the button. */
-function ModelMenu({ anchor, options, choice, queue, sending, onPick, onClose }: {
-  anchor: RefObject<HTMLButtonElement | null>; options: Option[]; choice: ChatChoice; queue: Queue | null; sending: boolean;
+function ModelMenu({ anchor, options, choice, queues, sending, onPick, onClose }: {
+  anchor: RefObject<HTMLButtonElement | null>; options: Option[]; choice: ChatChoice; queues: { local: Queue | null; code: Queue | null }; sending: boolean;
   onPick: (c: ChatChoice) => void; onClose: (refocus?: boolean) => void;
 }) {
   const phone = usePhone();
@@ -184,8 +190,9 @@ function ModelMenu({ anchor, options, choice, queue, sending, onPick, onClose }:
   };
 
   const rows = options.map((o, i) => {
-    const RowIcon = o.id === "local" ? Cpu : Cloud;
-    const g = o.id === "local" ? gpuState(queue, sending && o.id === choice, o.fallback) : null;
+    const RowIcon = ICON[o.id] ?? Cloud;
+    const queue = o.id === "code" ? queues.code : o.id === "local" ? queues.local : null;
+    const g = ours(o.id) ? gpuState(queue, sending && o.id === choice, o.fallback) : null;
     const tone = !g || !queue ? "" : !queue.available ? "text-rose-600" : g.busy ? "text-amber-700" : "text-emerald-700";
     const selected = o.id === choice;
     return (
@@ -225,16 +232,17 @@ function ModelMenu({ anchor, options, choice, queue, sending, onPick, onClose }:
   );
 }
 
-/** Beside an answer: the model that wrote it ("Gemini 3.1 Flash Lite" or "Local · Qwen3 8B").
+/** Beside an answer: the model that wrote it ("Gemini 3.1 Flash Lite", "Local · Qwen3 8B" or "Code · Qwen3 Coder 30B").
  *  Answers from before the label existed carry no model and show nothing. */
 export function ModelTag({ metadata }: { metadata: unknown }) {
   const m = metadata as { llm?: ChatChoice; model?: string } | undefined;
   if (!m?.model) return null;
-  const Icon = m.llm === "local" ? Cpu : Cloud;
+  const Icon = ICON[m.llm ?? "cloud"] ?? Cloud;
+  const title = m.llm === "local" ? "Answered by the local model on our own GPU" : m.llm === "code" ? "Answered by the coding model on our own GPU" : "Answered by a cloud model";
   return (
-    <span title={m.llm === "local" ? "Answered by the local model on our own GPU" : "Answered by a cloud model"}
+    <span title={title}
       className="inline-flex w-fit items-center gap-1 text-[10.5px] leading-none text-slate-400">
-      <Icon size={11} aria-hidden />{m.llm === "local" ? `Local · ${m.model}` : m.model}
+      <Icon size={11} aria-hidden />{m.llm === "local" ? `Local · ${m.model}` : m.llm === "code" ? `Code · ${m.model}` : m.model}
     </span>
   );
 }

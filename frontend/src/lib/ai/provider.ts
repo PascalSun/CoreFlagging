@@ -10,15 +10,17 @@ import { pickLocalModel } from "./localModel";
 // The local model is our own GPU's Ollama (OpenAI-compatible API): OLLAMA_BASE_URL, OLLAMA_API_KEY
 // and OLLAMA_MODEL, defaulting to the house "Home GPU" model. No per-token cost; a smaller model, so
 // answers are slower and plainer. People pick cloud or local in the chat bar (chatChoices); CHAT_PROVIDER=ollama
-// makes local the default.
+// makes local the default. A third choice, code, is the gateway's coding model (OLLAMA_CODE_MODEL, default
+// qwen3-coder-30b; empty: not offered) through the same key: text only, no smaller model to fall back to.
 const DEFAULT_MODEL = "google/gemini-2.5-flash";
 const OLLAMA_BASE_URL = "https://ollama.ai4wa.com/v1";
 const OLLAMA_MODEL = "qwen3-8b-32k";
 const OLLAMA_FALLBACK = "qwen3.5-4b";
+const OLLAMA_CODE = "qwen3-coder-30b";
 
 export type ChatProvider = "openrouter" | "ollama";
-/** What a person picks in the chat bar: the cloud model (OpenRouter) or the local one (Ollama). */
-export type ChatChoice = "cloud" | "local";
+/** What a person picks in the chat bar: the cloud model (OpenRouter), the local one or the coding one (our GPUs). */
+export type ChatChoice = "cloud" | "local" | "code";
 
 /** The server's default, from CHAT_PROVIDER. */
 export function chatProvider(): ChatProvider {
@@ -29,9 +31,13 @@ function ollamaReady(): boolean {
   return Boolean(process.env.OLLAMA_API_KEY || process.env.OLLAMA_BASE_URL);
 }
 
+const codeModel = () => process.env.OLLAMA_CODE_MODEL ?? OLLAMA_CODE;
+/** The coding model was picked and can be served. */
+const isCode = (choice?: unknown) => choice === "code" && ollamaReady() && Boolean(codeModel());
+
 /** The provider for one request: the person's choice when it can be served, else the default. */
 function providerFor(choice?: unknown): ChatProvider {
-  if (choice === "local" && ollamaReady()) return "ollama";
+  if ((choice === "local" || isCode(choice)) && ollamaReady()) return "ollama";
   if (choice === "cloud") return "openrouter";
   return chatProvider();
 }
@@ -47,13 +53,14 @@ const maxWaitS = () => Number(process.env.LOCAL_MAX_WAIT_S) || 20;
  *  (undefined when the chat goes to the cloud). Pass it to chatModel / chatModelId / chatTag. */
 export async function localModelNow(choice?: unknown): Promise<string | undefined> {
   if (providerFor(choice) !== "ollama") return undefined;
+  if (isCode(choice)) return codeModel();
   const { model } = await pickLocalModel({ primary: localModel(), fallback: fallbackModel(), queueUrl: queueFor, maxWaitS: maxWaitS() });
   return model;
 }
 
 /** The model id the usage log records. */
 export function chatModelId(choice?: unknown, local?: string): string {
-  return providerFor(choice) === "ollama" ? `ollama/${local ?? localModel()}` : cloudModel();
+  return providerFor(choice) === "ollama" ? `ollama/${local ?? (isCode(choice) ? codeModel() : localModel())}` : cloudModel();
 }
 
 /** "google/gemini-3.1-flash-lite" → "Gemini 3.1 Flash Lite", "qwen3-8b-32k" → "Qwen3 8B",
@@ -82,16 +89,19 @@ const localQueue = () => queueFor(localModel());
 /** `fallback`: the smaller local model a chat goes to while this one is busy. */
 type Choice = { id: ChatChoice; label: string; model: string; queue?: string; fallback?: string };
 
-/** What the chat bar offers: the cloud model always, the local one when Ollama is configured (with its queue). */
+/** What the chat bar offers: the cloud model always; the local and coding ones when Ollama is configured (with their
+ *  queues). */
 export function chatChoices(): { default: ChatChoice; options: Choice[] } {
   const options: Choice[] = [{ id: "cloud", label: "Cloud", model: modelLabel(cloudModel()) }];
   if (ollamaReady()) options.push({ id: "local", label: "Local", model: modelLabel(localModel()), queue: localQueue(),
     ...(fallbackModel() && fallbackModel() !== localModel() ? { fallback: modelLabel(fallbackModel()) } : {}) });
+  if (ollamaReady() && codeModel()) options.push({ id: "code", label: "Code", model: modelLabel(codeModel()), queue: queueFor(codeModel()) });
   return { default: providerFor() === "ollama" ? "local" : "cloud", options };
 }
 
 /** What an answer is labelled with in the chat: which side served it and the model's name. */
 export function chatTag(choice?: unknown, local?: string): { llm: ChatChoice; model: string } {
+  if (isCode(choice)) return { llm: "code", model: modelLabel(local ?? codeModel()) };
   return providerFor(choice) === "ollama" ? { llm: "local", model: modelLabel(local ?? localModel()) } : { llm: "cloud", model: modelLabel(cloudModel()) };
 }
 
@@ -114,7 +124,7 @@ export function chatModel(choice?: unknown, local?: string): LanguageModel {
     // vLLM's qwen3 reasoning parser sends the thinking apart (`reasoning`), which the provider turns into reasoning
     // parts. Should a model or server not split it, the thinking comes inline as <think>…</think> in the answer:
     // the middleware lifts it out, so it shows as thinking, not as the answer (and is not sent back as history).
-    return wrapLanguageModel({ model: ollama(local ?? localModel()), middleware: extractReasoningMiddleware({ tagName: "think" }) });
+    return wrapLanguageModel({ model: ollama(local ?? (isCode(choice) ? codeModel() : localModel())), middleware: extractReasoningMiddleware({ tagName: "think" }) });
   }
   return openrouter(cloudModel());
 }
