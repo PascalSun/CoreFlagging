@@ -9,6 +9,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { ExternalLink, Loader2, Maximize2, Minimize2, Minus, Plus } from "lucide-react";
 import { PLATFORM_URL } from "@ntlp/geodata-web/fetch";
+import { authToken } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 
 export type ReportPdfProps = { url: string; title: string; page?: number; subtitle?: string };
@@ -20,9 +21,12 @@ const AHEAD = 600;   // px outside the viewport that still get drawn
 
 export function ReportPdf({ url, title, page: openAt, subtitle }: ReportPdfProps) {
   const src = url.startsWith("http") ? url : `${PLATFORM_URL}${url}`;
+  const paper = src.includes("corpus=geolit");
   const [doc, setDoc] = useState<PdfDoc | null>(null);
   const [dims, setDims] = useState<{ w: number; h: number }[]>([]);
   const [error, setError] = useState<string | null>(null);
+  /** where to read a paper the platform does not pass on (no open licence, #835): its DOI */
+  const [elsewhere, setElsewhere] = useState<string | null>(null);
   const [zoom, setZoom] = useState(1);
   const [fit, setFit] = useState(0);
   const [current, setCurrent] = useState(openAt ?? 1);
@@ -38,12 +42,15 @@ export function ReportPdf({ url, title, page: openAt, subtitle }: ReportPdfProps
   useEffect(() => {
     let dead = false;
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setDoc(null); setDims([]); setError(null); drawn.current.clear(); jumped.current = false;
+    setDoc(null); setDims([]); setError(null); setElsewhere(null); drawn.current.clear(); jumped.current = false;
     (async () => {
       try {
         const pdfjs = await import("pdfjs-dist");
         pdfjs.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
-        const d = (await pdfjs.getDocument({ url: src, withCredentials: false }).promise) as unknown as PdfDoc;
+        // a paper with no open licence opens for staff only (#835): asked for as the person signed in
+        const tok = paper ? authToken() : null;
+        const d = (await pdfjs.getDocument({ url: src, withCredentials: false,
+          ...(tok ? { httpHeaders: { Authorization: `Bearer ${tok}` } } : {}) }).promise) as unknown as PdfDoc;
         if (dead) return;
         const first = (await d.getPage(1)).getViewport({ scale: 1 });
         if (dead) return;
@@ -54,7 +61,20 @@ export function ReportPdf({ url, title, page: openAt, subtitle }: ReportPdfProps
           if (dead) return;
           setDims((prev) => { if (prev[n - 1]?.w === v.width && prev[n - 1]?.h === v.height) return prev; const next = [...prev]; next[n - 1] = { w: v.width, h: v.height }; return next; });
         }
-      } catch (e) { if (!dead) setError(e instanceof Error ? e.message : String(e)); }
+      } catch (e) {
+        if (dead) return;
+        // pdf.js only says "Unexpected server response (451)": ask once more for the platform's reason
+        if (paper) {
+          const tok = authToken();
+          const r = await fetch(src, { headers: { Range: "bytes=0-0", ...(tok ? { Authorization: `Bearer ${tok}` } : {}) } }).catch(() => null);
+          if (r?.status === 451) {
+            const body = await r.json().catch(() => ({})) as { detail?: string; link?: string };
+            if (!dead) { setError(body.detail ?? "this copy is not served"); setElsewhere(body.link || ""); }
+            return;
+          }
+        }
+        if (!dead) setError(e instanceof Error ? e.message : String(e));
+      }
     })();
     return () => { dead = true; };
   }, [src]);
@@ -134,7 +154,13 @@ export function ReportPdf({ url, title, page: openAt, subtitle }: ReportPdfProps
       {/* `relative`: page hosts are placed by offsetTop, which must be measured against this scroll box and not the
           chat panel around it (measured against the panel, every page looked far below the viewport and none was drawn). */}
       <div ref={scrollRef} className="relative min-h-0 flex-1 overflow-auto bg-slate-200/70 p-2.5">
-        {error ? <p className="p-3 text-xs text-red-800">The report could not be opened: {error}</p>
+        {error && elsewhere !== null ? (
+          <div className="p-3 text-xs text-slate-700">
+            <p>{error}</p>
+            {elsewhere && <a href={elsewhere} target="_blank" rel="noopener noreferrer"
+              className="mt-2 inline-flex h-7 items-center rounded-full bg-white px-3 font-medium text-slate-800 ring-1 ring-slate-300 hover:ring-slate-500">Read it at the publisher</a>}
+          </div>)
+        : error ? <p className="p-3 text-xs text-red-800">The report could not be opened: {error}</p>
         : !doc ? <p className="flex items-center gap-2 p-3 text-xs text-slate-600"><Loader2 size={13} className="animate-spin" />Opening the report…</p>
         : dims.map((d, i) => (
           <div key={i} ref={(el) => { if (el) hosts.current.set(i + 1, el); else hosts.current.delete(i + 1); }} className="mx-auto mb-2.5 bg-white shadow-sm" style={{ width: d.w * scale, height: d.h * scale }}>
