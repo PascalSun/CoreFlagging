@@ -10,6 +10,7 @@ import { createPortal } from "react-dom";
 import { BookOpen, ExternalLink, Loader2, Maximize2, Minimize2, Minus, Plus } from "lucide-react";
 import { PLATFORM_URL } from "@ntlp/geodata-web/fetch";
 import { authToken } from "@/lib/auth";
+import { DocLicenceTag } from "@/components/coretrace/DocLicence";
 import { cn } from "@/lib/utils";
 
 export type ReportPdfProps = { url: string; title: string; page?: number; subtitle?: string };
@@ -19,9 +20,21 @@ type PdfPage = { getViewport: (o: { scale: number }) => { width: number; height:
 
 const AHEAD = 600;   // px outside the viewport that still get drawn
 
+/** Which document a platform PDF address is: /geo/api/doc/file/?corpus=&key= or /geo/api/wamex/report/<A-number>/<file>. */
+function docOf(src: string): { corpus: string; key: string } | null {
+  try {
+    const u = new URL(src, "https://x");
+    const w = u.pathname.match(/\/geo\/api\/wamex\/report\/([^/]+)\//);
+    if (w) return { corpus: "wamex", key: decodeURIComponent(w[1]) };
+    const corpus = u.searchParams.get("corpus"), key = u.searchParams.get("key");
+    return corpus && key ? { corpus, key } : null;
+  } catch { return null; }
+}
+
 export function ReportPdf({ url, title, page: openAt, subtitle }: ReportPdfProps) {
   const src = url.startsWith("http") ? url : `${PLATFORM_URL}${url}`;
   const paper = src.includes("corpus=geolit");
+  const docRef = docOf(src);
   const [doc, setDoc] = useState<PdfDoc | null>(null);
   const [dims, setDims] = useState<{ w: number; h: number }[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -144,7 +157,9 @@ export function ReportPdf({ url, title, page: openAt, subtitle }: ReportPdfProps
   const frame = (
     <div className={cn("flex flex-col overflow-hidden rounded-xl border border-slate-200 bg-white", full ? "fixed inset-3 z-[71] shadow-2xl sm:inset-6" : "h-[460px] w-full")}>
       <div className="flex items-center gap-2 border-b border-slate-100 bg-slate-50/80 px-2.5 py-1.5 text-xs">
-        <div className="min-w-0 flex-1"><div className="truncate font-semibold text-slate-900">{title}</div>{subtitle && <div className="truncate text-[11px] text-slate-500">{subtitle}</div>}</div>
+        <div className="min-w-0 flex-1"><div className="truncate font-semibold text-slate-900">{title}</div>{subtitle && <div className="truncate text-[11px] text-slate-500">{subtitle}</div>}
+          {/* the document's licence, linked to its collection in the data library (Groundwork #835) */}
+          {docRef && <DocLicenceTag corpus={docRef.corpus} docKey={docRef.key} className="mt-0.5" />}</div>
         {n > 0 && <span className="font-mono text-[11px] text-slate-500"><input type="number" min={1} max={n} value={current} onChange={(e) => go(Number(e.target.value))} className="w-10 rounded border border-slate-200 px-1 text-right" aria-label="Page" /> / {n}</span>}
         <button type="button" onClick={() => setZoom((z) => Math.max(0.4, z / 1.25))} aria-label="Zoom out" className="grid size-6 place-items-center rounded hover:bg-white"><Minus size={13} /></button>
         <button type="button" onClick={() => setZoom((z) => Math.min(4, z * 1.25))} aria-label="Zoom in" className="grid size-6 place-items-center rounded hover:bg-white"><Plus size={13} /></button>
