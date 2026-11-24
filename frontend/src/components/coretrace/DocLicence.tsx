@@ -8,6 +8,9 @@ const PLATFORM = (process.env.NEXT_PUBLIC_PLATFORM_URL ?? "https://platform.nlp-
 /** Where the data library is: this site, or the hub when the label is shown by another app. */
 const LIBRARY = (process.env.NEXT_PUBLIC_DATA_LIBRARY_URL ?? "https://geo.nlp-tlp.org").replace(/\/$/, "");
 
+/** Where a licence shown wrongly is reported (Groundwork #835). */
+const CORRECTIONS = "pascal.sun@research.uwa.edu.au";
+
 export type DocLicence = { name: string; commercial: boolean; status: string; source: string; url: string };
 
 const cache = new Map<string, Promise<DocLicence | null>>();
@@ -40,10 +43,18 @@ export function DocLicenceTag({ corpus, docKey, className = "" }: { corpus?: str
   if (!lic?.name) return null;
   const tone = lic.commercial ? "bg-emerald-50 text-emerald-800 ring-emerald-200" : "bg-amber-50 text-amber-800 ring-amber-200";
   const why = `${lic.name}${lic.source ? ` · ${lic.source}` : ""}${WORDS[lic.status] ? ` (${WORDS[lic.status]})` : ""}${lic.commercial ? "" : ". Not for commercial use."}`;
+  const subject = `Licence shown wrongly: ${corpus}${docKey ? ` ${docKey}` : ""}`;
+  const body = `The platform shows "${lic.name}" for ${corpus}${docKey ? ` ${docKey}` : ""}.\n\nWhat it should be, and where you read its terms:\n`;
   return (
-    <a href={`${LIBRARY}${lic.url}`} target="_blank" rel="noopener noreferrer" title={`${why} Open the data library for the terms.`}
-      className={`inline-flex max-w-[16rem] items-center truncate rounded-full px-2 py-px text-[10.5px] font-semibold ring-1 hover:underline ${tone} ${className}`}>
-      {lic.name}
-    </a>
+    <span className={`inline-flex min-w-0 items-center gap-1.5 ${className}`}>
+      <a href={`${LIBRARY}${lic.url}`} target="_blank" rel="noopener noreferrer" title={`${why} Open the data library for the terms.`}
+        className={`inline-flex max-w-[16rem] items-center truncate rounded-full px-2 py-px text-[10.5px] font-semibold ring-1 hover:underline ${tone}`}>
+        {lic.name}
+      </a>
+      {/* a licence we show wrongly is ours to fix: one click to say so, with the document already named */}
+      <a href={`mailto:${CORRECTIONS}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`}
+        title={`Tell us at ${CORRECTIONS} and we will correct it`}
+        className="shrink-0 text-[10.5px] text-slate-400 underline-offset-2 hover:text-slate-600 hover:underline">Wrong licence?</a>
+    </span>
   );
 }
