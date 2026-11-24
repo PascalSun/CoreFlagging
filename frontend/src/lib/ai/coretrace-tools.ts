@@ -8,6 +8,7 @@ import { tool } from "ai";
 import { z } from "zod";
 
 import { modelView } from "@/lib/ai/model-view";
+import { LICENCE_RULE } from "@/lib/ai/licences";
 
 const PLATFORM = (process.env.PLATFORM_API_URL ?? process.env.NEXT_PUBLIC_PLATFORM_URL ?? "http://localhost:8001").replace(/\/$/, "");
 const err = (e: unknown) => ({ error: e instanceof Error ? e.message : String(e) });
@@ -270,6 +271,7 @@ What the data is:
 - The auto log cuts the hole where the model's reading changes; descriptions are written by rule and no geologist has reviewed them.
 
 How to answer:
+- ${LICENCE_RULE}
 - Use the tools for every fact about a hole; never invent depths, minerals or scores. Name the hole and the depths you mean.
 - Say plainly what a number means and how far to trust it: unusual is not mineralised; a hole used in training (split train/val) flatters the models.
 - The models were trained on WA core only. For a hole from another State say that its results are read outside the training area and deserve more caution; "similar core" searches WA core only. Offshore wells are petroleum wells in Commonwealth waters.
