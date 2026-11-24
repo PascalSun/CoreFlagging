@@ -7,8 +7,9 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { ExternalLink, Loader2, Maximize2, Minimize2, Minus, Plus } from "lucide-react";
+import { BookOpen, ExternalLink, Loader2, Maximize2, Minimize2, Minus, Plus } from "lucide-react";
 import { PLATFORM_URL } from "@ntlp/geodata-web/fetch";
+import { authToken } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 
 export type ReportPdfProps = { url: string; title: string; page?: number; subtitle?: string };
@@ -20,9 +21,12 @@ const AHEAD = 600;   // px outside the viewport that still get drawn
 
 export function ReportPdf({ url, title, page: openAt, subtitle }: ReportPdfProps) {
   const src = url.startsWith("http") ? url : `${PLATFORM_URL}${url}`;
+  const paper = src.includes("corpus=geolit");
   const [doc, setDoc] = useState<PdfDoc | null>(null);
   const [dims, setDims] = useState<{ w: number; h: number }[]>([]);
   const [error, setError] = useState<string | null>(null);
+  /** where to read a paper the platform does not pass on (no open licence, #835): its DOI */
+  const [elsewhere, setElsewhere] = useState<string | null>(null);
   const [zoom, setZoom] = useState(1);
   const [fit, setFit] = useState(0);
   const [current, setCurrent] = useState(openAt ?? 1);
@@ -38,12 +42,15 @@ export function ReportPdf({ url, title, page: openAt, subtitle }: ReportPdfProps
   useEffect(() => {
     let dead = false;
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setDoc(null); setDims([]); setError(null); drawn.current.clear(); jumped.current = false;
+    setDoc(null); setDims([]); setError(null); setElsewhere(null); drawn.current.clear(); jumped.current = false;
     (async () => {
       try {
         const pdfjs = await import("pdfjs-dist");
         pdfjs.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
-        const d = (await pdfjs.getDocument({ url: src, withCredentials: false }).promise) as unknown as PdfDoc;
+        // a paper with no open licence opens for staff only (#835): asked for as the person signed in
+        const tok = paper ? authToken() : null;
+        const d = (await pdfjs.getDocument({ url: src, withCredentials: false,
+          ...(tok ? { httpHeaders: { Authorization: `Bearer ${tok}` } } : {}) }).promise) as unknown as PdfDoc;
         if (dead) return;
         const first = (await d.getPage(1)).getViewport({ scale: 1 });
         if (dead) return;
@@ -54,7 +61,20 @@ export function ReportPdf({ url, title, page: openAt, subtitle }: ReportPdfProps
           if (dead) return;
           setDims((prev) => { if (prev[n - 1]?.w === v.width && prev[n - 1]?.h === v.height) return prev; const next = [...prev]; next[n - 1] = { w: v.width, h: v.height }; return next; });
         }
-      } catch (e) { if (!dead) setError(e instanceof Error ? e.message : String(e)); }
+      } catch (e) {
+        if (dead) return;
+        // pdf.js only says "Unexpected server response (451)": ask once more for the platform's reason
+        if (paper) {
+          const tok = authToken();
+          const r = await fetch(src, { headers: { Range: "bytes=0-0", ...(tok ? { Authorization: `Bearer ${tok}` } : {}) } }).catch(() => null);
+          if (r?.status === 451) {
+            const body = await r.json().catch(() => ({})) as { detail?: string; link?: string };
+            if (!dead) { setError(body.detail ?? "this copy is not served"); setElsewhere(body.link || ""); }
+            return;
+          }
+        }
+        if (!dead) setError(e instanceof Error ? e.message : String(e));
+      }
     })();
     return () => { dead = true; };
   }, [src]);
@@ -134,7 +154,8 @@ export function ReportPdf({ url, title, page: openAt, subtitle }: ReportPdfProps
       {/* `relative`: page hosts are placed by offsetTop, which must be measured against this scroll box and not the
           chat panel around it (measured against the panel, every page looked far below the viewport and none was drawn). */}
       <div ref={scrollRef} className="relative min-h-0 flex-1 overflow-auto bg-slate-200/70 p-2.5">
-        {error ? <p className="p-3 text-xs text-red-800">The report could not be opened: {error}</p>
+        {error && elsewhere !== null ? <PaperNotLent tdm={error.includes("text and data mining")} link={elsewhere || null} />
+        : error ? <p className="p-3 text-xs text-red-800">The report could not be opened: {error}</p>
         : !doc ? <p className="flex items-center gap-2 p-3 text-xs text-slate-600"><Loader2 size={13} className="animate-spin" />Opening the report…</p>
         : dims.map((d, i) => (
           <div key={i} ref={(el) => { if (el) hosts.current.set(i + 1, el); else hosts.current.delete(i + 1); }} className="mx-auto mb-2.5 bg-white shadow-sm" style={{ width: d.w * scale, height: d.h * scale }}>
@@ -146,4 +167,30 @@ export function ReportPdf({ url, title, page: openAt, subtitle }: ReportPdfProps
   // the panel, it could not cover the screen
   if (!full) return frame;
   return createPortal(<><div className="fixed inset-0 z-[70] bg-black/40" onClick={() => toggle(false)} />{frame}</>, document.body);
+}
+
+
+/** A paper the platform reads but does not pass on (Groundwork #835): why, and where to read it instead. */
+function PaperNotLent({ tdm, link }: { tdm: boolean; link: string | null }) {
+  const doi = link?.replace(/^https?:\/\/doi\.org\//, "");
+  return (
+    <div className="mx-auto mt-6 max-w-xs rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
+      <div className="flex items-center gap-2.5">
+        <span className="grid size-8 shrink-0 place-items-center rounded-full bg-amber-50 text-amber-700"><BookOpen size={15} /></span>
+        <p className="text-[13px] font-semibold text-slate-900">{tdm ? "Licensed for text mining only" : "Read this paper at its publisher"}</p>
+      </div>
+      <p className="mt-2.5 text-xs leading-relaxed text-slate-600">
+        {tdm
+          ? "Our copy came under a text-and-data-mining licence, so it can be searched and quoted but not shown."
+          : "It is free to read on the publisher's site, but it has no open licence, so we don't share our copy. Its text is still searched and quoted."}
+      </p>
+      {link && (
+        <a href={link} target="_blank" rel="noopener noreferrer"
+          className="mt-3 inline-flex h-8 items-center gap-1.5 rounded-full bg-slate-900 px-3.5 text-xs font-semibold text-white hover:bg-slate-700">
+          Open at the publisher <ExternalLink size={12} />
+        </a>
+      )}
+      {doi && <p className="mt-2 truncate text-[10.5px] text-slate-400">DOI {doi}</p>}
+    </div>
+  );
 }
