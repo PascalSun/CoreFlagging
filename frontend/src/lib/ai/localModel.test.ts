@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { busy, pickLocalModel } from "./localModel";
+import { busy, isDown, pickLocalModel } from "./localModel";
 
 const Q = (o: object) => ({ available: true, running: 10, parallel: 48, waiting: 0, eta_s: { interactive: 0, batch: 0 }, ...o });
 const answer = (by: Record<string, object | number>) =>
@@ -52,5 +52,16 @@ describe("local model", () => {
   test("a slow gateway times out to the main model", async () => {
     const slow = ((_: string, init?: RequestInit) => new Promise((_r, rej) => init?.signal?.addEventListener("abort", () => rej(new Error("timeout"))))) as unknown as typeof fetch;
     expect(await pickLocalModel({ primary: "big", fallback: "small", queueUrl, fetcher: slow, timeoutMs: 20 })).toEqual({ model: "big", fellBack: false });
+  });
+});
+
+describe("isDown", () => {
+  test("only the gateway saying no backend is up counts", async () => {
+    const f = answer({ big: Q({ available: false }), small: Q({}), err: 500 });
+    expect(await isDown(queueUrl("big"), f)).toBe(true);
+    expect(await isDown(queueUrl("small"), f)).toBe(false);
+    expect(await isDown(queueUrl("err"), f)).toBe(false);          // an error page: no news
+    expect(await isDown(queueUrl("gone"), f)).toBe(false);         // no answer: no news
+    expect(await isDown(undefined, f)).toBe(false);                // not behind a gateway
   });
 });
