@@ -40,3 +40,10 @@ export async function pickLocalModel(o: {
   if (fq !== null && busy(fq, maxWaitS)) return { model: primary, fellBack: false };   // both busy: the better one
   return { model: fallback, fellBack: true };
 }
+
+/** The gateway says nothing serves this model now (no backend that has it is up). A model not behind a gateway, or a
+ *  gateway that does not answer, is not taken for down: no news is no reason to hide it. */
+export async function isDown(url: string | undefined, fetcher: typeof fetch = fetch, timeoutMs = 1500): Promise<boolean> {
+  if (!url) return false;
+  return (await queueOf(url, fetcher, timeoutMs))?.available === false;
+}

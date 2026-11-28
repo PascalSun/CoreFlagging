@@ -1,7 +1,7 @@
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { extractReasoningMiddleware, wrapLanguageModel, type LanguageModel } from "ai";
-import { pickLocalModel } from "./localModel";
+import { isDown, pickLocalModel } from "./localModel";
 
 // The assistant's model. OpenRouter by default: Gemini Flash (thinking) — thinking is on by
 // default for these models, so no special config is needed; `sendReasoning: true` on the
@@ -97,6 +97,22 @@ export function chatChoices(): { default: ChatChoice; options: Choice[] } {
     ...(fallbackModel() && fallbackModel() !== localModel() ? { fallback: modelLabel(fallbackModel()) } : {}) });
   if (ollamaReady() && codeModel()) options.push({ id: "code", label: "Code", model: modelLabel(codeModel()), queue: queueFor(codeModel()) });
   return { default: providerFor() === "ollama" ? "local" : "cloud", options };
+}
+
+/** chatChoices without our models that nothing serves right now, as the gateway says: the coding model while its GPU
+ *  is off, the local one when neither it nor its fallback is up. A gateway that does not answer leaves them in. When
+ *  the default is left out, cloud is the default. */
+export async function chatChoicesNow(fetcher: typeof fetch = fetch): Promise<ReturnType<typeof chatChoices>> {
+  const c = chatChoices();
+  const has = (id: ChatChoice) => c.options.some((o) => o.id === id);
+  const fb = fallbackModel() && fallbackModel() !== localModel() ? fallbackModel() : "";
+  const [localDown, fbDown, codeDown] = await Promise.all([
+    has("local") && isDown(localQueue(), fetcher),
+    has("local") && (fb ? isDown(queueFor(fb), fetcher) : true),
+    has("code") && isDown(queueFor(codeModel()), fetcher),
+  ]);
+  const gone = new Set<ChatChoice>([...(localDown && fbDown ? ["local" as const] : []), ...(codeDown ? ["code" as const] : [])]);
+  return { default: gone.has(c.default) ? "cloud" : c.default, options: c.options.filter((o) => !gone.has(o.id)) };
 }
 
 /** What an answer is labelled with in the chat: which side served it and the model's name. */
